@@ -1,2 +1,2 @@
 # libmaid
-Cryptography Library
+A Cryptography Library for Maids
