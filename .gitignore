@@ -2,5 +2,8 @@
 build
 
 # Personal files
+backup
 TODO
 token
+test*.c
+a.exe

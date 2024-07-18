@@ -43,7 +43,7 @@ FOLDERS = build build/crypto
 $(FOLDERS):
 	mkdir -p $@
 
-OBJS = utils.o crypto/aes.o crypto/chacha.o 
+OBJS = utils.o crypto/aes.o crypto/chacha.o crypto/poly1305.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -c $< -o $@

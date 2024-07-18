@@ -22,4 +22,24 @@
 
 void maid_memset(void *dest, const u8 c, const size_t length);
 
+#ifndef NDEBUG
+void maid_mp_debug(const char *name, u32 *x, size_t s);
+#endif
+
+void maid_mp_add(u32 *out, const u32 *a, const u32 *b,
+                 const size_t so, const size_t sa, const size_t sb);
+void maid_mp_sub(u32 *out, const u32 *a, const u32 *b,
+                 const size_t so, const size_t sa, const size_t sb);
+void maid_mp_mul(u32 *restrict out, const u32 *restrict a,
+                 const u32 *restrict b, const size_t so,
+                 const size_t sa, const size_t sb);
+void maid_mp_shr(u32 *restrict out, const u32 *restrict a,
+                 const size_t n, const size_t so, const size_t sa);
+
+struct maid_cb_read
+{
+    size_t (*f)(void *, u8 *, size_t);
+    void *ctx;
+};
+
 #endif
