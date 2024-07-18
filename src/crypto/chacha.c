@@ -66,7 +66,7 @@ maid_chacha_del(struct maid_chacha *ch)
 {
     if (ch)
     {
-        maid_memset(ch->key, '\0', ch->ks);
+        maid_mem_clear(ch->key, ch->ks);
         free(ch->key);
     }
     free(ch);
@@ -154,7 +154,7 @@ maid_chacha_keystream(struct maid_chacha *ch,
         for (u8 i = 0; i < 64; i++)
             out[i] += ((u8*)tmp)[i];
 
-        maid_memset(tmp, '\0', sizeof(tmp));
+        maid_mem_clear(tmp, sizeof(tmp));
     }
 
     return (ch);

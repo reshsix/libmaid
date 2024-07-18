@@ -15,7 +15,7 @@
 #  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 #
 
-CFLAGS += -Iinclude -Wall -Wextra
+CFLAGS += --std=c99 -Iinclude -Wall -Wextra
 
 .PHONY: all debug clean install uninstall
 

@@ -20,7 +20,7 @@
 
 #include <maid/types.h>
 
-void maid_memset(void *dest, const u8 c, const size_t length);
+void maid_mem_clear(void *dest, const size_t length);
 
 #ifndef NDEBUG
 void maid_mp_debug(const char *name, u32 *x, size_t s);
@@ -38,7 +38,7 @@ void maid_mp_shr(u32 *restrict out, const u32 *restrict a,
 
 struct maid_cb_read
 {
-    size_t (*f)(void *, u8 *, size_t);
+    size_t (*f)(void *, u8 *, const size_t);
     void *ctx;
 };
 

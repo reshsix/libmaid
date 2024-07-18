@@ -20,18 +20,18 @@
 #include <maid/types.h>
 
 extern void
-maid_memset(void *addr, const u8 c, const size_t length)
+maid_mem_clear(void *addr, const size_t length)
 {
     volatile u8 *dest = addr;
     for (size_t i = 0; i < length; i++)
-        dest[i] = c;
+        dest[i] = 0x0;
 }
 
 #ifndef NDEBUG
 #include <stdio.h>
 
 extern void
-maid_mp_debug(const char *name, u32 *x, size_t s)
+maid_mp_debug(const char *name, const u32 *x, const size_t s)
 {
     fprintf(stderr, "%s:\n", name);
     for (size_t i = 0; i < s; i++)

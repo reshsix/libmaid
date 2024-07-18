@@ -74,12 +74,12 @@ poly1305(const u8 *key, const struct maid_cb_read *data, u8 *tag)
     memcpy(tag, acc2, 16);
 
     /* Cleans intermediary values */
-    maid_memset(acc,   '\0', 40);
-    maid_memset(acc2,  '\0', 40);
-    maid_memset(acc3,  '\0', 40);
-    maid_memset(r,     '\0', 16);
-    maid_memset(s,     '\0', 16);
-    maid_memset(block, '\0', 20);
+    maid_mem_clear(acc,   40);
+    maid_mem_clear(acc2,  40);
+    maid_mem_clear(acc3,  40);
+    maid_mem_clear(r,     16);
+    maid_mem_clear(s,     16);
+    maid_mem_clear(block, 20);
 }
 
 /* External Interface */
@@ -93,7 +93,7 @@ struct poly1305_reader
 };
 
 static size_t
-poly1305_data(void *ctx, u8 *dest, size_t bytes)
+poly1305_data(void *ctx, u8 *dest, const size_t bytes)
 {
     /* Bytes is always 16 */
     (void)bytes;

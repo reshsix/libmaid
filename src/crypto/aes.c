@@ -316,7 +316,7 @@ mixcolumn_e(u8 *block)
         col[3] = gmul3[t[0]] ^       t[1]  ^       t[2]  ^ gmul2[t[3]];
     }
 
-    maid_memset(t, '\0', sizeof(t));
+    maid_mem_clear(t, sizeof(t));
 }
 
 static void
@@ -336,11 +336,11 @@ mixcolumn_d(u8 *block)
         col[3] = gmul11[t[0]] ^ gmul13[t[1]] ^  gmul9[t[2]] ^ gmul14[t[3]];
     }
     
-    maid_memset(t, '\0', sizeof(t));
+    maid_mem_clear(t, sizeof(t));
 }
 
 static void
-addroundkey(u8 *ctx, u8 *block, u8 round)
+addroundkey(const u8 *ctx, u8 *block, const u8 round)
 {
     for (u8 i = 0; i < 16; i++)
         block[i] ^= ctx[(round * 16) + i];
@@ -358,7 +358,7 @@ maid_aes_del(struct maid_aes *aes)
 {
     if (aes)
     {
-        maid_memset(aes->ctx, '\0', 16 * (aes->nr + 1));
+        maid_mem_clear(aes->ctx, 16 * (aes->nr + 1));
         free(aes->ctx);
     }
     free(aes);
@@ -443,7 +443,7 @@ maid_aes_new(const enum maid_aes_v version, const u8 *key)
                     ret->ctx[((i - ret->nk) * 4) + j] ^ tmp[j];
         }
 
-        maid_memset(tmp, '\0', sizeof(tmp));
+        maid_mem_clear(tmp, sizeof(tmp));
     }
 
     return ret;
