@@ -39,11 +39,15 @@ uninstall:
 	rm -rf "$(DESTDIR)/lib/libmaid.a"
 	rm -rf "$(DESTDIR)/lib/libmaid.so"
 
+test:
+	$(CC) $(CFLAGS) tests.c -o build/tests -Lbuild -lmaid
+	build/tests
+
 FOLDERS = build build/crypto
 $(FOLDERS):
 	mkdir -p $@
 
-OBJS = utils.o crypto/aes.o crypto/chacha.o crypto/poly1305.o
+OBJS = utils.o crypto/aes.o crypto/chacha.o crypto/poly1305.o maid.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -c $< -o $@

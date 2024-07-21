@@ -46,7 +46,7 @@ doubleround(u32 *block)
     quarterround(block,  1,  5,  9, 13);
     quarterround(block,  2,  6, 10, 14);
     quarterround(block,  3,  7, 11, 15);
-    
+
     /* Diagonal round */
     quarterround(block,  0,  5, 10, 15);
     quarterround(block,  1,  6, 11, 12);
@@ -92,7 +92,7 @@ maid_chacha_new(const enum maid_chacha_v version, const u8 *key)
                 ret->ks = 32;
                 ret->ns = 8;
                 break;
-            
+
             case MAID_CHACHA20V2_128:
                 ret->ks = 16;
                 ret->ns = 12;
@@ -133,7 +133,7 @@ maid_chacha_keystream(struct maid_chacha *ch,
         {
             strcpy((char*)out, "expand 32-byte k");
             memcpy(&(out[16]), ch->key, 32);
-        } 
+        }
         else
         {
             strcpy((char*)out, "expand 16-byte k");
@@ -151,10 +151,16 @@ maid_chacha_keystream(struct maid_chacha *ch,
         for (u8 i = 0; i < 10; i++)
             doubleround(tmp);
 
-        for (u8 i = 0; i < 64; i++)
-            out[i] += ((u8*)tmp)[i];
+        /* A second copy to not rely on alignment of out */
+        u32 tmp2[64 / sizeof(u32)] = {0};
+        memcpy(tmp2, out, 64);
+
+        for (u8 i = 0; i < 64 / sizeof(u32); i++)
+            tmp2[i] += tmp[i];
+        memcpy(out, tmp2, 64);
 
         maid_mem_clear(tmp, sizeof(tmp));
+        maid_mem_clear(tmp2, sizeof(tmp2));
     }
 
     return (ch);

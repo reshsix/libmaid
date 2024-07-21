@@ -23,7 +23,7 @@
 void maid_mem_clear(void *dest, const size_t length);
 
 #ifndef NDEBUG
-void maid_mp_debug(const char *name, u32 *x, size_t s);
+void maid_mp_debug(const char *name, const u32 *x, const size_t s);
 #endif
 
 void maid_mp_add(u32 *out, const u32 *a, const u32 *b,
@@ -41,5 +41,20 @@ struct maid_cb_read
     size_t (*f)(void *, u8 *, const size_t);
     void *ctx;
 };
+
+struct maid_cb_write
+{
+    size_t (*f)(void *, u8 *, const size_t);
+    void *ctx;
+};
+
+struct maid_cb_buf
+{
+    u8 *data;
+    size_t counter, limit;
+    bool write;
+};
+
+size_t maid_cb_buffer(void *ctx, u8 *data, size_t bytes);
 
 #endif

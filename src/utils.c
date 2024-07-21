@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include <maid/types.h>
+#include <maid/utils.h>
 
 extern void
 maid_mem_clear(void *addr, const size_t length)
@@ -142,4 +143,26 @@ maid_mp_shr(u32 *restrict out, const u32 *restrict a,
             next = 0;
         }
     }
+}
+
+extern size_t
+maid_cb_buffer(void *ctx, u8 *data, size_t bytes)
+{
+    size_t ret = 0;
+
+    struct maid_cb_buf *buf = ctx;
+    if (buf->counter < buf->limit)
+    {
+        size_t limit = buf->limit - buf->counter;
+        bytes = (bytes < limit) ? bytes : limit;
+
+        if (buf->write)
+            memcpy(&(buf->data[buf->counter]), data, bytes);
+        else
+            memcpy(data, &(buf->data[buf->counter]), bytes);
+        buf->counter += bytes;
+        ret = bytes;
+    }
+
+    return ret;
 }
