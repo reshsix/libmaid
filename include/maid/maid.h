@@ -28,7 +28,8 @@ enum maid_op
 
 enum maid_cipher
 {
-    MAID_CHACHA20POLY1305
+    MAID_CHACHA20POLY1305,
+    MAID_AES_GCM
 };
 
 bool maid_crypt(enum maid_op op, enum maid_cipher cph,

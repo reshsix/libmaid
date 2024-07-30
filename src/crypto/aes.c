@@ -358,7 +358,8 @@ maid_aes_del(struct maid_aes *aes)
 {
     if (aes)
     {
-        maid_mem_clear(aes->ctx, 16 * (aes->nr + 1));
+        if (aes->ctx)
+            maid_mem_clear(aes->ctx, 16 * (aes->nr + 1));
         free(aes->ctx);
     }
     free(aes);
@@ -408,7 +409,7 @@ maid_aes_new(const enum maid_aes_v version, const u8 *key)
 
     if (ret)
     {
-        memcpy(ret->ctx, key, ret->nk * 32);
+        memcpy(ret->ctx, key, ret->nk * 4);
 
         u8 tmp[256] = {0};
 

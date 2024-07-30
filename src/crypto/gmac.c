@@ -95,8 +95,15 @@ maid_gmac_ghash(const u8 *h, const u8 *nonce,
                 break;
             case 2:
                 last = 16;
-                memcpy(block, &ad_s, sizeof(u64));
-                memcpy(&(block[8]), &ct_s, sizeof(u64));
+                ad_s *= 8;
+                ct_s *= 8;
+
+                /* Copies as big endian */
+                for (u8 i = 0; i < 8; i++)
+                {
+                    block[7  - i] = ((u8*)&ad_s)[i];
+                    block[15 - i] = ((u8*)&ct_s)[i];
+                }
                 step++;
             default:
                 break;

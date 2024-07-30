@@ -23,6 +23,9 @@
 #include <maid/crypto/chacha.h>
 #include <maid/crypto/poly1305.h>
 
+#include <maid/crypto/aes.h>
+#include <maid/crypto/gmac.h>
+
 #include <maid/maid.h>
 
 struct c20p1305_state
@@ -98,6 +101,105 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
     return (ch);
 }
 
+struct aes_gcm_state
+{
+    bool decrypt;
+
+    u8 h[16], nonce[16];
+    const struct maid_cb_read *data;
+    const struct maid_cb_write *out;
+
+    maid_aes *aes;
+    u8 counter[16];
+};
+
+static size_t
+aes_gcm_codec(void *ctx, u8 *data, const size_t bytes)
+{
+    /* Called by gmac, bytes will always be 16 */
+    (void)bytes;
+
+    struct aes_gcm_state *st = ctx;
+    size_t read = st->data->f(st->data->ctx, data, 16);
+    if (read)
+    {
+        /* Increases counter (big endian order) */
+        volatile u8 carry = 1;
+        for (u8 i = 15; i < 16; i--)
+        {
+            volatile u16 sum = carry + st->counter[i];
+
+            st->counter[i] = sum & 0xFF;
+            carry = sum >> 8;
+
+            sum = 0;
+        }
+        carry = 0;
+
+        /* AES-CTR encryption/decryption */
+        u8 tmp[16] = {0};
+        memcpy(tmp, st->counter, sizeof(tmp));
+        maid_aes_encrypt(st->aes, tmp);
+
+        if (!(st->decrypt))
+        {
+            for (u8 i = 0; i < 16; i++)
+                data[i] ^= tmp[i];
+            st->out->f(st->out->ctx, data, 16);
+        }
+        else
+        {
+            for (u8 i = 0; i < 16; i++)
+                tmp[i] ^= data[i];
+            st->out->f(st->out->ctx, tmp, 16);
+        }
+
+        maid_mem_clear(tmp, sizeof(tmp));
+    }
+
+    return read;
+}
+
+static bool
+aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
+              const struct maid_cb_read  *data,
+              const struct maid_cb_read  *ad,
+              const struct maid_cb_write *out,
+              u8 *tag)
+{
+    maid_aes *aes = maid_aes_new(MAID_AES256, key);
+
+    if (aes)
+    {
+        struct aes_gcm_state st = {.decrypt = decrypt,
+                                   .data = data, .out = out, .aes = aes};
+
+        /* H is encrypted zeros */
+        maid_aes_encrypt(aes, st.h);
+
+        /* Counter is nonce || 2^31 */
+        memcpy(st.counter, nonce, 12);
+        st.counter[15] = 0x1;
+
+        /* Nonce is saved encrypted for ghash */
+        memcpy(st.nonce, nonce, 12);
+        st.nonce[15] = 0x1;
+        maid_aes_encrypt(aes, st.nonce);
+
+        /* Works both ways */
+        struct maid_cb_read ct = {.f = aes_gcm_codec, .ctx = &st};
+        maid_gmac_ghash(st.h, st.nonce, &ct, ad, tag);
+
+        maid_mem_clear(st.h,       sizeof(st.h));
+        maid_mem_clear(st.counter, sizeof(st.counter));
+        maid_mem_clear(st.nonce,   sizeof(st.nonce));
+    }
+
+    maid_aes_del(aes);
+
+    return (aes);
+}
+
 extern bool
 maid_crypt(enum maid_op op, enum maid_cipher cph,
            const u8 *key, const u8 *nonce,
@@ -116,6 +218,10 @@ maid_crypt(enum maid_op op, enum maid_cipher cph,
             case MAID_CHACHA20POLY1305:
                 ret = c20p1305_crypt(op == MAID_DECRYPT,
                                      key, nonce, data, ad, out, tag);
+                break;
+            case MAID_AES_GCM:
+                ret = aes_gcm_crypt(op == MAID_DECRYPT,
+                                    key, nonce, data, ad, out, tag);
                 break;
         }
     }

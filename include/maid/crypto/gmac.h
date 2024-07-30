@@ -21,8 +21,8 @@
 #include <maid/utils.h>
 #include <maid/types.h>
 
-void maid_gmac_mac(const u8 *h, const u8 *nonce,
-                   const struct maid_cb_read *ct,
-                   const struct maid_cb_read *ad, u8 *tag);
+void maid_gmac_ghash(const u8 *h, const u8 *nonce,
+                     const struct maid_cb_read *ct,
+                     const struct maid_cb_read *ad, u8 *tag);
 
 #endif
