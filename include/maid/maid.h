@@ -64,4 +64,23 @@ struct maid_stream
 
 size_t maid_stream_xor(void *ctx, u8 *buffer, size_t size);
 
+struct maid_block
+{
+    const struct maid_cb_read *read;
+
+    void *context;
+    void (*encrypt)(void *, u8 *);
+    void (*decrypt)(void *, u8 *);
+
+    const u8 *nonce;
+    u32 counter;
+
+    u8 *buffer;
+    size_t buffer_c;
+    size_t buffer_s;
+    bool initialized;
+};
+
+size_t maid_block_ctr(void *ctx, u8 *buffer, size_t size);
+
 #endif

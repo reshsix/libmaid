@@ -450,11 +450,12 @@ maid_aes_new(const enum maid_aes_v version, const u8 *key)
     return ret;
 }
 
-extern bool
-maid_aes_encrypt(struct maid_aes *aes, u8 *block)
+extern void
+maid_aes_encrypt(void *ctx, u8 *block)
 {
-    if (aes)
+    if (ctx && block)
     {
+        struct maid_aes *aes = ctx;
         addroundkey(aes->ctx, block, 0);
 
         for (u8 i = 1; i < aes->nr; i++)
@@ -469,15 +470,14 @@ maid_aes_encrypt(struct maid_aes *aes, u8 *block)
 
         addroundkey(aes->ctx, block, aes->nr);
     }
-
-    return (aes);
 }
 
-extern bool
-maid_aes_decrypt(struct maid_aes *aes, u8 *block)
+extern void
+maid_aes_decrypt(void *ctx, u8 *block)
 {
-    if (aes)
+    if (ctx && block)
     {
+        struct maid_aes *aes = ctx;
         addroundkey(aes->ctx, block, aes->nr);
 
         for (u8 i = 1; i < aes->nr; i++)
@@ -492,6 +492,4 @@ maid_aes_decrypt(struct maid_aes *aes, u8 *block)
 
         addroundkey(aes->ctx, block, 0);
     }
-
-    return (aes);
 }

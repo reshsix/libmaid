@@ -85,65 +85,6 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
     return (ch);
 }
 
-struct aes_gcm_state
-{
-    bool decrypt;
-
-    u8 h[16], nonce[16];
-    const struct maid_cb_read *data;
-    const struct maid_cb_write *out;
-
-    maid_aes *aes;
-    u8 counter[16];
-};
-
-static size_t
-aes_gcm_codec(void *ctx, u8 *data, const size_t bytes)
-{
-    /* Called by gmac, bytes will always be 16 */
-    (void)bytes;
-
-    struct aes_gcm_state *st = ctx;
-    size_t read = st->data->f(st->data->ctx, data, 16);
-    if (read)
-    {
-        /* Increases counter (big endian order) */
-        volatile u8 carry = 1;
-        for (u8 i = 15; i < 16; i--)
-        {
-            volatile u16 sum = carry + st->counter[i];
-
-            st->counter[i] = sum & 0xFF;
-            carry = sum >> 8;
-
-            sum = 0;
-        }
-        carry = 0;
-
-        /* AES-CTR encryption/decryption */
-        u8 tmp[16] = {0};
-        memcpy(tmp, st->counter, sizeof(tmp));
-        maid_aes_encrypt(st->aes, tmp);
-
-        if (!(st->decrypt))
-        {
-            for (u8 i = 0; i < 16; i++)
-                data[i] ^= tmp[i];
-            st->out->f(st->out->ctx, data, 16);
-        }
-        else
-        {
-            for (u8 i = 0; i < 16; i++)
-                tmp[i] ^= data[i];
-            st->out->f(st->out->ctx, tmp, 16);
-        }
-
-        maid_mem_clear(tmp, sizeof(tmp));
-    }
-
-    return read;
-}
-
 static bool
 aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
               const struct maid_cb_read  *data,
@@ -155,28 +96,53 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
     if (aes)
     {
-        struct aes_gcm_state st = {.decrypt = decrypt,
-                                   .data = data, .out = out, .aes = aes};
+        /* Saves data in case of decryption */
+        u8 cache[16] = {0};
+        struct maid_cb_save sv = {.read = data,
+                                  .buffer = cache, .buffer_s = 16};
+        struct maid_cb_read rs = {.f = maid_cb_saver, .ctx = &sv};
+        if (decrypt)
+            data = &rs;
+
+        /* AES encryption/decryption */
+        u8 tmp[16] = {0};
+        struct maid_block bt = {.read = data, .context = aes,
+                                .encrypt = maid_aes_encrypt,
+                                .decrypt = maid_aes_decrypt,
+                                .nonce = nonce, .counter = 2,
+                                .buffer = tmp, .buffer_s = sizeof(tmp)};
+        struct maid_cb_read ct = {.f = maid_block_ctr, .ctx = &bt};
+
+        /* Outputs encrypt/decrypt data */
+        struct maid_cb_split sp = {.read = &ct, .write = out};
+        struct maid_cb_read ct2 = {.f = maid_cb_splitter, .ctx = &sp};
+        struct maid_cb_read *last = &ct2;
+
+        /* Loads cached data in case of decryption */
+        struct maid_cb_load ld = {.read = &ct2, .saved = &sv};
+        struct maid_cb_read rl = {.f = maid_cb_loader, .ctx = &ld};
+        if (decrypt)
+            last = &rl;
 
         /* H is encrypted zeros */
-        maid_aes_encrypt(aes, st.h);
+        u8 h[16] = {0};
+        maid_aes_encrypt(aes, h);
 
-        /* Counter is nonce || 2^31 */
-        memcpy(st.counter, nonce, 12);
-        st.counter[15] = 0x1;
+        /* Nonce is encrypted for ghash */
+        u8 nonce2[16] = {0};
+        memcpy(nonce2, nonce, 12);
+        nonce2[15] = 0x1;
+        maid_aes_encrypt(aes, nonce2);
 
-        /* Nonce is saved encrypted for ghash */
-        memcpy(st.nonce, nonce, 12);
-        st.nonce[15] = 0x1;
-        maid_aes_encrypt(aes, st.nonce);
+        /* Endpoint function: swallows everything */
+        maid_gmac_ghash(h, nonce2, last, ad, tag);
 
-        /* Works both ways */
-        struct maid_cb_read ct = {.f = aes_gcm_codec, .ctx = &st};
-        maid_gmac_ghash(st.h, st.nonce, &ct, ad, tag);
-
-        maid_mem_clear(st.h,       sizeof(st.h));
-        maid_mem_clear(st.counter, sizeof(st.counter));
-        maid_mem_clear(st.nonce,   sizeof(st.nonce));
+        /* Cleanup */
+        if (decrypt)
+            maid_mem_clear(cache, sizeof(cache));
+        maid_mem_clear(tmp,    sizeof(tmp));
+        maid_mem_clear(h,      sizeof(h));
+        maid_mem_clear(nonce2, sizeof(nonce2));
     }
 
     maid_aes_del(aes);

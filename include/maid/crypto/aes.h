@@ -29,7 +29,7 @@ enum maid_aes_v
 
 maid_aes *maid_aes_new(const enum maid_aes_v version, const u8 *key);
 maid_aes *maid_aes_del(maid_aes *aes);
-bool maid_aes_encrypt(maid_aes *aes, u8 *block);
-bool maid_aes_decrypt(maid_aes *aes, u8 *block);
+void maid_aes_encrypt(void *ctx, u8 *block);
+void maid_aes_decrypt(void *ctx, u8 *block);
 
 #endif
