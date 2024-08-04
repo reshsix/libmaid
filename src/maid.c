@@ -28,52 +28,6 @@
 
 #include <maid/maid.h>
 
-struct c20p1305_state
-{
-    bool decrypt;
-
-    const u8 *nonce;
-    const struct maid_cb_read *data;
-    const struct maid_cb_write *out;
-
-    maid_chacha *ch;
-    u8 keystream[64], step;
-    u32 counter;
-};
-
-static size_t
-c20p1305_codec(void *ctx, u8 *data, const size_t bytes)
-{
-    /* Called by poly1305_data, bytes will always be 16 */
-    (void)bytes;
-
-    struct c20p1305_state *st = ctx;
-    size_t read = st->data->f(st->data->ctx, data, 16);
-    if (read)
-    {
-        if (st->step == 0)
-        {
-            st->counter++;
-            maid_chacha_keystream(st->ch, st->nonce, (u8*)&(st->counter),
-                                  st->keystream);
-        }
-
-        u8 *keypart = &(st->keystream[st->step * 16]);
-        for (u8 i = 0; i < read; i++)
-            data[i] ^= keypart[i];
-
-        st->out->f(st->out->ctx, data, 16);
-        st->step = (st->step + 1) % 4;
-
-        /* Simpler than temporary memory */
-        if (st->decrypt)
-            for (u8 i = 0; i < read; i++)
-                data[i] ^= keypart[i];
-    }
-
-    return read;
-}
-
 static bool
 c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
                const struct maid_cb_read  *data,
@@ -85,15 +39,45 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
     if (ch)
     {
-        struct c20p1305_state st = {.decrypt = decrypt, .nonce = nonce,
-                                    .data = data, .out = out, .ch = ch};
-        struct maid_cb_read ct = {.f = c20p1305_codec, .ctx = &st};
+        /* Saves data in case of decryption */
+        u8 cache[16] = {0};
+        struct maid_cb_save sv = {.read = data,
+                                  .buffer = cache, .buffer_s = 16};
+        struct maid_cb_read rs = {.f = maid_cb_saver, .ctx = &sv};
+        if (decrypt)
+            data = &rs;
 
-        maid_chacha_keystream(ch, nonce, (u8*)&(st.counter), st.keystream);
-        if (tag)
-            maid_poly1305_mac(st.keystream, &ct, ad, tag);
+        /* Chacha20 encryption/decryption */
+        u8 tmp[64] = {0};
+        struct maid_stream st = {.read = data, .context = ch,
+                                 .keystream = maid_chacha_keystream,
+                                 .nonce = nonce, .counter = 1,
+                                 .buffer = tmp, .buffer_s = sizeof(tmp)};
+        struct maid_cb_read ct = {.f = maid_stream_xor, .ctx = &st};
 
-        maid_mem_clear(st.keystream, sizeof(st.keystream));
+        /* Outputs encrypt/decrypt data */
+        struct maid_cb_split sp = {.read = &ct, .write = out};
+        struct maid_cb_read ct2 = {.f = maid_cb_splitter, .ctx = &sp};
+        struct maid_cb_read *last = &ct2;
+
+        /* Loads cached data in case of decryption */
+        struct maid_cb_load ld = {.read = &ct2, .saved = &sv};
+        struct maid_cb_read rl = {.f = maid_cb_loader, .ctx = &ld};
+        if (decrypt)
+            last = &rl;
+
+        /* Poly1305 ephemeral key */
+        u8 tmp2[64] = {0};
+        maid_chacha_keystream(ch, nonce, 0, tmp2);
+
+        /* Endpoint function: swallows everything */
+        maid_poly1305_mac(tmp2, last, ad, tag);
+
+        /* Cleanup */
+        if (decrypt)
+            maid_mem_clear(cache, sizeof(cache));
+        maid_mem_clear(tmp, sizeof(tmp));
+        maid_mem_clear(tmp2, sizeof(tmp2));
     }
 
     maid_chacha_del(ch);

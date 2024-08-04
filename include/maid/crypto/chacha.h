@@ -32,7 +32,8 @@ enum maid_chacha_v
 
 maid_chacha *maid_chacha_new(const enum maid_chacha_v version, const u8 *key);
 maid_chacha *maid_chacha_del(maid_chacha *ch);
-bool maid_chacha_keystream(maid_chacha *ch, const u8 *restrict nonce,
-                           const u8 *restrict counter, u8 *restrict out);
+
+void maid_chacha_keystream(void *ctx, const u8 *restrict nonce,
+                           const u64 counter, u8 *restrict out);
 
 #endif

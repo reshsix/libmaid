@@ -121,14 +121,16 @@ maid_chacha_new(const enum maid_chacha_v version, const u8 *key)
     return ret;
 }
 
-extern bool
-maid_chacha_keystream(struct maid_chacha *ch,
+extern void
+maid_chacha_keystream(void *ctx,
                       const u8 *restrict nonce,
-                      const u8 *restrict counter,
+                      const u64 counter,
                       u8 *restrict out)
 {
-    if (ch)
+    if (ctx && nonce && out)
     {
+        struct maid_chacha *ch = ctx;
+
         if (ch->ks == 32)
         {
             strcpy((char*)out, "expand 32-byte k");
@@ -142,8 +144,8 @@ maid_chacha_keystream(struct maid_chacha *ch,
         }
 
         u8 cs = (sizeof(u32) * 4) - ch->ns;
-        memcpy(&(out[48]),      counter, cs);
-        memcpy(&(out[48 + cs]), nonce,   ch->ns);
+        memcpy(&(out[48]),      &counter, cs);
+        memcpy(&(out[48 + cs]), nonce,    ch->ns);
 
         u32 tmp[64 / sizeof(u32)] = {0};
         memcpy(tmp, out, 64);
@@ -162,6 +164,4 @@ maid_chacha_keystream(struct maid_chacha *ch,
         maid_mem_clear(tmp, sizeof(tmp));
         maid_mem_clear(tmp2, sizeof(tmp2));
     }
-
-    return (ch);
 }
