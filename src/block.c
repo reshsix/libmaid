@@ -15,66 +15,132 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <stdlib.h>
 #include <string.h>
 
-#include <maid/maid.h>
+#include <maid/utils.h>
 
-extern size_t
-maid_block_ctr(void *ctx, u8 *buffer, size_t size)
+#include <maid/block.h>
+
+struct maid_block
 {
-    size_t ret = 0;
+    void *ctx, *(*del)(void *);
+    void (*encrypt)(void *, u8 *);
+    void (*decrypt)(void *, u8 *);
 
-    if (ctx && buffer && size)
+    size_t state_s;
+    u8 *iv;
+
+    /* For ctr mode */
+    u8 *buffer;
+    size_t buffer_c;
+    bool initialized;
+};
+
+extern struct maid_block *
+maid_block_del(maid_block *bl)
+{
+    if (bl)
     {
-        struct maid_block *b = ctx;
+        bl->del(bl->ctx);
 
-        ret = size;
+        if (bl->buffer)
+            maid_mem_clear(bl->buffer, bl->state_s);
+        free(bl->buffer);
+
+        if (bl->iv)
+            maid_mem_clear(bl->iv, bl->state_s);
+        free(bl->iv);
+    }
+    free(bl);
+
+    return NULL;
+}
+
+extern struct maid_block *
+maid_block_new(void * (*new)(const u8, const u8 *),
+               void * (*del)(void *),
+               void (*encrypt)(void *, u8 *),
+               void (*decrypt)(void *, u8 *),
+               const size_t state_s,
+               const u8 version, const u8 *restrict key,
+               const u8 *restrict iv)
+{
+    struct maid_block *ret = calloc(1, sizeof(struct maid_block));
+
+    if (ret)
+    {
+        ret->del = del;
+        ret->encrypt = encrypt;
+        ret->decrypt = decrypt;
+
+        ret->ctx = new(version, key);
+        ret->state_s = state_s;
+        ret->iv  = calloc(1, state_s);
+
+        ret->buffer = calloc(1, state_s);
+        if (ret->ctx && ret->iv && ret->buffer)
+            memcpy(ret->iv, iv, state_s);
+        else
+            ret = maid_block_del(ret);
+    }
+
+    return ret;
+}
+
+extern void
+maid_block_ecb(struct maid_block *bl, u8 *buffer, bool decrypt)
+{
+    if (bl && buffer)
+    {
+        if (!decrypt)
+            bl->encrypt(bl->ctx, buffer);
+        else
+            bl->decrypt(bl->ctx, buffer);
+    }
+}
+
+extern void
+maid_block_ctr(struct maid_block *bl, u8 *buffer, size_t size)
+{
+    if (bl && buffer && size)
+    {
         while (size)
         {
-            size_t aval = (b->initialized) ? b->buffer_s - b->buffer_c: 0;
+            size_t aval = (bl->initialized) ? bl->state_s - bl->buffer_c: 0;
 
             if (aval >= size)
             {
-                memcpy(buffer, b->buffer, size);
-                b->buffer_c += size;
+                for (u8 i = 0; i < size; i++)
+                    buffer[i] ^= bl->buffer[bl->buffer_c++];
                 size = 0;
             }
             else
             {
-                /* Considering for AES (128 bit block) */
-                u8 tmp[16] = {0};
-                size_t bytes = b->read->f(b->read->ctx, tmp, b->buffer_s);
+                for (u8 i = 0; i < aval; i++)
+                    buffer[i] ^= bl->buffer[bl->buffer_c++];
+                buffer = &(buffer[aval]);
+                size -= aval;
 
-                if (bytes == 0)
+                memcpy(bl->buffer, bl->iv, bl->state_s);
+                bl->encrypt(bl->ctx, bl->buffer);
+
+                /* Increases counter in big-endian way */
+                volatile u8 carry = 1;
+                for (u8 i = 15; i < 16; i--)
                 {
-                    ret -= size;
-                    break;
+                    volatile u16 sum = carry + bl->iv[i];
+
+                    bl->iv[i] = sum & 0xFF;
+                    carry = sum >> 8;
+
+                    sum = 0;
                 }
+                carry = 0;
 
-                if (bytes < b->buffer_s && size > bytes)
-                {
-                    ret -= size - bytes;
-                    size = bytes;
-                }
-
-                /* Big endian 32-bit counter, again AES specific */
-                memcpy(b->buffer, b->nonce, b->buffer_s - 4);
-                for (u8 i = 0; i < 4; i++)
-                    b->buffer[b->buffer_s - 4 + i] =
-                        (b->counter >> ((3 - i) * 8) & 0xFF);
-
-                b->encrypt(b->context, b->buffer);
-                for (size_t i = 0; i < b->buffer_s; i++)
-                    b->buffer[i] ^= tmp[i];
-
-                b->counter++;
-                b->buffer_c = 0;
-                b->initialized = true;
-
-                maid_mem_clear(tmp, sizeof(tmp));
+                bl->buffer_c = 0;
+                bl->initialized = true;
             }
         }
     }
-
-    return ret;
 }

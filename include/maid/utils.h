@@ -57,29 +57,4 @@ struct maid_cb_buf
 
 size_t maid_cb_buffer(void *ctx, u8 *data, size_t bytes);
 
-struct maid_cb_split
-{
-    const struct maid_cb_read *read;
-    const struct maid_cb_write *write;
-};
-
-size_t maid_cb_splitter(void *ctx, u8 *data, size_t bytes);
-
-struct maid_cb_save
-{
-    const struct maid_cb_read *read;
-
-    u8 *buffer;
-    size_t buffer_s;
-};
-
-struct maid_cb_load
-{
-    const struct maid_cb_read *read;
-    const struct maid_cb_save *saved;
-};
-
-size_t maid_cb_saver(void *ctx, u8 *data, size_t bytes);
-size_t maid_cb_loader(void *ctx, u8 *data, size_t bytes);
-
 #endif

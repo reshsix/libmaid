@@ -15,6 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <maid/utils.h>
@@ -22,133 +23,100 @@
 
 /* Poly1305 implementation */
 
-static void
-poly1305(const u8 *key, const struct maid_cb_read *data, u8 *tag)
+struct maid_poly1305
 {
+    /* 320 bits, to handle multiplication */
+    u32 acc[10], acc2[10], acc3[10];
+    /* R and S key parts */
+    u32 r[4], s[4];
+    /* Block buffer */
+    u32 buffer[5];
+};
+
+extern void *
+maid_poly1305_del(void *ctx)
+{
+    if (ctx)
+        maid_mem_clear(ctx, sizeof(struct maid_poly1305));
+    free(ctx);
+
+    return NULL;
+}
+
+extern void *
+maid_poly1305_new(const u8 *key)
+{
+    struct maid_poly1305 *ret = calloc(1, sizeof(struct maid_poly1305));
+
+    if (ret)
+    {
+        if (key)
+        {
+            /* R and S initialization */
+            memcpy(ret->r, key, 16);
+            memcpy(ret->s, &(key[16]), 16);
+
+            /* R clamping */
+            ret->r[0] &= 0x0FFFFFFF;
+            ret->r[1] &= 0x0FFFFFFC;
+            ret->r[2] &= 0x0FFFFFFC;
+            ret->r[3] &= 0x0FFFFFFC;
+        }
+        else
+            ret = maid_poly1305_del(ret);
+    }
+
+    return ret;
+}
+
+extern void
+maid_poly1305_update(void *ctx, u8 *block, size_t size)
+{
+    /* Not intended to be used with size < 16,
+     * on a block other than the last one */
+
     /* 2^130 - 5 little endian */
     const u32 prime[5] = {0xfffffffb, 0xffffffff,
                           0xffffffff, 0xffffffff, 0x3};
 
-    /* 320 bits, to handle multiplication */
-    u32 acc[10] = {0};
-    u32 acc2[10] = {0};
-    u32 acc3[10] = {0};
-
-    /* R and S initialization */
-    u32 r[4] = {0}, s[4] = {0};
-    memcpy(r, key, 16);
-    memcpy(s, &(key[16]), 16);
-
-    /* R clamping */
-    r[0] &= 0x0FFFFFFF;
-    r[1] &= 0x0FFFFFFC;
-    r[2] &= 0x0FFFFFFC;
-    r[3] &= 0x0FFFFFFC;
-
-    u32 block[5] = {0x0};
-    while (true)
+    if (ctx && block)
     {
-        memset(block, 0, 20);
-
-        u8 last = data->f(data->ctx, (u8*)block, 16);
-        if (last == 0)
-            break;
-        block[last / 4] |= 0x1 << ((last % 4) * 8);
-
-        /* Adds block to the accumulator */
-        maid_mp_add(acc2, acc, block, 10, 10, 5);
-
-        /* Multiplies accumulator by r */
-        maid_mp_mul(acc3, acc2, r, 10, 10, 4);
-
-        /* Barret reduction by prime */
-        maid_mp_shr(acc, acc3, 130, 10, 10);
-        maid_mp_mul(acc2, acc, prime, 10, 10, 5);
-        maid_mp_sub(acc, acc3, acc2, 10, 10, 10);
-    }
-
-    /* Adds s to the accumulator */
-    maid_mp_add(acc2, acc, s, 10, 10, 4);
-
-    /* Exports 128 bits */
-    memcpy(tag, acc2, 16);
-
-    /* Cleans intermediary values */
-    maid_mem_clear(acc,   40);
-    maid_mem_clear(acc2,  40);
-    maid_mem_clear(acc3,  40);
-    maid_mem_clear(r,     16);
-    maid_mem_clear(s,     16);
-    maid_mem_clear(block, 20);
-}
-
-/* External Interface */
-
-struct poly1305_reader
-{
-    struct maid_cb_read *ad;
-    struct maid_cb_read *ct;
-    u64 ad_s, ct_s;
-    u8 step;
-};
-
-static size_t
-poly1305_data(void *ctx, u8 *dest, const size_t bytes)
-{
-    /* Bytes is always 16 */
-    (void)bytes;
-
-    struct poly1305_reader *r = ctx;
-
-    u8 read = 0;
-    bool stop = true;
-    do
-    {
-        /* Concatenates and pads the data accordingly */
-        stop = true;
-        switch (r->step)
+        struct maid_poly1305 *p = ctx;
+        while (size)
         {
-            case 0:
-            case 1:
-                if (r->step == 0) read = r->ad->f(r->ad->ctx, dest, 16);
-                else              read = r->ct->f(r->ct->ctx, dest, 16);
-                if (r->step == 0) r->ad_s += read;
-                else              r->ct_s += read;
+            u8 last = (size > 16) ? 16 : size;
+            memcpy(p->buffer, block, last);
+            memset(&(p->buffer[last]), 0, sizeof(p->buffer) - last);
+            p->buffer[last / 4] |= 0x1 << ((last % 4) * 8);
 
-                if (read == 0)
-                {
-                    r->step++;
-                    stop = false;
-                }
-                else if (read < 16)
-                {
-                    memset(&(dest[read]), '\0', 16 - read);
-                    r->step++;
-                }
-                read = 16;
-                break;
+            /* Adds block to the accumulator */
+            maid_mp_add(p->acc2, p->acc, p->buffer, 10, 10, 5);
 
-            case 2:
-                read = 16;
-                memcpy(dest,       &(r->ad_s), 8);
-                memcpy(&(dest[8]), &(r->ct_s), 8);
-                r->step++;
-                break;
+            /* Multiplies accumulator by r */
+            maid_mp_mul(p->acc3, p->acc2, p->r, 10, 10, 4);
 
-            default:
-                break;
+            /* Barret reduction by prime */
+            maid_mp_shr(p->acc,  p->acc3,     130, 10, 10);
+            maid_mp_mul(p->acc2, p->acc,    prime, 10, 10, 5);
+            maid_mp_sub(p->acc,  p->acc3, p->acc2, 10, 10, 10);
+
+            block = &(block[last]);
+            size -= last;
         }
-    } while (!stop);
-
-    return read;
+    }
 }
 
 extern void
-maid_poly1305_mac(const u8 *key, const struct maid_cb_read *ct,
-                  const struct maid_cb_read *ad, u8 *tag)
+maid_poly1305_digest(void *ctx, u8 *output)
 {
-    struct poly1305_reader r = {.ad = (struct maid_cb_read *)ad,
-                                .ct = (struct maid_cb_read *)ct};
-    struct maid_cb_read data = {.f = poly1305_data, .ctx = &r};
-    poly1305(key, &data, tag);
+    if (ctx && output)
+    {
+        struct maid_poly1305 *p = ctx;
+
+        /* Adds s to the accumulator */
+        maid_mp_add(p->acc2, p->acc, p->s, 10, 10, 4);
+
+        /* Exports 128 bits */
+        memcpy(output, p->acc2, 16);
+    }
 }

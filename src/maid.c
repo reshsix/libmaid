@@ -26,6 +26,9 @@
 #include <maid/crypto/aes.h>
 #include <maid/crypto/gmac.h>
 
+#include <maid/block.h>
+#include <maid/stream.h>
+
 #include <maid/maid.h>
 
 static bool
@@ -35,54 +38,75 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
                const struct maid_cb_write *out,
                u8 *tag)
 {
-    maid_chacha *ch = maid_chacha_new(MAID_CHACHA20V2_256, key);
+    bool ret = false;
 
-    if (ch)
+    maid_stream *st = maid_stream_new(maid_chacha_new, maid_chacha_del,
+                                      maid_chacha_gen, 64,
+                                      MAID_CHACHA20V2_256, key, nonce, 0);
+    if (st)
     {
-        /* Saves data in case of decryption */
-        u8 cache[16] = {0};
-        struct maid_cb_save sv = {.read = data,
-                                  .buffer = cache, .buffer_s = 16};
-        struct maid_cb_read rs = {.f = maid_cb_saver, .ctx = &sv};
-        if (decrypt)
-            data = &rs;
+        /* Poly1305 ephemeral key (32 bytes)
+         * Uses a chacha block to increase the counter */
+        u8 key[64] = {0};
+        maid_stream_xor(st, key, sizeof(key));
 
-        /* Chacha20 encryption/decryption */
-        u8 tmp[64] = {0};
-        struct maid_stream st = {.read = data, .context = ch,
-                                 .keystream = maid_chacha_keystream,
-                                 .nonce = nonce, .counter = 1,
-                                 .buffer = tmp, .buffer_s = sizeof(tmp)};
-        struct maid_cb_read ct = {.f = maid_stream_xor, .ctx = &st};
+        void *p = maid_poly1305_new(key);
+        if (p)
+        {
+            u8 block[16] = {0};
 
-        /* Outputs encrypt/decrypt data */
-        struct maid_cb_split sp = {.read = &ct, .write = out};
-        struct maid_cb_read ct2 = {.f = maid_cb_splitter, .ctx = &sp};
-        struct maid_cb_read *last = &ct2;
+            u64 ad_s = 0;
+            while (true)
+            {
+                u8 last = ad->f(ad->ctx, block, sizeof(block));
+                if (last == 0)
+                    break;
 
-        /* Loads cached data in case of decryption */
-        struct maid_cb_load ld = {.read = &ct2, .saved = &sv};
-        struct maid_cb_read rl = {.f = maid_cb_loader, .ctx = &ld};
-        if (decrypt)
-            last = &rl;
+                if (last < sizeof(block))
+                    memset(&(block[last]), '\0', sizeof(block) - last);
+                maid_poly1305_update(p, block, sizeof(block));
+                ad_s += last;
+            }
 
-        /* Poly1305 ephemeral key */
-        u8 tmp2[64] = {0};
-        maid_chacha_keystream(ch, nonce, 0, tmp2);
+            u64 ct_s = 0;
+            while (true)
+            {
+                u8 last = data->f(data->ctx, block, sizeof(block));
+                if (last == 0)
+                    break;
 
-        /* Endpoint function: swallows everything */
-        maid_poly1305_mac(tmp2, last, ad, tag);
+                if (last < sizeof(block))
+                    memset(&(block[last]), '\0', sizeof(block) - last);
+                if (!decrypt)
+                {
+                    maid_stream_xor(st, block, last);
+                    maid_poly1305_update(p, block, sizeof(block));
+                }
+                else
+                {
+                    maid_poly1305_update(p, block, sizeof(block));
+                    maid_stream_xor(st, block, last);
+                }
+                out->f(out->ctx, block, last);
+                ct_s += last;
+            }
 
-        /* Cleanup */
-        if (decrypt)
-            maid_mem_clear(cache, sizeof(cache));
-        maid_mem_clear(tmp, sizeof(tmp));
-        maid_mem_clear(tmp2, sizeof(tmp2));
+            memcpy(block,       &(ad_s), sizeof(ad_s));
+            memcpy(&(block[8]), &(ct_s), sizeof(ct_s));
+            maid_poly1305_update(p, block, sizeof(block));
+            maid_poly1305_digest(p, tag);
+
+            maid_mem_clear(block, sizeof(block));
+
+            ret = true;
+        }
+        maid_poly1305_del(p);
+
+        maid_mem_clear(key, sizeof(key));
     }
+    maid_stream_del(st);
 
-    maid_chacha_del(ch);
-
-    return (ch);
+    return ret;
 }
 
 static bool
@@ -92,62 +116,85 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
               const struct maid_cb_write *out,
               u8 *tag)
 {
-    maid_aes *aes = maid_aes_new(MAID_AES256, key);
+    bool ret = false;
 
-    if (aes)
+    u8 iv[16] = {0};
+    memcpy(iv, nonce, 12);
+    iv[15] = 0x1;
+
+    maid_block *bl = maid_block_new(maid_aes_new, maid_aes_del,
+                                    maid_aes_encrypt, maid_aes_decrypt, 16,
+                                    MAID_AES256, key, iv);
+    if (bl)
     {
-        /* Saves data in case of decryption */
-        u8 cache[16] = {0};
-        struct maid_cb_save sv = {.read = data,
-                                  .buffer = cache, .buffer_s = 16};
-        struct maid_cb_read rs = {.f = maid_cb_saver, .ctx = &sv};
-        if (decrypt)
-            data = &rs;
+        /* GMAC H and encrypted IV */
+        u8 key[32] = {0};
+        maid_block_ecb(bl, key, false);
+        maid_block_ctr(bl, &(key[16]), sizeof(key) - 16);
 
-        /* AES encryption/decryption */
-        u8 tmp[16] = {0};
-        struct maid_block bt = {.read = data, .context = aes,
-                                .encrypt = maid_aes_encrypt,
-                                .decrypt = maid_aes_decrypt,
-                                .nonce = nonce, .counter = 2,
-                                .buffer = tmp, .buffer_s = sizeof(tmp)};
-        struct maid_cb_read ct = {.f = maid_block_ctr, .ctx = &bt};
+        void *g = maid_gmac_new(key);
+        if (g)
+        {
+            u8 block[16] = {0};
 
-        /* Outputs encrypt/decrypt data */
-        struct maid_cb_split sp = {.read = &ct, .write = out};
-        struct maid_cb_read ct2 = {.f = maid_cb_splitter, .ctx = &sp};
-        struct maid_cb_read *last = &ct2;
+            u64 ad_s = 0;
+            while (true)
+            {
+                u8 last = ad->f(ad->ctx, block, sizeof(block));
+                if (last == 0)
+                    break;
 
-        /* Loads cached data in case of decryption */
-        struct maid_cb_load ld = {.read = &ct2, .saved = &sv};
-        struct maid_cb_read rl = {.f = maid_cb_loader, .ctx = &ld};
-        if (decrypt)
-            last = &rl;
+                if (last < sizeof(block))
+                    memset(&(block[last]), '\0', sizeof(block) - last);
+                maid_gmac_update(g, block, sizeof(block));
+                ad_s += last;
+            }
 
-        /* H is encrypted zeros */
-        u8 h[16] = {0};
-        maid_aes_encrypt(aes, h);
+            u64 ct_s = 0;
+            while (true)
+            {
+                u8 last = data->f(data->ctx, block, sizeof(block));
+                if (last == 0)
+                    break;
 
-        /* Nonce is encrypted for ghash */
-        u8 nonce2[16] = {0};
-        memcpy(nonce2, nonce, 12);
-        nonce2[15] = 0x1;
-        maid_aes_encrypt(aes, nonce2);
+                if (last < sizeof(block))
+                    memset(&(block[last]), '\0', sizeof(block) - last);
+                if (!decrypt)
+                {
+                    maid_block_ctr(bl, block, last);
+                    maid_gmac_update(g, block, sizeof(block));
+                }
+                else
+                {
+                    maid_gmac_update(g, block, sizeof(block));
+                    maid_block_ctr(bl, block, last);
+                }
+                out->f(out->ctx, block, last);
+                ct_s += last;
+            }
+            ad_s *= 8;
+            ct_s *= 8;
 
-        /* Endpoint function: swallows everything */
-        maid_gmac_ghash(h, nonce2, last, ad, tag);
+            /* Copies as big endian */
+            for (u8 i = 0; i < 8; i++)
+            {
+                block[7  - i] = ((u8*)&ad_s)[i];
+                block[15 - i] = ((u8*)&ct_s)[i];
+            }
+            maid_gmac_update(g, block, sizeof(block));
+            maid_gmac_digest(g, tag);
 
-        /* Cleanup */
-        if (decrypt)
-            maid_mem_clear(cache, sizeof(cache));
-        maid_mem_clear(tmp,    sizeof(tmp));
-        maid_mem_clear(h,      sizeof(h));
-        maid_mem_clear(nonce2, sizeof(nonce2));
+            maid_mem_clear(block, sizeof(block));
+
+            ret = true;
+        }
+        maid_gmac_del(g);
+
+        maid_mem_clear(key, sizeof(key));
     }
+    maid_block_del(bl);
 
-    maid_aes_del(aes);
-
-    return (aes);
+    return ret;
 }
 
 extern bool

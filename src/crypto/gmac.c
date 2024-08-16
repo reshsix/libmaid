@@ -15,6 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <maid/utils.h>
@@ -59,70 +60,67 @@ gf128_mul(const u8 *a, const u8 *b, u8 *out)
     maid_mem_clear(tmp, 16);
 }
 
-extern void
-maid_gmac_ghash(const u8 *h, const u8 *nonce,
-                const struct maid_cb_read *ct,
-                const struct maid_cb_read *ad, u8 *tag)
+struct maid_gmac
 {
-    u8 tmp[16] = {0};
+    u8 h[16], nonce[16];
+    u8 acc[16], buffer[16];
+};
 
-    u64 ad_s = 0, ct_s = 0;
-    u8 step = 0, block[16] = {0};
-    while (true)
+extern void *
+maid_gmac_del(void *ctx)
+{
+    if (ctx)
+        maid_mem_clear(ctx, sizeof(struct maid_gmac));
+    free(ctx);
+
+    return NULL;
+}
+
+extern void *
+maid_gmac_new(u8 *key)
+{
+    struct maid_gmac *ret = calloc(1, sizeof(struct maid_gmac));
+
+    if (ret)
     {
-        u8 last = 0;
-        switch (step)
+        memcpy(ret->h,            key, sizeof(ret->h));
+        memcpy(ret->nonce, &(key[16]), sizeof(ret->nonce));
+    }
+
+    return ret;
+}
+
+extern void
+maid_gmac_update(void *ctx, u8 *block, size_t size)
+{
+    if (ctx && block)
+    {
+        struct maid_gmac *g = ctx;
+        while (size)
         {
-            case 0:
-                last = ad->f(ad->ctx, block, 16);
-                if (last)
-                    ad_s += last;
-                else
-                {
-                    step++;
-                    continue;
-                }
-                break;
-            case 1:
-                last = ct->f(ct->ctx, block, 16);
-                if (last)
-                    ct_s += last;
-                else
-                {
-                    step++;
-                    continue;
-                }
-                break;
-            case 2:
-                last = 16;
-                ad_s *= 8;
-                ct_s *= 8;
+            u8 last = (size > 16) ? 16 : size;
+            memcpy(g->buffer, block, last);
+            memset(&(g->buffer[last]), 0, sizeof(g->buffer) - last);
 
-                /* Copies as big endian */
-                for (u8 i = 0; i < 8; i++)
-                {
-                    block[7  - i] = ((u8*)&ad_s)[i];
-                    block[15 - i] = ((u8*)&ct_s)[i];
-                }
-                step++;
-            default:
-                break;
+            for (u8 i = 0; i < 16; i++)
+                g->buffer[i] ^= g->acc[i];
+            gf128_mul(g->buffer, g->h, g->acc);
+
+            block = &(block[last]);
+            size -= last;
         }
-        if (last == 0)
-            break;
+    }
+}
 
-        if (last < 16)
-            memset(&(block[last]), '\0', 16 - last);
+extern void
+maid_gmac_digest(void *ctx, u8 *output)
+{
+    if (ctx && output)
+    {
+        struct maid_gmac *g = ctx;
 
         for (u8 i = 0; i < 16; i++)
-            block[i] ^= tmp[i];
-        gf128_mul(block, h, tmp);
+            g->acc[i] ^= g->nonce[i];
+        memcpy(output, g->acc, 16);
     }
-    maid_mem_clear(block, 16);
-
-    for (u8 i = 0; i < 16; i++)
-        tmp[i] ^= nonce[i];
-    memcpy(tag, tmp, 16);
-
-    maid_mem_clear(tmp, 16);
 }

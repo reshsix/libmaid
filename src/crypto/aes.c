@@ -295,7 +295,7 @@ shiftrow_d(u8 *block)
     block[11] = block[15];
     block[15] = block[3];
     block[3]  = tmp;
-    
+
     tmp = 0;
 }
 
@@ -335,7 +335,7 @@ mixcolumn_d(u8 *block)
         col[2] = gmul13[t[0]] ^  gmul9[t[1]] ^ gmul14[t[2]] ^ gmul11[t[3]];
         col[3] = gmul11[t[0]] ^ gmul13[t[1]] ^  gmul9[t[2]] ^ gmul14[t[3]];
     }
-    
+
     maid_mem_clear(t, sizeof(t));
 }
 
@@ -353,26 +353,27 @@ struct maid_aes
     u8 nk, nr, *ctx;
 };
 
-extern struct maid_aes *
-maid_aes_del(struct maid_aes *aes)
+extern void *
+maid_aes_del(void *ctx)
 {
-    if (aes)
+    if (ctx)
     {
+        struct maid_aes *aes = ctx;
         if (aes->ctx)
             maid_mem_clear(aes->ctx, 16 * (aes->nr + 1));
         free(aes->ctx);
     }
-    free(aes);
+    free(ctx);
 
     return NULL;
 }
 
 static const u8 rcon[10] = {0x01, 0x02, 0x04, 0x08, 0x10,
                             0x20, 0x40, 0x80, 0x1b, 0x36};
-extern struct maid_aes *
-maid_aes_new(const enum maid_aes_v version, const u8 *key)
+extern void *
+maid_aes_new(u8 version, const u8 *key)
 {
-    maid_aes *ret = calloc(1, sizeof(struct maid_aes));
+    struct maid_aes *ret = calloc(1, sizeof(struct maid_aes));
 
     if (ret)
     {

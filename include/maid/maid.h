@@ -46,41 +46,4 @@ bool maid_crypt2(enum maid_op op, enum maid_cipher cph,
                        u8 *out,  const size_t out_s,
                  u8 *tag);
 
-struct maid_stream
-{
-    const struct maid_cb_read *read;
-
-    void *context;
-    void (*keystream)(void *, const u8 *, const u64, u8 *);
-
-    const u8 *nonce;
-    u64 counter;
-
-    u8 *buffer;
-    size_t buffer_c;
-    size_t buffer_s;
-    bool initialized;
-};
-
-size_t maid_stream_xor(void *ctx, u8 *buffer, size_t size);
-
-struct maid_block
-{
-    const struct maid_cb_read *read;
-
-    void *context;
-    void (*encrypt)(void *, u8 *);
-    void (*decrypt)(void *, u8 *);
-
-    const u8 *nonce;
-    u32 counter;
-
-    u8 *buffer;
-    size_t buffer_c;
-    size_t buffer_s;
-    bool initialized;
-};
-
-size_t maid_block_ctr(void *ctx, u8 *buffer, size_t size);
-
 #endif

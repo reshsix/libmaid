@@ -15,23 +15,21 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_CRYPTO_CHACHA
-#define MAID_CRYPTO_CHACHA
+#ifndef MAID_BLOCK_H
+#define MAID_BLOCK_H
 
 #include <maid/types.h>
 
-enum
-{
-    MAID_CHACHA20V1_128,
-    MAID_CHACHA20V1_256,
-    MAID_CHACHA20V2_128,
-    MAID_CHACHA20V2_256
-};
-
-void *maid_chacha_new(const u8 version, const u8 *restrict key,
-                      const u8 *restrict nonce, const u64 counter);
-void *maid_chacha_del(void *ctx);
-
-void maid_chacha_gen(void *ctx, u8 *out);
+typedef struct maid_block maid_block;
+maid_block *maid_block_new(void * (*new)(const u8, const u8 *),
+                           void * (*del)(void *),
+                           void (*encrypt)(void *, u8 *),
+                           void (*decrypt)(void *, u8 *),
+                           const size_t state_s,
+                           const u8 version, const u8 *restrict key,
+                           const u8 *restrict iv);
+maid_block *maid_block_del(maid_block *bl);
+void maid_block_ecb(maid_block *bl, u8 *buffer, bool decrypt);
+void maid_block_ctr(maid_block *bl, u8 *buffer, size_t size);
 
 #endif

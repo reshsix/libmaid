@@ -21,7 +21,9 @@
 #include <maid/utils.h>
 #include <maid/types.h>
 
-void maid_poly1305_mac(const u8 *key, const struct maid_cb_read *ct,
-                       const struct maid_cb_read *ad, u8 *tag);
+void *maid_poly1305_new(const u8 *key);
+void *maid_poly1305_del(void *ctx);
+void maid_poly1305_update(void *ctx, u8 *block, size_t size);
+void maid_poly1305_digest(void *ctx, u8 *output);
 
 #endif

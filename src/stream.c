@@ -15,42 +15,89 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <maid/maid.h>
+#include <stdlib.h>
 
-extern size_t
-maid_stream_xor(void *ctx, u8 *buffer, size_t size)
+#include <maid/utils.h>
+
+#include <maid/stream.h>
+
+struct maid_stream
 {
-    size_t ret = 0;
+    void *ctx, *(*del)(void *), (*gen)(void *, u8 *);
 
-    if (ctx && buffer && size)
+    u8 *buffer;
+    size_t buffer_c;
+    size_t buffer_s;
+    bool initialized;
+};
+
+extern struct maid_stream *
+maid_stream_del(maid_stream *st)
+{
+    if (st)
     {
-        struct maid_stream *s = ctx;
-        size = s->read->f(s->read->ctx, buffer, size);
+        st->del(st->ctx);
 
-        ret = size;
+        if (st->buffer)
+            maid_mem_clear(st->buffer, st->buffer_s);
+        free(st->buffer);
+    }
+    free(st);
+
+    return NULL;
+}
+
+extern struct maid_stream *
+maid_stream_new(void * (*new)(const u8, const u8 *, const u8 *, const u64),
+                void * (*del)(void *),
+                void (*gen)(void *, u8 *), const size_t state_s,
+                const u8 version, const u8 *restrict key,
+                const u8 *restrict nonce, const u64 counter)
+{
+    struct maid_stream *ret = calloc(1, sizeof(struct maid_stream));
+
+    if (ret)
+    {
+        ret->del = del;
+        ret->gen = gen;
+
+        ret->ctx = new(version, key, nonce, counter);
+        ret->buffer = calloc(1, state_s);
+        ret->buffer_s = state_s;
+
+        if (!(ret->ctx && ret->buffer))
+            ret = maid_stream_del(ret);
+    }
+
+    return ret;
+}
+
+extern void
+maid_stream_xor(struct maid_stream *st, u8 *buffer, size_t size)
+{
+    if (st && buffer && size)
+    {
         while (size)
         {
-            size_t aval = (s->initialized) ? s->buffer_s - s->buffer_c: 0;
+            size_t aval = (st->initialized) ? st->buffer_s - st->buffer_c: 0;
 
             if (aval >= size)
             {
                 for (u8 i = 0; i < size; i++)
-                    buffer[i] ^= s->buffer[s->buffer_c++];
+                    buffer[i] ^= st->buffer[st->buffer_c++];
                 size = 0;
             }
             else
             {
                 for (u8 i = 0; i < aval; i++)
-                    buffer[i] ^= s->buffer[s->buffer_c++];
+                    buffer[i] ^= st->buffer[st->buffer_c++];
                 buffer = &(buffer[aval]);
                 size -= aval;
 
-                s->keystream(s->context, s->nonce, s->counter++, s->buffer);
-                s->buffer_c = 0;
-                s->initialized = true;
+                st->gen(st->ctx, st->buffer);
+                st->buffer_c = 0;
+                st->initialized = true;
             }
         }
     }
-
-    return ret;
 }

@@ -20,15 +20,13 @@
 
 #include <maid/types.h>
 
-typedef struct maid_aes maid_aes;
-
-enum maid_aes_v
+enum
 {
     MAID_AES128, MAID_AES192, MAID_AES256
 };
 
-maid_aes *maid_aes_new(const enum maid_aes_v version, const u8 *key);
-maid_aes *maid_aes_del(maid_aes *aes);
+void *maid_aes_new(u8 version, const u8 *key);
+void *maid_aes_del(void *ctx);
 void maid_aes_encrypt(void *ctx, u8 *block);
 void maid_aes_decrypt(void *ctx, u8 *block);
 

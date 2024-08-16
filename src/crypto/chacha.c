@@ -58,24 +58,27 @@ doubleround(u32 *block)
 
 struct maid_chacha
 {
-    u8 ks, ns, *key;
+    u8 ks, ns, *key, *nonce;
+    u64 counter;
 };
 
-extern struct maid_chacha *
-maid_chacha_del(struct maid_chacha *ch)
+extern void *
+maid_chacha_del(void *ctx)
 {
-    if (ch)
+    if (ctx)
     {
+        struct maid_chacha *ch = ctx;
         maid_mem_clear(ch->key, ch->ks);
         free(ch->key);
     }
-    free(ch);
+    free(ctx);
 
     return NULL;
 }
 
-extern struct maid_chacha *
-maid_chacha_new(const enum maid_chacha_v version, const u8 *key)
+extern void *
+maid_chacha_new(const u8 version, const u8 *restrict key,
+                const u8 *restrict nonce, const u64 counter)
 {
     struct maid_chacha *ret = calloc(1, sizeof(struct maid_chacha));
 
@@ -118,16 +121,19 @@ maid_chacha_new(const enum maid_chacha_v version, const u8 *key)
             ret = maid_chacha_del(ret);
     }
 
+    if (ret)
+    {
+        ret->nonce = (u8*)nonce;
+        ret->counter = counter;
+    }
+
     return ret;
 }
 
 extern void
-maid_chacha_keystream(void *ctx,
-                      const u8 *restrict nonce,
-                      const u64 counter,
-                      u8 *restrict out)
+maid_chacha_gen(void *ctx, u8 *out)
 {
-    if (ctx && nonce && out)
+    if (ctx && out)
     {
         struct maid_chacha *ch = ctx;
 
@@ -144,8 +150,8 @@ maid_chacha_keystream(void *ctx,
         }
 
         u8 cs = (sizeof(u32) * 4) - ch->ns;
-        memcpy(&(out[48]),      &counter, cs);
-        memcpy(&(out[48 + cs]), nonce,    ch->ns);
+        memcpy(&(out[48]),      &ch->counter, cs);
+        memcpy(&(out[48 + cs]), ch->nonce,    ch->ns);
 
         u32 tmp[64 / sizeof(u32)] = {0};
         memcpy(tmp, out, 64);
@@ -161,6 +167,7 @@ maid_chacha_keystream(void *ctx,
             tmp2[i] += tmp[i];
         memcpy(out, tmp2, 64);
 
+        ch->counter++;
         maid_mem_clear(tmp, sizeof(tmp));
         maid_mem_clear(tmp2, sizeof(tmp2));
     }
