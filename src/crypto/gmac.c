@@ -96,19 +96,12 @@ maid_gmac_update(void *ctx, u8 *block, size_t size)
     if (ctx && block)
     {
         struct maid_gmac *g = ctx;
-        while (size)
-        {
-            u8 last = (size > 16) ? 16 : size;
-            memcpy(g->buffer, block, last);
-            memset(&(g->buffer[last]), 0, sizeof(g->buffer) - last);
+        memcpy(g->buffer, block, size);
+        memset(&(g->buffer[size]), 0, sizeof(g->buffer) - size);
 
-            for (u8 i = 0; i < 16; i++)
-                g->buffer[i] ^= g->acc[i];
-            gf128_mul(g->buffer, g->h, g->acc);
-
-            block = &(block[last]);
-            size -= last;
-        }
+        for (u8 i = 0; i < 16; i++)
+            g->buffer[i] ^= g->acc[i];
+        gf128_mul(g->buffer, g->h, g->acc);
     }
 }
 

@@ -72,9 +72,6 @@ maid_poly1305_new(const u8 *key)
 extern void
 maid_poly1305_update(void *ctx, u8 *block, size_t size)
 {
-    /* Not intended to be used with size < 16,
-     * on a block other than the last one */
-
     /* 2^130 - 5 little endian */
     const u32 prime[5] = {0xfffffffb, 0xffffffff,
                           0xffffffff, 0xffffffff, 0x3};
@@ -82,27 +79,20 @@ maid_poly1305_update(void *ctx, u8 *block, size_t size)
     if (ctx && block)
     {
         struct maid_poly1305 *p = ctx;
-        while (size)
-        {
-            u8 last = (size > 16) ? 16 : size;
-            memcpy(p->buffer, block, last);
-            memset(&(p->buffer[last]), 0, sizeof(p->buffer) - last);
-            p->buffer[last / 4] |= 0x1 << ((last % 4) * 8);
+        memcpy(p->buffer, block, size);
+        memset(&(p->buffer[size]), 0, sizeof(p->buffer) - size);
+        p->buffer[size / 4] |= 0x1 << ((size % 4) * 8);
 
-            /* Adds block to the accumulator */
-            maid_mp_add(p->acc2, p->acc, p->buffer, 10, 10, 5);
+        /* Adds block to the accumulator */
+        maid_mp_add(p->acc2, p->acc, p->buffer, 10, 10, 5);
 
-            /* Multiplies accumulator by r */
-            maid_mp_mul(p->acc3, p->acc2, p->r, 10, 10, 4);
+        /* Multiplies accumulator by r */
+        maid_mp_mul(p->acc3, p->acc2, p->r, 10, 10, 4);
 
-            /* Barret reduction by prime */
-            maid_mp_shr(p->acc,  p->acc3,     130, 10, 10);
-            maid_mp_mul(p->acc2, p->acc,    prime, 10, 10, 5);
-            maid_mp_sub(p->acc,  p->acc3, p->acc2, 10, 10, 10);
-
-            block = &(block[last]);
-            size -= last;
-        }
+        /* Barret reduction by prime */
+        maid_mp_shr(p->acc,  p->acc3,     130, 10, 10);
+        maid_mp_mul(p->acc2, p->acc,    prime, 10, 10, 5);
+        maid_mp_sub(p->acc,  p->acc3, p->acc2, 10, 10, 10);
     }
 }
 

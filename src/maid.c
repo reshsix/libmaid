@@ -28,6 +28,7 @@
 
 #include <maid/block.h>
 #include <maid/stream.h>
+#include <maid/mac.h>
 
 #include <maid/maid.h>
 
@@ -50,8 +51,10 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
         u8 key[64] = {0};
         maid_stream_xor(st, key, sizeof(key));
 
-        void *p = maid_poly1305_new(key);
-        if (p)
+        maid_mac *m = maid_mac_new(maid_poly1305_new, maid_poly1305_del,
+                                   maid_poly1305_update, maid_poly1305_digest,
+                                   16, key);
+        if (m)
         {
             u8 block[16] = {0};
 
@@ -64,7 +67,7 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
                 if (last < sizeof(block))
                     memset(&(block[last]), '\0', sizeof(block) - last);
-                maid_poly1305_update(p, block, sizeof(block));
+                maid_mac_update(m, block, sizeof(block));
                 ad_s += last;
             }
 
@@ -80,11 +83,11 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
                 if (!decrypt)
                 {
                     maid_stream_xor(st, block, last);
-                    maid_poly1305_update(p, block, sizeof(block));
+                    maid_mac_update(m, block, sizeof(block));
                 }
                 else
                 {
-                    maid_poly1305_update(p, block, sizeof(block));
+                    maid_mac_update(m, block, sizeof(block));
                     maid_stream_xor(st, block, last);
                 }
                 out->f(out->ctx, block, last);
@@ -93,14 +96,14 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
             memcpy(block,       &(ad_s), sizeof(ad_s));
             memcpy(&(block[8]), &(ct_s), sizeof(ct_s));
-            maid_poly1305_update(p, block, sizeof(block));
-            maid_poly1305_digest(p, tag);
+            maid_mac_update(m, block, sizeof(block));
+            maid_mac_digest(m, tag);
 
             maid_mem_clear(block, sizeof(block));
 
             ret = true;
         }
-        maid_poly1305_del(p);
+        maid_mac_del(m);
 
         maid_mem_clear(key, sizeof(key));
     }
@@ -132,8 +135,10 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
         maid_block_ecb(bl, key, false);
         maid_block_ctr(bl, &(key[16]), sizeof(key) - 16);
 
-        void *g = maid_gmac_new(key);
-        if (g)
+        maid_mac *m = maid_mac_new(maid_gmac_new, maid_gmac_del,
+                                   maid_gmac_update, maid_gmac_digest,
+                                   16, key);
+        if (m)
         {
             u8 block[16] = {0};
 
@@ -146,7 +151,7 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
                 if (last < sizeof(block))
                     memset(&(block[last]), '\0', sizeof(block) - last);
-                maid_gmac_update(g, block, sizeof(block));
+                maid_mac_update(m, block, sizeof(block));
                 ad_s += last;
             }
 
@@ -162,11 +167,11 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
                 if (!decrypt)
                 {
                     maid_block_ctr(bl, block, last);
-                    maid_gmac_update(g, block, sizeof(block));
+                    maid_mac_update(m, block, sizeof(block));
                 }
                 else
                 {
-                    maid_gmac_update(g, block, sizeof(block));
+                    maid_mac_update(m, block, sizeof(block));
                     maid_block_ctr(bl, block, last);
                 }
                 out->f(out->ctx, block, last);
@@ -181,14 +186,14 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
                 block[7  - i] = ((u8*)&ad_s)[i];
                 block[15 - i] = ((u8*)&ct_s)[i];
             }
-            maid_gmac_update(g, block, sizeof(block));
-            maid_gmac_digest(g, tag);
+            maid_mac_update(m, block, sizeof(block));
+            maid_mac_digest(m, tag);
 
             maid_mem_clear(block, sizeof(block));
 
             ret = true;
         }
-        maid_gmac_del(g);
+        maid_mac_del(m);
 
         maid_mem_clear(key, sizeof(key));
     }
