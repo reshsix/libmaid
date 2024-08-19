@@ -22,10 +22,9 @@
 
 enum
 {
-    MAID_CHACHA20V1_128,
-    MAID_CHACHA20V1_256,
-    MAID_CHACHA20V2_128,
-    MAID_CHACHA20V2_256
+    MAID_CHACHA20_128,
+    MAID_CHACHA20_256,
+    MAID_CHACHA20_IETF,
 };
 
 void *maid_chacha_new(const u8 version, const u8 *restrict key,

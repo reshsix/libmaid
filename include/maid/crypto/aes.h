@@ -22,7 +22,7 @@
 
 enum
 {
-    MAID_AES128, MAID_AES192, MAID_AES256
+    MAID_AES_128, MAID_AES_192, MAID_AES_256
 };
 
 void *maid_aes_new(u8 version, const u8 *key);

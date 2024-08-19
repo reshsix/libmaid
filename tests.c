@@ -37,14 +37,14 @@ chacha20poly1305_vec1(void)
                     0x44, 0x45, 0x46, 0x47};
 
     u8 out[128] = {0}, out2[16] = {0};
-    maid_crypt2(MAID_ENCRYPT, MAID_CHACHA20POLY1305, key, nonce,
-                (u8*)data, strlen(data), ad, sizeof(ad),
-                out, sizeof(out), out2);
+    maid_crypt(MAID_ENCRYPT, MAID_CHACHA20_POLY1305, key, nonce,
+               (u8*)data, strlen(data), ad, sizeof(ad),
+               out, sizeof(out), out2);
 
     u8 out3[128] = {0}, out4[16] = {0};
-    maid_crypt2(MAID_DECRYPT, MAID_CHACHA20POLY1305, key, nonce,
-                out, strlen(data), ad, sizeof(ad),
-                out3, sizeof(out3), out4);
+    maid_crypt(MAID_DECRYPT, MAID_CHACHA20_POLY1305, key, nonce,
+               out, strlen(data), ad, sizeof(ad),
+               out3, sizeof(out3), out4);
 
     u8 cipher[] = {0xd3, 0x1a, 0x8d, 0x34, 0x64, 0x8e, 0x60, 0xdb,
                    0x7b, 0x86, 0xaf, 0xbc, 0x53, 0xef, 0x7e, 0xc2,
@@ -94,14 +94,14 @@ aes_gcm_vec1(void)
                     0xde, 0xca, 0xf8, 0x88};
 
     u8 out[128] = {0}, out2[16] = {0};
-    maid_crypt2(MAID_ENCRYPT, MAID_AES_GCM, key, nonce,
-                data, sizeof(data), ad, sizeof(ad),
-                out, sizeof(out), out2);
+    maid_crypt(MAID_ENCRYPT, MAID_AES_256_GCM, key, nonce,
+               data, sizeof(data), ad, sizeof(ad),
+               out, sizeof(out), out2);
 
     u8 out3[128] = {0}, out4[16] = {0};
-    maid_crypt2(MAID_DECRYPT, MAID_AES_GCM, key, nonce,
-                out, sizeof(data), ad, sizeof(ad),
-                out3, sizeof(out3), out4);
+    maid_crypt(MAID_DECRYPT, MAID_AES_256_GCM, key, nonce,
+               out, sizeof(data), ad, sizeof(ad),
+               out3, sizeof(out3), out4);
 
     u8 cipher[] = {0x52, 0x2d, 0xc1, 0xf0, 0x99, 0x56, 0x7d, 0x07,
                    0xf4, 0x7f, 0x37, 0xa3, 0x2a, 0x84, 0x42, 0x7d,
@@ -114,10 +114,35 @@ aes_gcm_vec1(void)
     u8 tag[] = {0x76, 0xfc, 0x6e, 0xce, 0x0f, 0x4e, 0x17, 0x68,
                 0xcd, 0xdf, 0x88, 0x53, 0xbb, 0x2d, 0x55, 0x1b};
 
-    return memcmp(out,  cipher, sizeof(cipher)) == 0 &&
-           memcmp(out2, tag,    sizeof(tag))    == 0 &&
-           memcmp(out3, data,   sizeof(data))   == 0 &&
-           memcmp(out4, tag,    sizeof(tag))    == 0 ;
+    u8 out5[128] = {0}, out6[16] = {0};
+    maid_crypt(MAID_ENCRYPT, MAID_AES_128_GCM, key, nonce,
+               data, sizeof(data), ad, sizeof(ad),
+               out5, sizeof(out5), out6);
+
+    u8 out7[128] = {0}, out8[16] = {0};
+    maid_crypt(MAID_DECRYPT, MAID_AES_128_GCM, key, nonce,
+               out5, sizeof(data), ad, sizeof(ad),
+               out7, sizeof(out7), out8);
+
+    u8 cipher2[] = {0x42, 0x83, 0x1e, 0xc2, 0x21, 0x77, 0x74, 0x24,
+                    0x4b, 0x72, 0x21, 0xb7, 0x84, 0xd0, 0xd4, 0x9c,
+                    0xe3, 0xaa, 0x21, 0x2f, 0x2c, 0x02, 0xa4, 0xe0,
+                    0x35, 0xc1, 0x7e, 0x23, 0x29, 0xac, 0xa1, 0x2e,
+                    0x21, 0xd5, 0x14, 0xb2, 0x54, 0x66, 0x93, 0x1c,
+                    0x7d, 0x8f, 0x6a, 0x5a, 0xac, 0x84, 0xaa, 0x05,
+                    0x1b, 0xa3, 0x0b, 0x39, 0x6a, 0x0a, 0xac, 0x97,
+                    0x3d, 0x58, 0xe0, 0x91};
+    u8 tag2[] = {0x5b, 0xc9, 0x4f, 0xbc, 0x32, 0x21, 0xa5, 0xdb,
+                 0x94, 0xfa, 0xe9, 0x5a, 0xe7, 0x12, 0x1a, 0x47};
+
+    return memcmp(out,  cipher,  sizeof(cipher))  == 0 &&
+           memcmp(out2, tag,     sizeof(tag))     == 0 &&
+           memcmp(out3, data,    sizeof(data))    == 0 &&
+           memcmp(out4, tag,     sizeof(tag))     == 0 &&
+           memcmp(out5, cipher2, sizeof(cipher2)) == 0 &&
+           memcmp(out6, tag2,    sizeof(tag2))    == 0 &&
+           memcmp(out7, data,    sizeof(data))    == 0 &&
+           memcmp(out8, tag2,    sizeof(tag2))    == 0 ;
 }
 
 extern int

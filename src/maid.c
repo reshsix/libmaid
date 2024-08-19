@@ -43,7 +43,7 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
     maid_stream *st = maid_stream_new(maid_chacha_new, maid_chacha_del,
                                       maid_chacha_gen, 64,
-                                      MAID_CHACHA20V2_256, key, nonce, 0);
+                                      MAID_CHACHA20_IETF, key, nonce, 0);
     if (st)
     {
         /* Poly1305 ephemeral key (32 bytes)
@@ -113,7 +113,7 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 }
 
 static bool
-aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
+aes_gcm_crypt(u8 version, bool decrypt, const u8 *key, const u8 *nonce,
               const struct maid_cb_read  *data,
               const struct maid_cb_read  *ad,
               const struct maid_cb_write *out,
@@ -127,7 +127,7 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 
     maid_block *bl = maid_block_new(maid_aes_new, maid_aes_del,
                                     maid_aes_encrypt, maid_aes_decrypt, 16,
-                                    MAID_AES256, key, iv);
+                                    version, key, iv);
     if (bl)
     {
         /* GMAC H and encrypted IV */
@@ -203,12 +203,12 @@ aes_gcm_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 }
 
 extern bool
-maid_crypt(enum maid_op op, enum maid_cipher cph,
-           const u8 *key, const u8 *nonce,
-           const struct maid_cb_read  *data,
-           const struct maid_cb_read  *ad,
-           const struct maid_cb_write *out,
-           u8 *tag)
+maid_crypt_cb(enum maid_op op, enum maid_cipher cph,
+              const u8 *key, const u8 *nonce,
+              const struct maid_cb_read  *data,
+              const struct maid_cb_read  *ad,
+              const struct maid_cb_write *out,
+              u8 *tag)
 {
     bool ret = (op == MAID_ENCRYPT || op == MAID_DECRYPT) &&
                key && nonce && data && ad && out && tag;
@@ -217,13 +217,17 @@ maid_crypt(enum maid_op op, enum maid_cipher cph,
     {
         switch (cph)
         {
-            case MAID_CHACHA20POLY1305:
+            case MAID_AES_128_GCM:
+                ret = aes_gcm_crypt(MAID_AES_128, op == MAID_DECRYPT,
+                                    key, nonce, data, ad, out, tag);
+                break;
+            case MAID_AES_256_GCM:
+                ret = aes_gcm_crypt(MAID_AES_256, op == MAID_DECRYPT,
+                                    key, nonce, data, ad, out, tag);
+                break;
+            case MAID_CHACHA20_POLY1305:
                 ret = c20p1305_crypt(op == MAID_DECRYPT,
                                      key, nonce, data, ad, out, tag);
-                break;
-            case MAID_AES_GCM:
-                ret = aes_gcm_crypt(op == MAID_DECRYPT,
-                                    key, nonce, data, ad, out, tag);
                 break;
         }
     }
@@ -232,12 +236,12 @@ maid_crypt(enum maid_op op, enum maid_cipher cph,
 }
 
 extern bool
-maid_crypt2(enum maid_op op, enum maid_cipher cph,
-            const u8 *key, const u8 *nonce,
-            const u8 *data, const size_t data_s,
-            const u8 *ad,   const size_t ad_s,
-                  u8 *out,  const size_t out_s,
-            u8 *tag)
+maid_crypt(enum maid_op op, enum maid_cipher cph,
+           const u8 *key, const u8 *nonce,
+           const u8 *data, const size_t data_s,
+           const u8 *ad,   const size_t ad_s,
+                 u8 *out,  const size_t out_s,
+           u8 *tag)
 {
     struct maid_cb_buf data_b = {.data = (u8*)data, .limit = data_s};
     struct maid_cb_buf ad_b   = {.data = (u8*)ad,   .limit = ad_s};
@@ -248,5 +252,5 @@ maid_crypt2(enum maid_op op, enum maid_cipher cph,
     struct maid_cb_read  ad_r   = {.f = maid_cb_buffer, .ctx = &ad_b};
     struct maid_cb_write out_w  = {.f = maid_cb_buffer, .ctx = &out_b};
 
-    return maid_crypt(op, cph, key, nonce, &data_r, &ad_r, &out_w, tag);
+    return maid_crypt_cb(op, cph, key, nonce, &data_r, &ad_r, &out_w, tag);
 }

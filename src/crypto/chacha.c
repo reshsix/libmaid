@@ -86,22 +86,17 @@ maid_chacha_new(const u8 version, const u8 *restrict key,
     {
         switch (version)
         {
-            case MAID_CHACHA20V1_128:
+            case MAID_CHACHA20_128:
                 ret->ks = 16;
                 ret->ns = 8;
                 break;
 
-            case MAID_CHACHA20V1_256:
+            case MAID_CHACHA20_256:
                 ret->ks = 32;
                 ret->ns = 8;
                 break;
 
-            case MAID_CHACHA20V2_128:
-                ret->ks = 16;
-                ret->ns = 12;
-                break;
-
-            case MAID_CHACHA20V2_256:
+            case MAID_CHACHA20_IETF:
                 ret->ks = 32;
                 ret->ns = 12;
                 break;

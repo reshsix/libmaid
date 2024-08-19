@@ -379,17 +379,17 @@ maid_aes_new(u8 version, const u8 *key)
     {
         switch (version)
         {
-            case MAID_AES128:
+            case MAID_AES_128:
                 ret->nk = 4;
                 ret->nr = 10;
                 break;
 
-            case MAID_AES192:
+            case MAID_AES_192:
                 ret->nk = 6;
                 ret->nr = 12;
                 break;
 
-            case MAID_AES256:
+            case MAID_AES_256:
                 ret->nk = 8;
                 ret->nr = 14;
                 break;

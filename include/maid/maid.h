@@ -28,22 +28,23 @@ enum maid_op
 
 enum maid_cipher
 {
-    MAID_CHACHA20POLY1305,
-    MAID_AES_GCM
+    MAID_AES_128_GCM,
+    MAID_AES_256_GCM,
+    MAID_CHACHA20_POLY1305
 };
+
+bool maid_crypt_cb(enum maid_op op, enum maid_cipher cph,
+                   const u8 *key, const u8 *nonce,
+                   const struct maid_cb_read  *data,
+                   const struct maid_cb_read  *ad,
+                   const struct maid_cb_write *out,
+                   u8 *tag);
 
 bool maid_crypt(enum maid_op op, enum maid_cipher cph,
                 const u8 *key, const u8 *nonce,
-                const struct maid_cb_read  *data,
-                const struct maid_cb_read  *ad,
-                const struct maid_cb_write *out,
+                const u8 *data, const size_t data_s,
+                const u8 *ad,   const size_t ad_s,
+                      u8 *out,  const size_t out_s,
                 u8 *tag);
-
-bool maid_crypt2(enum maid_op op, enum maid_cipher cph,
-                 const u8 *key, const u8 *nonce,
-                 const u8 *data, const size_t data_s,
-                 const u8 *ad,   const size_t ad_s,
-                       u8 *out,  const size_t out_s,
-                 u8 *tag);
 
 #endif
