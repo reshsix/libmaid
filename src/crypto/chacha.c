@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/stream.h>
 #include <maid/utils.h>
-#include <maid/crypto/chacha.h>
 
 /* Chacha20 implementation */
 
@@ -56,18 +56,23 @@ doubleround(u32 *block)
 
 /* External functions */
 
-struct maid_chacha
+enum
+{
+    CHACHA20_128, CHACHA20_256, CHACHA20_IETF
+};
+
+struct chacha
 {
     u8 ks, ns, *key, *nonce;
     u64 counter;
 };
 
-extern void *
-maid_chacha_del(void *ctx)
+static void *
+chacha_del(void *ctx)
 {
     if (ctx)
     {
-        struct maid_chacha *ch = ctx;
+        struct chacha *ch = ctx;
         maid_mem_clear(ch->key, ch->ks);
         free(ch->key);
     }
@@ -76,33 +81,33 @@ maid_chacha_del(void *ctx)
     return NULL;
 }
 
-extern void *
-maid_chacha_new(const u8 version, const u8 *restrict key,
-                const u8 *restrict nonce, const u64 counter)
+static void *
+chacha_new(const u8 version, const u8 *restrict key,
+           const u8 *restrict nonce, const u64 counter)
 {
-    struct maid_chacha *ret = calloc(1, sizeof(struct maid_chacha));
+    struct chacha *ret = calloc(1, sizeof(struct chacha));
 
     if (ret)
     {
         switch (version)
         {
-            case MAID_CHACHA20_128:
+            case CHACHA20_128:
                 ret->ks = 16;
                 ret->ns = 8;
                 break;
 
-            case MAID_CHACHA20_256:
+            case CHACHA20_256:
                 ret->ks = 32;
                 ret->ns = 8;
                 break;
 
-            case MAID_CHACHA20_IETF:
+            case CHACHA20_IETF:
                 ret->ks = 32;
                 ret->ns = 12;
                 break;
 
             default:
-                ret = maid_chacha_del(ret);
+                ret = chacha_del(ret);
                 break;
         }
     }
@@ -113,7 +118,7 @@ maid_chacha_new(const u8 version, const u8 *restrict key,
         if (ret->key)
             memcpy(ret->key, key, ret->ks);
         else
-            ret = maid_chacha_del(ret);
+            ret = chacha_del(ret);
     }
 
     if (ret)
@@ -125,12 +130,12 @@ maid_chacha_new(const u8 version, const u8 *restrict key,
     return ret;
 }
 
-extern void
-maid_chacha_gen(void *ctx, u8 *out)
+static void
+chacha_gen(void *ctx, u8 *out)
 {
     if (ctx && out)
     {
-        struct maid_chacha *ch = ctx;
+        struct chacha *ch = ctx;
 
         if (ch->ks == 32)
         {
@@ -167,3 +172,32 @@ maid_chacha_gen(void *ctx, u8 *out)
         maid_mem_clear(tmp2, sizeof(tmp2));
     }
 }
+
+/* Maid stream definitions */
+
+const struct maid_stream_def maid_chacha20_128 =
+{
+    .new = chacha_new,
+    .del = chacha_del,
+    .gen = chacha_gen,
+    .state_s = 64,
+    .version = CHACHA20_128
+};
+
+const struct maid_stream_def maid_chacha20_256 =
+{
+    .new = chacha_new,
+    .del = chacha_del,
+    .gen = chacha_gen,
+    .state_s = 64,
+    .version = CHACHA20_256
+};
+
+const struct maid_stream_def maid_chacha20_ietf =
+{
+    .new = chacha_new,
+    .del = chacha_del,
+    .gen = chacha_gen,
+    .state_s = 64,
+    .version = CHACHA20_IETF
+};

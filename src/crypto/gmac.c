@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mac.h>
 #include <maid/utils.h>
-#include <maid/types.h>
 
 static void
 gf128_mul(const u8 *a, const u8 *b, u8 *out)
@@ -60,26 +60,28 @@ gf128_mul(const u8 *a, const u8 *b, u8 *out)
     maid_mem_clear(tmp, 16);
 }
 
-struct maid_gmac
+/* External functions */
+
+struct gmac
 {
     u8 h[16], nonce[16];
     u8 acc[16], buffer[16];
 };
 
 extern void *
-maid_gmac_del(void *ctx)
+gmac_del(void *ctx)
 {
     if (ctx)
-        maid_mem_clear(ctx, sizeof(struct maid_gmac));
+        maid_mem_clear(ctx, sizeof(struct gmac));
     free(ctx);
 
     return NULL;
 }
 
 extern void *
-maid_gmac_new(u8 *key)
+gmac_new(const u8 *key)
 {
-    struct maid_gmac *ret = calloc(1, sizeof(struct maid_gmac));
+    struct gmac *ret = calloc(1, sizeof(struct gmac));
 
     if (ret)
     {
@@ -91,11 +93,11 @@ maid_gmac_new(u8 *key)
 }
 
 extern void
-maid_gmac_update(void *ctx, u8 *block, size_t size)
+gmac_update(void *ctx, u8 *block, size_t size)
 {
     if (ctx && block)
     {
-        struct maid_gmac *g = ctx;
+        struct gmac *g = ctx;
         memcpy(g->buffer, block, size);
         memset(&(g->buffer[size]), 0, sizeof(g->buffer) - size);
 
@@ -106,14 +108,25 @@ maid_gmac_update(void *ctx, u8 *block, size_t size)
 }
 
 extern void
-maid_gmac_digest(void *ctx, u8 *output)
+gmac_digest(void *ctx, u8 *output)
 {
     if (ctx && output)
     {
-        struct maid_gmac *g = ctx;
+        struct gmac *g = ctx;
 
         for (u8 i = 0; i < 16; i++)
             g->acc[i] ^= g->nonce[i];
         memcpy(output, g->acc, 16);
     }
 }
+
+/* Maid MAC definition */
+
+const struct maid_mac_def maid_gmac =
+{
+    .new = gmac_new,
+    .del = gmac_del,
+    .update = gmac_update,
+    .digest = gmac_digest,
+    .state_s = 16
+};

@@ -20,13 +20,17 @@
 
 #include <maid/types.h>
 
+struct maid_mac_def
+{
+    void * (*new)(const u8 *);
+    void * (*del)(void *);
+    void (*update)(void *, u8 *, size_t);
+    void (*digest)(void *, u8 *);
+    size_t state_s;
+};
+
 typedef struct maid_mac maid_mac;
-maid_mac *maid_mac_new(void * (*new)(const u8 *),
-                       void * (*del)(void *),
-                       void (*update)(void *, u8 *, size_t),
-                       void (*digest)(void *, u8 *),
-                       const size_t state_s,
-                       const u8 *restrict key);
+maid_mac *maid_mac_new(struct maid_mac_def def, const u8 *key);
 maid_mac *maid_mac_del(maid_mac *m);
 void maid_mac_update(maid_mac *m, u8 *buffer, size_t size);
 void maid_mac_digest(maid_mac *m, u8 *output);

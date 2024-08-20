@@ -24,11 +24,9 @@
 
 struct maid_block
 {
-    void *ctx, *(*del)(void *);
-    void (*encrypt)(void *, u8 *);
-    void (*decrypt)(void *, u8 *);
+    struct maid_block_def def;
+    void *ctx;
 
-    size_t state_s;
     u8 *iv;
 
     /* For ctr mode */
@@ -42,14 +40,14 @@ maid_block_del(maid_block *bl)
 {
     if (bl)
     {
-        bl->del(bl->ctx);
+        bl->def.del(bl->ctx);
 
         if (bl->buffer)
-            maid_mem_clear(bl->buffer, bl->state_s);
+            maid_mem_clear(bl->buffer, bl->def.state_s);
         free(bl->buffer);
 
         if (bl->iv)
-            maid_mem_clear(bl->iv, bl->state_s);
+            maid_mem_clear(bl->iv, bl->def.state_s);
         free(bl->iv);
     }
     free(bl);
@@ -58,29 +56,21 @@ maid_block_del(maid_block *bl)
 }
 
 extern struct maid_block *
-maid_block_new(void * (*new)(const u8, const u8 *),
-               void * (*del)(void *),
-               void (*encrypt)(void *, u8 *),
-               void (*decrypt)(void *, u8 *),
-               const size_t state_s,
-               const u8 version, const u8 *restrict key,
+maid_block_new(struct maid_block_def def,
+               const u8 *restrict key,
                const u8 *restrict iv)
 {
     struct maid_block *ret = calloc(1, sizeof(struct maid_block));
 
     if (ret)
     {
-        ret->del = del;
-        ret->encrypt = encrypt;
-        ret->decrypt = decrypt;
+        memcpy(&(ret->def), &def, sizeof(struct maid_block_def));
+        ret->ctx = def.new(def.version, key);
+        ret->iv  = calloc(1, def.state_s);
 
-        ret->ctx = new(version, key);
-        ret->state_s = state_s;
-        ret->iv  = calloc(1, state_s);
-
-        ret->buffer = calloc(1, state_s);
+        ret->buffer = calloc(1, def.state_s);
         if (ret->ctx && ret->iv && ret->buffer)
-            memcpy(ret->iv, iv, state_s);
+            memcpy(ret->iv, iv, def.state_s);
         else
             ret = maid_block_del(ret);
     }
@@ -94,9 +84,9 @@ maid_block_ecb(struct maid_block *bl, u8 *buffer, bool decrypt)
     if (bl && buffer)
     {
         if (!decrypt)
-            bl->encrypt(bl->ctx, buffer);
+            bl->def.encrypt(bl->ctx, buffer);
         else
-            bl->decrypt(bl->ctx, buffer);
+            bl->def.decrypt(bl->ctx, buffer);
     }
 }
 
@@ -107,8 +97,8 @@ maid_block_ctr(struct maid_block *bl, u8 *buffer, size_t size)
     {
         while (size)
         {
-            size_t aval = (bl->initialized) ? bl->state_s - bl->buffer_c: 0;
-
+            size_t aval = (bl->initialized) ? bl->def.state_s -
+                                              bl->buffer_c: 0;
             if (aval >= size)
             {
                 for (u8 i = 0; i < size; i++)
@@ -122,8 +112,8 @@ maid_block_ctr(struct maid_block *bl, u8 *buffer, size_t size)
                 buffer = &(buffer[aval]);
                 size -= aval;
 
-                memcpy(bl->buffer, bl->iv, bl->state_s);
-                bl->encrypt(bl->ctx, bl->buffer);
+                memcpy(bl->buffer, bl->iv, bl->def.state_s);
+                bl->def.encrypt(bl->ctx, bl->buffer);
 
                 /* Increases counter in big-endian way */
                 volatile u8 carry = 1;

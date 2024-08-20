@@ -18,12 +18,7 @@
 #ifndef MAID_CRYPTO_GMAC
 #define MAID_CRYPTO_GMAC
 
-#include <maid/utils.h>
-#include <maid/types.h>
-
-void *maid_gmac_new(const u8 *key);
-void *maid_gmac_del(void *ctx);
-void maid_gmac_update(void *ctx, u8 *block, size_t size);
-void maid_gmac_digest(void *ctx, u8 *output);
+#include <maid/mac.h>
+extern const struct maid_mac_def maid_gmac;
 
 #endif

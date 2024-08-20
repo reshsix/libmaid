@@ -20,13 +20,19 @@
 
 #include <maid/types.h>
 
+struct maid_block_def
+{
+    void * (*new)(const u8, const u8 *);
+    void * (*del)(void *);
+    void (*encrypt)(void *, u8 *);
+    void (*decrypt)(void *, u8 *);
+    const size_t state_s;
+    const u8 version;
+};
+
 typedef struct maid_block maid_block;
-maid_block *maid_block_new(void * (*new)(const u8, const u8 *),
-                           void * (*del)(void *),
-                           void (*encrypt)(void *, u8 *),
-                           void (*decrypt)(void *, u8 *),
-                           const size_t state_s,
-                           const u8 version, const u8 *restrict key,
+maid_block *maid_block_new(struct maid_block_def def,
+                           const u8 *restrict key,
                            const u8 *restrict iv);
 maid_block *maid_block_del(maid_block *bl);
 void maid_block_ecb(maid_block *bl, u8 *buffer, bool decrypt);

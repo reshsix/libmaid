@@ -41,9 +41,7 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 {
     bool ret = false;
 
-    maid_stream *st = maid_stream_new(maid_chacha_new, maid_chacha_del,
-                                      maid_chacha_gen, 64,
-                                      MAID_CHACHA20_IETF, key, nonce, 0);
+    maid_stream *st = maid_stream_new(maid_chacha20_ietf, key, nonce, 0);
     if (st)
     {
         /* Poly1305 ephemeral key (32 bytes)
@@ -51,9 +49,7 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
         u8 key[64] = {0};
         maid_stream_xor(st, key, sizeof(key));
 
-        maid_mac *m = maid_mac_new(maid_poly1305_new, maid_poly1305_del,
-                                   maid_poly1305_update, maid_poly1305_digest,
-                                   16, key);
+        maid_mac *m = maid_mac_new(maid_poly1305, key);
         if (m)
         {
             u8 block[16] = {0};
@@ -113,7 +109,8 @@ c20p1305_crypt(bool decrypt, const u8 *key, const u8 *nonce,
 }
 
 static bool
-aes_gcm_crypt(u8 version, bool decrypt, const u8 *key, const u8 *nonce,
+aes_gcm_crypt(struct maid_block_def aes, bool decrypt,
+              const u8 *key, const u8 *nonce,
               const struct maid_cb_read  *data,
               const struct maid_cb_read  *ad,
               const struct maid_cb_write *out,
@@ -125,9 +122,7 @@ aes_gcm_crypt(u8 version, bool decrypt, const u8 *key, const u8 *nonce,
     memcpy(iv, nonce, 12);
     iv[15] = 0x1;
 
-    maid_block *bl = maid_block_new(maid_aes_new, maid_aes_del,
-                                    maid_aes_encrypt, maid_aes_decrypt, 16,
-                                    version, key, iv);
+    maid_block *bl = maid_block_new(aes, key, iv);
     if (bl)
     {
         /* GMAC H and encrypted IV */
@@ -135,9 +130,7 @@ aes_gcm_crypt(u8 version, bool decrypt, const u8 *key, const u8 *nonce,
         maid_block_ecb(bl, key, false);
         maid_block_ctr(bl, &(key[16]), sizeof(key) - 16);
 
-        maid_mac *m = maid_mac_new(maid_gmac_new, maid_gmac_del,
-                                   maid_gmac_update, maid_gmac_digest,
-                                   16, key);
+        maid_mac *m = maid_mac_new(maid_gmac, key);
         if (m)
         {
             u8 block[16] = {0};
@@ -218,11 +211,11 @@ maid_crypt_cb(enum maid_op op, enum maid_cipher cph,
         switch (cph)
         {
             case MAID_AES_128_GCM:
-                ret = aes_gcm_crypt(MAID_AES_128, op == MAID_DECRYPT,
+                ret = aes_gcm_crypt(maid_aes_128, op == MAID_DECRYPT,
                                     key, nonce, data, ad, out, tag);
                 break;
             case MAID_AES_256_GCM:
-                ret = aes_gcm_crypt(MAID_AES_256, op == MAID_DECRYPT,
+                ret = aes_gcm_crypt(maid_aes_256, op == MAID_DECRYPT,
                                     key, nonce, data, ad, out, tag);
                 break;
             case MAID_CHACHA20_POLY1305:

@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/block.h>
 #include <maid/utils.h>
-#include <maid/crypto/aes.h>
 
 /* Lookup tables */
 
@@ -348,17 +348,22 @@ addroundkey(const u8 *ctx, u8 *block, const u8 round)
 
 /* External interface */
 
-struct maid_aes
+enum
+{
+    AES_128, AES_192, AES_256
+};
+
+struct aes
 {
     u8 nk, nr, *ctx;
 };
 
-extern void *
-maid_aes_del(void *ctx)
+static void *
+aes_del(void *ctx)
 {
     if (ctx)
     {
-        struct maid_aes *aes = ctx;
+        struct aes *aes = ctx;
         if (aes->ctx)
             maid_mem_clear(aes->ctx, 16 * (aes->nr + 1));
         free(aes->ctx);
@@ -370,32 +375,32 @@ maid_aes_del(void *ctx)
 
 static const u8 rcon[10] = {0x01, 0x02, 0x04, 0x08, 0x10,
                             0x20, 0x40, 0x80, 0x1b, 0x36};
-extern void *
-maid_aes_new(u8 version, const u8 *key)
+static void *
+aes_new(u8 version, const u8 *key)
 {
-    struct maid_aes *ret = calloc(1, sizeof(struct maid_aes));
+    struct aes *ret = calloc(1, sizeof(struct aes));
 
     if (ret)
     {
         switch (version)
         {
-            case MAID_AES_128:
+            case AES_128:
                 ret->nk = 4;
                 ret->nr = 10;
                 break;
 
-            case MAID_AES_192:
+            case AES_192:
                 ret->nk = 6;
                 ret->nr = 12;
                 break;
 
-            case MAID_AES_256:
+            case AES_256:
                 ret->nk = 8;
                 ret->nr = 14;
                 break;
 
             default:
-                ret = maid_aes_del(ret);
+                ret = aes_del(ret);
                 break;
         }
     }
@@ -405,7 +410,7 @@ maid_aes_new(u8 version, const u8 *key)
         /* 128 bits per round */
         ret->ctx = malloc(16 * (ret->nr + 1));
         if (!(ret->ctx))
-            ret = maid_aes_del(ret);
+            ret = aes_del(ret);
     }
 
     if (ret)
@@ -451,12 +456,12 @@ maid_aes_new(u8 version, const u8 *key)
     return ret;
 }
 
-extern void
-maid_aes_encrypt(void *ctx, u8 *block)
+static void
+aes_encrypt(void *ctx, u8 *block)
 {
     if (ctx && block)
     {
-        struct maid_aes *aes = ctx;
+        struct aes *aes = ctx;
         addroundkey(aes->ctx, block, 0);
 
         for (u8 i = 1; i < aes->nr; i++)
@@ -473,12 +478,12 @@ maid_aes_encrypt(void *ctx, u8 *block)
     }
 }
 
-extern void
-maid_aes_decrypt(void *ctx, u8 *block)
+static void
+aes_decrypt(void *ctx, u8 *block)
 {
     if (ctx && block)
     {
-        struct maid_aes *aes = ctx;
+        struct aes *aes = ctx;
         addroundkey(aes->ctx, block, aes->nr);
 
         for (u8 i = 1; i < aes->nr; i++)
@@ -494,3 +499,35 @@ maid_aes_decrypt(void *ctx, u8 *block)
         addroundkey(aes->ctx, block, 0);
     }
 }
+
+/* Maid block definitions */
+
+const struct maid_block_def maid_aes_128 =
+{
+    .new = aes_new,
+    .del = aes_del,
+    .encrypt = aes_encrypt,
+    .decrypt = aes_decrypt,
+    .state_s = 16,
+    .version = AES_128
+};
+
+const struct maid_block_def maid_aes_192 =
+{
+    .new = aes_new,
+    .del = aes_del,
+    .encrypt = aes_encrypt,
+    .decrypt = aes_decrypt,
+    .state_s = 16,
+    .version = AES_192
+};
+
+const struct maid_block_def maid_aes_256 =
+{
+    .new = aes_new,
+    .del = aes_del,
+    .encrypt = aes_encrypt,
+    .decrypt = aes_decrypt,
+    .state_s = 16,
+    .version = AES_256
+};

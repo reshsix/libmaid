@@ -18,16 +18,9 @@
 #ifndef MAID_CRYPTO_AES_H
 #define MAID_CRYPTO_AES_H
 
-#include <maid/types.h>
-
-enum
-{
-    MAID_AES_128, MAID_AES_192, MAID_AES_256
-};
-
-void *maid_aes_new(u8 version, const u8 *key);
-void *maid_aes_del(void *ctx);
-void maid_aes_encrypt(void *ctx, u8 *block);
-void maid_aes_decrypt(void *ctx, u8 *block);
+#include <maid/block.h>
+extern const struct maid_block_def maid_aes_128;
+extern const struct maid_block_def maid_aes_192;
+extern const struct maid_block_def maid_aes_256;
 
 #endif

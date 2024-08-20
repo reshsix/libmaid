@@ -18,12 +18,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mac.h>
 #include <maid/utils.h>
-#include <maid/types.h>
 
-/* Poly1305 implementation */
+/* External functions */
 
-struct maid_poly1305
+struct poly1305
 {
     /* 320 bits, to handle multiplication */
     u32 acc[10], acc2[10], acc3[10];
@@ -34,19 +34,19 @@ struct maid_poly1305
 };
 
 extern void *
-maid_poly1305_del(void *ctx)
+poly1305_del(void *ctx)
 {
     if (ctx)
-        maid_mem_clear(ctx, sizeof(struct maid_poly1305));
+        maid_mem_clear(ctx, sizeof(struct poly1305));
     free(ctx);
 
     return NULL;
 }
 
 extern void *
-maid_poly1305_new(const u8 *key)
+poly1305_new(const u8 *key)
 {
-    struct maid_poly1305 *ret = calloc(1, sizeof(struct maid_poly1305));
+    struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
 
     if (ret)
     {
@@ -63,14 +63,14 @@ maid_poly1305_new(const u8 *key)
             ret->r[3] &= 0x0FFFFFFC;
         }
         else
-            ret = maid_poly1305_del(ret);
+            ret = poly1305_del(ret);
     }
 
     return ret;
 }
 
 extern void
-maid_poly1305_update(void *ctx, u8 *block, size_t size)
+poly1305_update(void *ctx, u8 *block, size_t size)
 {
     /* 2^130 - 5 little endian */
     const u32 prime[5] = {0xfffffffb, 0xffffffff,
@@ -78,7 +78,7 @@ maid_poly1305_update(void *ctx, u8 *block, size_t size)
 
     if (ctx && block)
     {
-        struct maid_poly1305 *p = ctx;
+        struct poly1305 *p = ctx;
         memcpy(p->buffer, block, size);
         memset(&(p->buffer[size]), 0, sizeof(p->buffer) - size);
         p->buffer[size / 4] |= 0x1 << ((size % 4) * 8);
@@ -97,11 +97,11 @@ maid_poly1305_update(void *ctx, u8 *block, size_t size)
 }
 
 extern void
-maid_poly1305_digest(void *ctx, u8 *output)
+poly1305_digest(void *ctx, u8 *output)
 {
     if (ctx && output)
     {
-        struct maid_poly1305 *p = ctx;
+        struct poly1305 *p = ctx;
 
         /* Adds s to the accumulator */
         maid_mp_add(p->acc2, p->acc, p->s, 10, 10, 4);
@@ -110,3 +110,14 @@ maid_poly1305_digest(void *ctx, u8 *output)
         memcpy(output, p->acc2, 16);
     }
 }
+
+/* Maid MAC definition */
+
+const struct maid_mac_def maid_poly1305 =
+{
+    .new = poly1305_new,
+    .del = poly1305_del,
+    .update = poly1305_update,
+    .digest = poly1305_digest,
+    .state_s = 16
+};

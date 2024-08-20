@@ -18,12 +18,7 @@
 #ifndef MAID_CRYPTO_POLY1305
 #define MAID_CRYPTO_POLY1305
 
-#include <maid/utils.h>
-#include <maid/types.h>
-
-void *maid_poly1305_new(const u8 *key);
-void *maid_poly1305_del(void *ctx);
-void maid_poly1305_update(void *ctx, u8 *block, size_t size);
-void maid_poly1305_digest(void *ctx, u8 *output);
+#include <maid/mac.h>
+extern const struct maid_mac_def maid_poly1305;
 
 #endif

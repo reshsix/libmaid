@@ -20,13 +20,20 @@
 
 #include <maid/types.h>
 
+struct maid_stream_def
+{
+    void * (*new)(const u8, const u8 *, const u8 *, const u64);
+    void * (*del)(void *);
+    void (*gen)(void *, u8 *);
+    const size_t state_s;
+    const u8 version;
+};
+
 typedef struct maid_stream maid_stream;
-maid_stream *maid_stream_new(void * (*new)(const u8, const u8 *,
-                                           const u8 *, const u64),
-                             void * (*del)(void *),
-                             void (*gen)(void *, u8 *), const size_t state_s,
-                             const u8 version, const u8 *restrict key,
-                             const u8 *restrict nonce, const u64 counter);
+maid_stream *maid_stream_new(struct maid_stream_def def,
+                             const u8 *restrict key,
+                             const u8 *restrict nonce,
+                             const u64 counter);
 maid_stream *maid_stream_del(maid_stream *st);
 void maid_stream_xor(maid_stream *st, u8 *buffer, size_t size);
 

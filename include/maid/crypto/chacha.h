@@ -18,19 +18,9 @@
 #ifndef MAID_CRYPTO_CHACHA
 #define MAID_CRYPTO_CHACHA
 
-#include <maid/types.h>
-
-enum
-{
-    MAID_CHACHA20_128,
-    MAID_CHACHA20_256,
-    MAID_CHACHA20_IETF,
-};
-
-void *maid_chacha_new(const u8 version, const u8 *restrict key,
-                      const u8 *restrict nonce, const u64 counter);
-void *maid_chacha_del(void *ctx);
-
-void maid_chacha_gen(void *ctx, u8 *out);
+#include <maid/stream.h>
+extern const struct maid_stream_def maid_chacha20_128;
+extern const struct maid_stream_def maid_chacha20_256;
+extern const struct maid_stream_def maid_chacha20_ietf;
 
 #endif
