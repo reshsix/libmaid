@@ -18,8 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/stream.h>
 #include <maid/utils.h>
+
+#include <maid/crypto/poly1305.h>
+
+#include <maid/stream.h>
+#include <maid/mac.h>
+#include <maid/aead.h>
 
 /* Chacha20 implementation */
 
@@ -54,7 +59,7 @@ doubleround(u32 *block)
     quarterround(block,  3,  4,  9, 14);
 }
 
-/* External functions */
+/* Maid stream definitions */
 
 enum
 {
@@ -173,8 +178,6 @@ chacha_gen(void *ctx, u8 *out)
     }
 }
 
-/* Maid stream definitions */
-
 const struct maid_stream_def maid_chacha20_128 =
 {
     .new = chacha_new,
@@ -200,4 +203,62 @@ const struct maid_stream_def maid_chacha20_ietf =
     .gen = chacha_gen,
     .state_s = 64,
     .version = CHACHA20_IETF
+};
+
+/* Maid AEAD definitions */
+
+static void
+chacha20poly1305_init(struct maid_stream_def def,
+                      const u8 *key, const u8 *nonce,
+                      maid_stream **st, maid_mac **m)
+{
+    *st = maid_stream_new(def, key, nonce, 0);
+    if (*st)
+    {
+        /* Poly1305 ephemeral key (32 bytes)
+         * Uses a chacha block to increase the counter */
+        u8 key[64] = {0};
+        maid_stream_xor(*st, key, sizeof(key));
+        *m = maid_mac_new(maid_poly1305, key);
+        maid_mem_clear(key, sizeof(key));
+    }
+}
+
+const struct maid_aead_def maid_chacha20poly1305_128 =
+{
+    .init.stream = chacha20poly1305_init,
+    .mode.stream = maid_stream_xor,
+    .c_def.stream = maid_chacha20_128,
+
+    .m_def = &maid_poly1305,
+    .s_big = false,
+    .s_bits = false,
+
+    .block = false
+};
+
+const struct maid_aead_def maid_chacha20poly1305_256 =
+{
+    .init.stream = chacha20poly1305_init,
+    .mode.stream = maid_stream_xor,
+    .c_def.stream = maid_chacha20_256,
+
+    .m_def = &maid_poly1305,
+    .s_big = false,
+    .s_bits = false,
+
+    .block = false
+};
+
+const struct maid_aead_def maid_chacha20poly1305_ietf =
+{
+    .init.stream = chacha20poly1305_init,
+    .mode.stream = maid_stream_xor,
+    .c_def.stream = maid_chacha20_ietf,
+
+    .m_def = &maid_poly1305,
+    .s_big = false,
+    .s_bits = false,
+
+    .block = false
 };

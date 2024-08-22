@@ -21,7 +21,7 @@
 #include <maid/mac.h>
 #include <maid/utils.h>
 
-/* External functions */
+/* Maid MAC definition */
 
 struct poly1305
 {
@@ -33,7 +33,7 @@ struct poly1305
     u32 buffer[5];
 };
 
-extern void *
+static void *
 poly1305_del(void *ctx)
 {
     if (ctx)
@@ -43,7 +43,7 @@ poly1305_del(void *ctx)
     return NULL;
 }
 
-extern void *
+static void *
 poly1305_new(const u8 *key)
 {
     struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
@@ -69,7 +69,7 @@ poly1305_new(const u8 *key)
     return ret;
 }
 
-extern void
+static void
 poly1305_update(void *ctx, u8 *block, size_t size)
 {
     /* 2^130 - 5 little endian */
@@ -96,7 +96,7 @@ poly1305_update(void *ctx, u8 *block, size_t size)
     }
 }
 
-extern void
+static void
 poly1305_digest(void *ctx, u8 *output)
 {
     if (ctx && output)
@@ -110,8 +110,6 @@ poly1305_digest(void *ctx, u8 *output)
         memcpy(output, p->acc2, 16);
     }
 }
-
-/* Maid MAC definition */
 
 const struct maid_mac_def maid_poly1305 =
 {

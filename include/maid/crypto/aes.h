@@ -23,4 +23,9 @@ extern const struct maid_block_def maid_aes_128;
 extern const struct maid_block_def maid_aes_192;
 extern const struct maid_block_def maid_aes_256;
 
+#include <maid/aead.h>
+extern const struct maid_aead_def maid_aes_gcm_128;
+extern const struct maid_aead_def maid_aes_gcm_192;
+extern const struct maid_aead_def maid_aes_gcm_256;
+
 #endif

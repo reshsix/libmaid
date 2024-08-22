@@ -49,7 +49,7 @@ $(FOLDERS):
 	mkdir -p $@
 
 OBJS = utils.o crypto/aes.o crypto/chacha.o \
-       crypto/poly1305.o crypto/gmac.o maid.o block.o stream.o mac.o
+       crypto/poly1305.o crypto/gmac.o block.o stream.o mac.o aead.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -c $< -o $@

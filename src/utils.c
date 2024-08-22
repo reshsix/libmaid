@@ -144,28 +144,3 @@ maid_mp_shr(u32 *restrict out, const u32 *restrict a,
         }
     }
 }
-
-extern size_t
-maid_cb_buffer(void *ctx, u8 *data, size_t bytes)
-{
-    size_t ret = 0;
-
-    if (ctx && data)
-    {
-        struct maid_cb_buf *buf = ctx;
-        if (buf->data && buf->counter < buf->limit)
-        {
-            size_t limit = buf->limit - buf->counter;
-            bytes = (bytes < limit) ? bytes : limit;
-
-            if (buf->write)
-                memcpy(&(buf->data[buf->counter]), data, bytes);
-            else
-                memcpy(data, &(buf->data[buf->counter]), bytes);
-            buf->counter += bytes;
-            ret = bytes;
-        }
-    }
-
-    return ret;
-}

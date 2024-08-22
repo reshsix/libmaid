@@ -36,25 +36,4 @@ void maid_mp_mul(u32 *restrict out, const u32 *restrict a,
 void maid_mp_shr(u32 *restrict out, const u32 *restrict a,
                  const size_t n, const size_t so, const size_t sa);
 
-struct maid_cb_read
-{
-    size_t (*f)(void *, u8 *, const size_t);
-    void *ctx;
-};
-
-struct maid_cb_write
-{
-    size_t (*f)(void *, u8 *, const size_t);
-    void *ctx;
-};
-
-struct maid_cb_buf
-{
-    u8 *data;
-    size_t counter, limit;
-    bool write;
-};
-
-size_t maid_cb_buffer(void *ctx, u8 *data, size_t bytes);
-
 #endif

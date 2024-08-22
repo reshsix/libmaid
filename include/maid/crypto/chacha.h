@@ -23,4 +23,9 @@ extern const struct maid_stream_def maid_chacha20_128;
 extern const struct maid_stream_def maid_chacha20_256;
 extern const struct maid_stream_def maid_chacha20_ietf;
 
+#include <maid/aead.h>
+extern const struct maid_aead_def maid_chacha20poly1305_128;
+extern const struct maid_aead_def maid_chacha20poly1305_256;
+extern const struct maid_aead_def maid_chacha20poly1305_ietf;
+
 #endif

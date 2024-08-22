@@ -60,7 +60,7 @@ gf128_mul(const u8 *a, const u8 *b, u8 *out)
     maid_mem_clear(tmp, 16);
 }
 
-/* External functions */
+/* Maid MAC definition */
 
 struct gmac
 {
@@ -68,7 +68,7 @@ struct gmac
     u8 acc[16], buffer[16];
 };
 
-extern void *
+static void *
 gmac_del(void *ctx)
 {
     if (ctx)
@@ -78,7 +78,7 @@ gmac_del(void *ctx)
     return NULL;
 }
 
-extern void *
+static void *
 gmac_new(const u8 *key)
 {
     struct gmac *ret = calloc(1, sizeof(struct gmac));
@@ -92,7 +92,7 @@ gmac_new(const u8 *key)
     return ret;
 }
 
-extern void
+static void
 gmac_update(void *ctx, u8 *block, size_t size)
 {
     if (ctx && block)
@@ -107,7 +107,7 @@ gmac_update(void *ctx, u8 *block, size_t size)
     }
 }
 
-extern void
+static void
 gmac_digest(void *ctx, u8 *output)
 {
     if (ctx && output)
@@ -119,8 +119,6 @@ gmac_digest(void *ctx, u8 *output)
         memcpy(output, g->acc, 16);
     }
 }
-
-/* Maid MAC definition */
 
 const struct maid_mac_def maid_gmac =
 {
