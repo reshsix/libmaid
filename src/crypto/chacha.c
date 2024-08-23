@@ -178,25 +178,7 @@ chacha_gen(void *ctx, u8 *out)
     }
 }
 
-const struct maid_stream_def maid_chacha20_128 =
-{
-    .new = chacha_new,
-    .del = chacha_del,
-    .gen = chacha_gen,
-    .state_s = 64,
-    .version = CHACHA20_128
-};
-
-const struct maid_stream_def maid_chacha20_256 =
-{
-    .new = chacha_new,
-    .del = chacha_del,
-    .gen = chacha_gen,
-    .state_s = 64,
-    .version = CHACHA20_256
-};
-
-const struct maid_stream_def maid_chacha20_ietf =
+const struct maid_stream_def maid_chacha20 =
 {
     .new = chacha_new,
     .del = chacha_del,
@@ -224,37 +206,11 @@ chacha20poly1305_init(struct maid_stream_def def,
     }
 }
 
-const struct maid_aead_def maid_chacha20poly1305_128 =
+const struct maid_aead_def maid_chacha20poly1305 =
 {
     .init.stream = chacha20poly1305_init,
     .mode.stream = maid_stream_xor,
-    .c_def.stream = maid_chacha20_128,
-
-    .m_def = &maid_poly1305,
-    .s_big = false,
-    .s_bits = false,
-
-    .block = false
-};
-
-const struct maid_aead_def maid_chacha20poly1305_256 =
-{
-    .init.stream = chacha20poly1305_init,
-    .mode.stream = maid_stream_xor,
-    .c_def.stream = maid_chacha20_256,
-
-    .m_def = &maid_poly1305,
-    .s_big = false,
-    .s_bits = false,
-
-    .block = false
-};
-
-const struct maid_aead_def maid_chacha20poly1305_ietf =
-{
-    .init.stream = chacha20poly1305_init,
-    .mode.stream = maid_stream_xor,
-    .c_def.stream = maid_chacha20_ietf,
+    .c_def.stream = maid_chacha20,
 
     .m_def = &maid_poly1305,
     .s_big = false,

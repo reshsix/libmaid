@@ -19,13 +19,9 @@
 #define MAID_CRYPTO_CHACHA
 
 #include <maid/stream.h>
-extern const struct maid_stream_def maid_chacha20_128;
-extern const struct maid_stream_def maid_chacha20_256;
-extern const struct maid_stream_def maid_chacha20_ietf;
+extern const struct maid_stream_def maid_chacha20;
 
 #include <maid/aead.h>
-extern const struct maid_aead_def maid_chacha20poly1305_128;
-extern const struct maid_aead_def maid_chacha20poly1305_256;
-extern const struct maid_aead_def maid_chacha20poly1305_ietf;
+extern const struct maid_aead_def maid_chacha20poly1305;
 
 #endif

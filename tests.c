@@ -2266,7 +2266,7 @@ chacha_test(char *file, char *num, char *key_h, char *nonce_h, u32 counter,
     hex_read(input, input_h);
     size_t length = hex_read(output, output_h);
 
-    maid_stream *st = maid_stream_new(maid_chacha20_ietf, key, nonce, counter);
+    maid_stream *st = maid_stream_new(maid_chacha20, key, nonce, counter);
     if (st)
     {
         maid_stream_xor(st, input, length);
@@ -2439,7 +2439,7 @@ chacha20poly1305_vec1(void)
     u8 tag[] = {0x1a, 0xe1, 0x0b, 0x59, 0x4f, 0x09, 0xe2, 0x6a,
                 0x7e, 0x90, 0x2e, 0xcb, 0xd0, 0x60, 0x06, 0x91};
 
-    return aead_test(maid_chacha20poly1305_ietf, key, nonce,
+    return aead_test(maid_chacha20poly1305, key, nonce,
                      ad, sizeof(ad), (u8*)data, strlen(data),
                      cipher, tag, sizeof(tag));
 }
