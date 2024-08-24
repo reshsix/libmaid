@@ -22,6 +22,7 @@
 #include <maid/utils.h>
 
 #include <maid/crypto/aes.h>
+#include <maid/crypto/gmac.h>
 #include <maid/crypto/chacha.h>
 #include <maid/crypto/poly1305.h>
 
@@ -278,6 +279,214 @@ aes_ctr_tests(void)
            "2b0930daa23de94ce87017ba2d84988ddfc9c58db67aada613c2dd08457941a6",
            "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
            "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
+}
+
+/* AES-GCM GCM Spec vectors */
+
+static void
+aes_gcm_test(struct maid_aead_def def, char *file, char *num,
+             char *key_h, char *nonce_h, char *ad_h, char *input_h,
+             char *output_h, char *tag_h, bool decrypt)
+{
+    u8 key[32], nonce[64], ad[32], input[64], output[64], tag[16], tag2[16];
+    hex_read(key,   key_h);
+    hex_read(input, input_h);
+    hex_read(tag2,  tag_h);
+    size_t length  = hex_read(nonce, nonce_h);
+    size_t length2 = hex_read(output, output_h);
+    size_t length3 = hex_read(ad, ad_h);
+
+    u8 iv[16] = {0};
+    if (length == 12)
+    {
+        memcpy(iv, nonce, 12);
+        iv[15] = 0x1;
+    }
+    else
+    {
+        u8 gkey[32] = {0};
+        maid_block *blk = maid_block_new(def.c_def.block, key, iv);
+        if (blk)
+        {
+            maid_block_ecb(blk, gkey, false);
+            maid_mac *m = maid_mac_new(maid_gmac, gkey);
+            if (m)
+            {
+                maid_mac_update(m, nonce, length);
+                memset(gkey, 0, 16);
+                if (length % 16)
+                    maid_mac_update(m, gkey, 16 - (length % 16));
+
+                u64 size = length * 8;
+                for (u8 i = 0; i < sizeof(size); i++)
+                    gkey[15 - i] = ((u8*)&size)[i];
+                maid_mac_update(m, gkey, 16);
+
+                maid_mac_digest(m, iv);
+            }
+            maid_mac_del(m);
+        }
+        maid_block_del(blk);
+        maid_mem_clear(gkey, sizeof(gkey));
+    }
+
+    maid_aead *ae = maid_aead_new(def, key, iv);
+    if (ae)
+    {
+        maid_aead_update(ae, ad, length3);
+        maid_aead_crypt(ae, input, length2, decrypt);
+        maid_aead_digest(ae, tag);
+
+        if (memcmp(input, output, length2)  != 0 ||
+            memcmp(tag, tag2, sizeof(tag2)) != 0 )
+            fail_test(file, num, "Authenticated Encryption");
+    }
+    maid_aead_del(ae);
+}
+
+static void
+aes_gcm_tests(void)
+{
+    aes_gcm_test(maid_aes_gcm_128, "GCM Spec", "1",
+                 "00000000000000000000000000000000",
+                 "000000000000000000000000", "", "", "",
+                 "58e2fccefa7e3061367f1d57a4e7455a", false);
+    aes_gcm_test(maid_aes_gcm_128, "GCM Spec", "2",
+                 "00000000000000000000000000000000",
+                 "000000000000000000000000", "",
+                 "00000000000000000000000000000000",
+                 "0388dace60b6a392f328c2b971b2fe78",
+                 "ab6e47d42cec13bdf53a67b21257bddf", false);
+    aes_gcm_test(maid_aes_gcm_128, "GCM Spec", "3",
+            "feffe9928665731c6d6a8f9467308308",
+            "cafebabefacedbaddecaf888", "",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255",
+            "42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e"
+            "21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091473f5985",
+            "4d5c2af327cd64a62cf35abd2ba6fab4", false);
+    aes_gcm_test(maid_aes_gcm_128, "GCM Spec", "4",
+            "feffe9928665731c6d6a8f9467308308",
+            "cafebabefacedbaddecaf888",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e"
+            "21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091",
+            "5bc94fbc3221a5db94fae95ae7121a47", false);
+    aes_gcm_test(maid_aes_gcm_128, "GCM Spec", "5",
+            "feffe9928665731c6d6a8f9467308308",
+            "cafebabefacedbad",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "61353b4c2806934a777ff51fa22a4755699b2a714fcdc6f83766e5f97b6c7423"
+            "73806900e49f24b22b097544d4896b424989b5e1ebac0f07c23f4598",
+            "3612d2e79e3b0785561be14aaca2fccb", false);
+    aes_gcm_test(maid_aes_gcm_128, "GCM Spec", "6",
+            "feffe9928665731c6d6a8f9467308308",
+            "9313225df88406e555909c5aff5269aa6a7a9538534f7da1e4c303d2a318a728"
+            "c3c0c95156809539fcf0e2429a6b525416aedbf5a0de6a57a637b39b",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "8ce24998625615b603a033aca13fb894be9112a5c3a211a8ba262a3cca7e2ca7"
+            "01e4a9a4fba43c90ccdcb281d48c7c6fd62875d2aca417034c34aee5",
+            "619cc5aefffe0bfa462af43c1699d050", false);
+
+    aes_gcm_test(maid_aes_gcm_192, "GCM Spec", "7",
+                 "000000000000000000000000000000000000000000000000",
+                 "000000000000000000000000", "", "", "",
+                 "cd33b28ac773f74ba00ed1f312572435", false);
+    aes_gcm_test(maid_aes_gcm_192, "GCM Spec", "8",
+                 "000000000000000000000000000000000000000000000000",
+                 "000000000000000000000000", "",
+                 "00000000000000000000000000000000",
+                 "98e7247c07f0fe411c267e4384b0f600",
+                 "2ff58d80033927ab8ef4d4587514f0fb", false);
+    aes_gcm_test(maid_aes_gcm_192, "GCM Spec", "9",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c",
+            "cafebabefacedbaddecaf888", "",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255",
+            "3980ca0b3c00e841eb06fac4872a2757859e1ceaa6efd984628593b40ca1e19c"
+            "7d773d00c144c525ac619d18c84a3f4718e2448b2fe324d9ccda2710acade256",
+            "9924a7c8587336bfb118024db8674a14", false);
+    aes_gcm_test(maid_aes_gcm_192, "GCM Spec", "10",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c",
+            "cafebabefacedbaddecaf888",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "3980ca0b3c00e841eb06fac4872a2757859e1ceaa6efd984628593b40ca1e19c"
+            "7d773d00c144c525ac619d18c84a3f4718e2448b2fe324d9ccda2710",
+            "2519498e80f1478f37ba55bd6d27618c", false);
+    aes_gcm_test(maid_aes_gcm_192, "GCM Spec", "11",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c",
+            "cafebabefacedbad",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "0f10f599ae14a154ed24b36e25324db8c566632ef2bbb34f8347280fc4507057"
+            "fddc29df9a471f75c66541d4d4dad1c9e93a19a58e8b473fa0f062f7",
+            "65dcc57fcf623a24094fcca40d3533f8", false);
+    aes_gcm_test(maid_aes_gcm_192, "GCM Spec", "12",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c",
+            "9313225df88406e555909c5aff5269aa6a7a9538534f7da1e4c303d2a318a728"
+            "c3c0c95156809539fcf0e2429a6b525416aedbf5a0de6a57a637b39b",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "d27e88681ce3243c4830165a8fdcf9ff1de9a1d8e6b447ef6ef7b79828666e45"
+            "81e79012af34ddd9e2f037589b292db3e67c036745fa22e7e9b7373b",
+            "dcf566ff291c25bbb8568fc3d376a6d9", false);
+
+    aes_gcm_test(maid_aes_gcm_256, "GCM Spec", "13",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            "000000000000000000000000", "", "", "",
+            "530f8afbc74536b9a963b4f1c4cb738b", false);
+    aes_gcm_test(maid_aes_gcm_256, "GCM Spec", "14",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            "000000000000000000000000", "",
+            "00000000000000000000000000000000",
+            "cea7403d4d606b6e074ec5d3baf39d18",
+            "d0d1c8a799996bf0265b98b5d48ab919", false);
+    aes_gcm_test(maid_aes_gcm_256, "GCM Spec", "15",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+            "cafebabefacedbaddecaf888", "",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b391aafd255",
+            "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+            "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662898015ad",
+            "b094dac5d93471bdec1a502270e3cc6c", false);
+    aes_gcm_test(maid_aes_gcm_256, "GCM Spec", "16",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+            "cafebabefacedbaddecaf888",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+            "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662",
+            "76fc6ece0f4e1768cddf8853bb2d551b", false);
+    aes_gcm_test(maid_aes_gcm_256, "GCM Spec", "17",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+            "cafebabefacedbad",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "c3762df1ca787d32ae47c13bf19844cbaf1ae14d0b976afac52ff7d79bba9de0"
+            "feb582d33934a4f0954cc2363bc73f7862ac430e64abe499f47c9b1f",
+            "3a337dbf46a792c45e454913fe2ea8f2", false);
+    aes_gcm_test(maid_aes_gcm_256, "GCM Spec", "18",
+            "feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308",
+            "9313225df88406e555909c5aff5269aa6a7a9538534f7da1e4c303d2a318a728"
+            "c3c0c95156809539fcf0e2429a6b525416aedbf5a0de6a57a637b39b",
+            "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+            "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+            "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39",
+            "5a8def2f0c9e53f1f75d7853659e2a20eeb2b22aafde6419a058ab4f6f746bf4"
+            "0fc0c3b780f244452da3ebf1c5d82cdea2418997200ef82e44ae7e3f",
+            "a44a8266ee1c8eb0c8b5d4cf5ae9f19a", false);
 }
 
 /* Chacha20 RFC8439 vectors */
@@ -610,113 +819,16 @@ chacha20poly1305_tests(void)
             true);
 }
 
-/* Legacy tests */
-
-static bool
-aead_test(struct maid_aead_def def, u8 *key, u8 *nonce,
-          u8 *ad, size_t ad_s, u8 *data, size_t data_s,
-          u8 *cipher, u8 *tag, size_t tag_s)
-{
-    bool ret = false;
-
-    maid_aead *ae = maid_aead_new(def, key, nonce);
-    maid_aead *ae2 = maid_aead_new(def, key, nonce);
-    u8 *buffer = calloc(1, data_s);
-    u8 *buffer2 = calloc(1, tag_s);
-
-    if (ae && buffer)
-    {
-        memcpy(buffer, data, data_s);
-        maid_aead_update(ae, ad, ad_s);
-        maid_aead_update(ae2, ad, ad_s);
-
-        maid_aead_crypt(ae, buffer, data_s, false);
-        maid_aead_digest(ae, buffer2);
-
-        ret = memcmp(buffer, cipher, data_s) == 0 &&
-              memcmp(buffer2,   tag,  tag_s) == 0;
-
-        maid_aead_crypt(ae2, buffer, data_s, true);
-        maid_aead_digest(ae2, buffer2);
-
-        ret = ret && memcmp(buffer, data, data_s) == 0 &&
-                     memcmp(buffer2, tag,  tag_s) == 0;
-    }
-
-    maid_aead_del(ae);
-    maid_aead_del(ae2);
-    maid_mem_clear(buffer, data_s);
-    maid_mem_clear(buffer2, tag_s);
-
-    free(buffer);
-    free(buffer2);
-
-    return ret;
-}
-
-static bool
-aes_gcm_vec1(void)
-{
-    u8 data[] = {0xd9, 0x31, 0x32, 0x25, 0xf8, 0x84, 0x06, 0xe5,
-                 0xa5, 0x59, 0x09, 0xc5, 0xaf, 0xf5, 0x26, 0x9a,
-                 0x86, 0xa7, 0xa9, 0x53, 0x15, 0x34, 0xf7, 0xda,
-                 0x2e, 0x4c, 0x30, 0x3d, 0x8a, 0x31, 0x8a, 0x72,
-                 0x1c, 0x3c, 0x0c, 0x95, 0x95, 0x68, 0x09, 0x53,
-                 0x2f, 0xcf, 0x0e, 0x24, 0x49, 0xa6, 0xb5, 0x25,
-                 0xb1, 0x6a, 0xed, 0xf5, 0xaa, 0x0d, 0xe6, 0x57,
-                 0xba, 0x63, 0x7b, 0x39};
-    u8 ad[] = {0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef,
-               0xfe, 0xed, 0xfa, 0xce, 0xde, 0xad, 0xbe, 0xef,
-               0xab, 0xad, 0xda, 0xd2};
-
-    u8 key[32] = {0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
-                  0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08,
-                  0xfe, 0xff, 0xe9, 0x92, 0x86, 0x65, 0x73, 0x1c,
-                  0x6d, 0x6a, 0x8f, 0x94, 0x67, 0x30, 0x83, 0x08};
-    u8 nonce[12] = {0xca, 0xfe, 0xba, 0xbe,
-                    0xfa, 0xce, 0xdb, 0xad,
-                    0xde, 0xca, 0xf8, 0x88};
-
-    u8 cipher[] = {0x52, 0x2d, 0xc1, 0xf0, 0x99, 0x56, 0x7d, 0x07,
-                   0xf4, 0x7f, 0x37, 0xa3, 0x2a, 0x84, 0x42, 0x7d,
-                   0x64, 0x3a, 0x8c, 0xdc, 0xbf, 0xe5, 0xc0, 0xc9,
-                   0x75, 0x98, 0xa2, 0xbd, 0x25, 0x55, 0xd1, 0xaa,
-                   0x8c, 0xb0, 0x8e, 0x48, 0x59, 0x0d, 0xbb, 0x3d,
-                   0xa7, 0xb0, 0x8b, 0x10, 0x56, 0x82, 0x88, 0x38,
-                   0xc5, 0xf6, 0x1e, 0x63, 0x93, 0xba, 0x7a, 0x0a,
-                   0xbc, 0xc9, 0xf6, 0x62};
-    u8 tag[] = {0x76, 0xfc, 0x6e, 0xce, 0x0f, 0x4e, 0x17, 0x68,
-                0xcd, 0xdf, 0x88, 0x53, 0xbb, 0x2d, 0x55, 0x1b};
-
-    u8 cipher2[] = {0x42, 0x83, 0x1e, 0xc2, 0x21, 0x77, 0x74, 0x24,
-                    0x4b, 0x72, 0x21, 0xb7, 0x84, 0xd0, 0xd4, 0x9c,
-                    0xe3, 0xaa, 0x21, 0x2f, 0x2c, 0x02, 0xa4, 0xe0,
-                    0x35, 0xc1, 0x7e, 0x23, 0x29, 0xac, 0xa1, 0x2e,
-                    0x21, 0xd5, 0x14, 0xb2, 0x54, 0x66, 0x93, 0x1c,
-                    0x7d, 0x8f, 0x6a, 0x5a, 0xac, 0x84, 0xaa, 0x05,
-                    0x1b, 0xa3, 0x0b, 0x39, 0x6a, 0x0a, 0xac, 0x97,
-                    0x3d, 0x58, 0xe0, 0x91};
-    u8 tag2[] = {0x5b, 0xc9, 0x4f, 0xbc, 0x32, 0x21, 0xa5, 0xdb,
-                 0x94, 0xfa, 0xe9, 0x5a, 0xe7, 0x12, 0x1a, 0x47};
-
-    return aead_test(maid_aes_gcm_256, key, nonce,
-                     ad, sizeof(ad), data, sizeof(data),
-                     cipher, tag, sizeof(tag)) &&
-           aead_test(maid_aes_gcm_128, key, nonce,
-                     ad, sizeof(ad), data, sizeof(data),
-                     cipher2, tag2, sizeof(tag2));
-}
-
 extern int
 main(void)
 {
     aes_tests();
     aes_ctr_tests();
+    aes_gcm_tests();
 
     chacha_tests();
     poly1305_tests();
     chacha20poly1305_tests();
 
-    return failures == 0 && aes_gcm_vec1() ?
-           EXIT_SUCCESS : EXIT_FAILURE;
+    return failures == 0;
 }

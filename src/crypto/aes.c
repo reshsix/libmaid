@@ -542,11 +542,7 @@ gcm_init(struct maid_block_def def,
          const u8 *key, const u8 *nonce,
          maid_block **bl, maid_mac **m)
 {
-    u8 iv[16] = {0};
-    memcpy(iv, nonce, 12);
-    iv[15] = 0x1;
-
-    *bl = maid_block_new(def, key, iv);
+    *bl = maid_block_new(def, key, nonce);
     if (*bl)
     {
         /* GMAC H and encrypted IV */
