@@ -201,6 +201,85 @@ aes_tests(void)
             "f69f2445df4f9b17ad2b417be66c3710", true);
 }
 
+/* AES-CTR NIST SP 800-38A vectors */
+
+static void
+aes_ctr_test(struct maid_block_def def, char *file, char *num,
+             char *key_h, char *iv_h, char *input_h, char *output_h)
+{
+    u8 key[32], iv[16], input[64], output[64];
+    hex_read(key,    key_h);
+    hex_read(iv,     iv_h);
+    hex_read(input,  input_h);
+    size_t length = hex_read(output, output_h);
+
+    maid_block *bl = maid_block_new(def, key, iv);
+    if (bl)
+    {
+        maid_block_ctr(bl, input, length);
+        if (memcmp(input, output, length) != 0)
+            fail_test(file, num, "Encryption");
+    }
+    maid_block_del(bl);
+
+    maid_mem_clear(key,    sizeof(key));
+    maid_mem_clear(iv,     sizeof(iv));
+    maid_mem_clear(input,  sizeof(input));
+    maid_mem_clear(output, sizeof(output));
+}
+
+static void
+aes_ctr_tests(void)
+{
+    aes_ctr_test(maid_aes_128, "NIST SP 800-38A-F.5.1", "0",
+           "2b7e151628aed2a6abf7158809cf4f3c",
+           "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+           "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+           "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+           "874d6191b620e3261bef6864990db6ce9806f66b7970fdff8617187bb9fffdff"
+           "5ae4df3edbd5d35e5b4f09020db03eab1e031dda2fbe03d1792170a0f3009cee");
+
+    aes_ctr_test(maid_aes_128, "NIST SP 800-38A-F.5.2", "0",
+           "2b7e151628aed2a6abf7158809cf4f3c",
+           "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+           "874d6191b620e3261bef6864990db6ce9806f66b7970fdff8617187bb9fffdff"
+           "5ae4df3edbd5d35e5b4f09020db03eab1e031dda2fbe03d1792170a0f3009cee",
+           "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+           "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
+
+    aes_ctr_test(maid_aes_192, "NIST SP 800-38A-F.5.3", "0",
+           "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
+           "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+           "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+           "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+           "1abc932417521ca24f2b0459fe7e6e0b090339ec0aa6faefd5ccc2c6f4ce8e94"
+           "1e36b26bd1ebc670d1bd1d665620abf74f78a7f6d29809585a97daec58c6b050");
+
+    aes_ctr_test(maid_aes_192, "NIST SP 800-38A-F.5.4", "0",
+           "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
+           "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+           "1abc932417521ca24f2b0459fe7e6e0b090339ec0aa6faefd5ccc2c6f4ce8e94"
+           "1e36b26bd1ebc670d1bd1d665620abf74f78a7f6d29809585a97daec58c6b050",
+           "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+           "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
+
+    aes_ctr_test(maid_aes_256, "NIST SP 800-38A-F.5.5", "0",
+           "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
+           "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+           "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+           "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710",
+           "601ec313775789a5b7a7f504bbf3d228f443e3ca4d62b59aca84e990cacaf5c5"
+           "2b0930daa23de94ce87017ba2d84988ddfc9c58db67aada613c2dd08457941a6");
+
+    aes_ctr_test(maid_aes_256, "NIST SP 800-38A-F.5.6", "0",
+           "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
+           "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+           "601ec313775789a5b7a7f504bbf3d228f443e3ca4d62b59aca84e990cacaf5c5"
+           "2b0930daa23de94ce87017ba2d84988ddfc9c58db67aada613c2dd08457941a6",
+           "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51"
+           "30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
+}
+
 /* Chacha20 RFC8439 vectors */
 
 static void
@@ -632,6 +711,7 @@ extern int
 main(void)
 {
     aes_tests();
+    aes_ctr_tests();
 
     chacha_tests();
     poly1305_tests();
