@@ -25,8 +25,8 @@
 
 struct poly1305
 {
-    /* 320 bits, to handle multiplication */
-    u32 acc[10], acc2[10], acc3[10];
+    /* 416 bits, to handle multiplication and reduction */
+    u32 acc[13], acc2[13], acc3[13];
     /* R and S key parts */
     u32 r[4], s[4];
     /* Block buffer */
@@ -75,24 +75,29 @@ poly1305_update(void *ctx, u8 *block, size_t size)
     /* 2^130 - 5 little endian */
     const u32 prime[5] = {0xfffffffb, 0xffffffff,
                           0xffffffff, 0xffffffff, 0x3};
-
+    /* 2^260 // prime, for Barret's reduction */
+    const u32 m[5] = {0x00000005, 0x00000000,
+                      0x00000000, 0x00000000, 0x4};
     if (ctx && block)
     {
         struct poly1305 *p = ctx;
+
         memcpy(p->buffer, block, size);
-        memset(&(p->buffer[size]), 0, sizeof(p->buffer) - size);
+        if (sizeof(p->buffer) > size)
+            memset(&(((u8*)p->buffer)[size]), 0, sizeof(p->buffer) - size);
         p->buffer[size / 4] |= 0x1 << ((size % 4) * 8);
 
         /* Adds block to the accumulator */
-        maid_mp_add(p->acc2, p->acc, p->buffer, 10, 10, 5);
+        maid_mp_add(p->acc2, p->acc, p->buffer, 13, 13, 5);
 
         /* Multiplies accumulator by r */
-        maid_mp_mul(p->acc3, p->acc2, p->r, 10, 10, 4);
+        maid_mp_mul(p->acc3, p->acc2, p->r, 13, 13, 4);
 
         /* Barret reduction by prime */
-        maid_mp_shr(p->acc,  p->acc3,     130, 10, 10);
-        maid_mp_mul(p->acc2, p->acc,    prime, 10, 10, 5);
-        maid_mp_sub(p->acc,  p->acc3, p->acc2, 10, 10, 10);
+        maid_mp_mul(p->acc2, p->acc3,       m, 13, 13, 5);
+        maid_mp_shr(p->acc,  p->acc2,     260, 13, 13);
+        maid_mp_mul(p->acc2, p->acc,    prime, 13, 13, 5);
+        maid_mp_sub(p->acc,  p->acc3, p->acc2, 13, 13, 13);
     }
 }
 
@@ -104,7 +109,7 @@ poly1305_digest(void *ctx, u8 *output)
         struct poly1305 *p = ctx;
 
         /* Adds s to the accumulator */
-        maid_mp_add(p->acc2, p->acc, p->s, 10, 10, 4);
+        maid_mp_add(p->acc2, p->acc, p->s, 13, 13, 4);
 
         /* Exports 128 bits */
         memcpy(output, p->acc2, 16);

@@ -23,9 +23,11 @@
 
 #include <maid/crypto/aes.h>
 #include <maid/crypto/chacha.h>
+#include <maid/crypto/poly1305.h>
 
 #include <maid/block.h>
 #include <maid/stream.h>
+#include <maid/mac.h>
 #include <maid/aead.h>
 
 /* Thanks to AES NIST extensive tests, most of this file is machine-generated
@@ -64,10 +66,9 @@ hex_read(u8 *data, char *hex)
 
 static u32 failures = 0;
 static void
-fail_test(char *file, char *num, bool decrypt)
+fail_test(char *file, char *num, char *op)
 {
-    fprintf(stderr, "- %s Test %s from %s Failed\n",
-           (decrypt) ? "Decryption" : "Encryption", num, file);
+    fprintf(stderr, "- %s Test %s from %s Failed\n", op, num, file);
     failures++;
 }
 
@@ -88,7 +89,7 @@ aes_test(struct maid_block_def def, char *file, char *num,
     {
         maid_block_ecb(bl, input, decrypt);
         if (memcmp(input, output, sizeof(output)) != 0)
-            fail_test(file, num, decrypt);
+            fail_test(file, num, (decrypt) ? "Decryption" : "Encryption");
     }
     maid_block_del(bl);
 
@@ -2271,7 +2272,7 @@ chacha_test(char *file, char *num, char *key_h, char *nonce_h, u32 counter,
     {
         maid_stream_xor(st, input, length);
         if (memcmp(input, output, length) != 0)
-            fail_test(file, num, false);
+            fail_test(file, num, "Encryption");
     }
     maid_stream_del(st);
 
@@ -2359,6 +2360,117 @@ chacha_tests(void)
                                                 "166d3df2d721caf9b21e5fb14c616871fd84c54f9d65b283196c7fe4f60553eb"
                                                 "f39c6402c42234e32a356b3e764312a61a5532055716ead6962568f87d3f3f77"
                                                 "04c6a8d1bcd1bf4d50d6154b6da731b187b58dfd728afa36757a797ac188d1");
+
+    chacha_test("RFC7539-Appendix.A.4", "1", "0000000000000000000000000000000000000000000000000000000000000000",
+                "000000000000000000000000", 0, "0000000000000000000000000000000000000000000000000000000000000000",
+                                               "76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7");
+    chacha_test("RFC7539-Appendix.A.4", "2", "0000000000000000000000000000000000000000000000000000000000000001",
+                "000000000000000000000002", 0, "0000000000000000000000000000000000000000000000000000000000000000",
+                                               "ecfa254f845f647473d3cb140da9e87606cb33066c447b87bc2666dde3fbb739");
+    chacha_test("RFC7539-Appendix.A.4", "3", "1c9240a5eb55d38af333888604f6b5f0473917c1402b80099dca5cbc207075c0",
+                "000000000000000000000002", 0, "0000000000000000000000000000000000000000000000000000000000000000",
+                                               "965e3bc6f9ec7ed9560808f4d229f94b137ff275ca9b3fcbdd59deaad23310ae");
+}
+
+/* Poly1305 RFC7539 vectors */
+
+static void
+poly1305_test(char *file, char *num, char *key_h, char *input_h, char *tag_h)
+{
+    u8 key[32], input[1024], tag[16], output[16];
+    hex_read(key,     key_h);
+    hex_read(output,  tag_h);
+    size_t length = hex_read(input, input_h);
+
+    maid_mac *m = maid_mac_new(maid_poly1305, key);
+    if (m)
+    {
+        maid_mac_update(m, input, length);
+        maid_mac_digest(m, tag);
+        if (memcmp(tag, output, sizeof(output)) != 0)
+        {
+            fail_test(file, num, "Authentication");
+            for (int i = 0; i < 16; i++)
+                printf("%02x ", tag[i]);
+            printf("\n");
+        }
+    }
+    maid_mac_del(m);
+
+    maid_mem_clear(key,    sizeof(key));
+    maid_mem_clear(input,  sizeof(input));
+    maid_mem_clear(tag,    sizeof(tag));
+    maid_mem_clear(output, sizeof(output));
+}
+
+static void
+poly1305_tests(void)
+{
+    poly1305_test("RFC7539-Appendix.A.3", "1", "0000000000000000000000000000000000000000000000000000000000000000",
+                                               "0000000000000000000000000000000000000000000000000000000000000000"
+                                               "0000000000000000000000000000000000000000000000000000000000000000"
+                                               "0000000000000000000000000000000000000000000000000000000000000000"
+                                               "0000000000000000000000000000000000000000000000000000000000000000",
+                                               "00000000000000000000000000000000");
+    poly1305_test("RFC7539-Appendix.A.3", "2", "0000000000000000000000000000000036e5f6b5c5e06070f0efca96227a863e",
+                                               "416e79207375626d697373696f6e20746f20746865204945544620696e74656e"
+                                               "6465642062792074686520436f6e7472696275746f7220666f72207075626c69"
+                                               "636174696f6e20617320616c6c206f722070617274206f6620616e2049455446"
+                                               "20496e7465726e65742d4472616674206f722052464320616e6420616e792073"
+                                               "746174656d656e74206d6164652077697468696e2074686520636f6e74657874"
+                                               "206f6620616e204945544620616374697669747920697320636f6e7369646572"
+                                               "656420616e20224945544620436f6e747269627574696f6e222e205375636820"
+                                               "73746174656d656e747320696e636c756465206f72616c2073746174656d656e"
+                                               "747320696e20494554462073657373696f6e732c2061732077656c6c20617320"
+                                               "7772697474656e20616e6420656c656374726f6e696320636f6d6d756e696361"
+                                               "74696f6e73206d61646520617420616e792074696d65206f7220706c6163652c"
+                                               "207768696368206172652061646472657373656420746f",
+                                               "36e5f6b5c5e06070f0efca96227a863e");
+    poly1305_test("RFC7539-Appendix.A.3", "3", "36e5f6b5c5e06070f0efca96227a863e00000000000000000000000000000000",
+                                               "416e79207375626d697373696f6e20746f20746865204945544620696e74656e"
+                                               "6465642062792074686520436f6e7472696275746f7220666f72207075626c69"
+                                               "636174696f6e20617320616c6c206f722070617274206f6620616e2049455446"
+                                               "20496e7465726e65742d4472616674206f722052464320616e6420616e792073"
+                                               "746174656d656e74206d6164652077697468696e2074686520636f6e74657874"
+                                               "206f6620616e204945544620616374697669747920697320636f6e7369646572"
+                                               "656420616e20224945544620436f6e747269627574696f6e222e205375636820"
+                                               "73746174656d656e747320696e636c756465206f72616c2073746174656d656e"
+                                               "747320696e20494554462073657373696f6e732c2061732077656c6c20617320"
+                                               "7772697474656e20616e6420656c656374726f6e696320636f6d6d756e696361"
+                                               "74696f6e73206d61646520617420616e792074696d65206f7220706c6163652c"
+                                               "207768696368206172652061646472657373656420746f",
+                                               "f3477e7cd95417af89a6b8794c310cf0");
+    poly1305_test("RFC7539-Appendix.A.3", "4", "1c9240a5eb55d38af333888604f6b5f0473917c1402b80099dca5cbc207075c0",
+                                               "2754776173206272696c6c69672c20616e642074686520736c6974687920746f"
+                                               "7665730a446964206779726520616e642067696d626c6520696e207468652077"
+                                               "6162653a0a416c6c206d696d737920776572652074686520626f726f676f7665"
+                                               "732c0a416e6420746865206d6f6d65207261746873206f757467726162652e",
+                                               "4541669a7eaaee61e708dc7cbcc5eb62");
+    poly1305_test("RFC7539-Appendix.A.3", "5", "0200000000000000000000000000000000000000000000000000000000000000",
+                                               "ffffffffffffffffffffffffffffffff",
+                                               "03000000000000000000000000000000");
+    poly1305_test("RFC7539-Appendix.A.3", "6", "02000000000000000000000000000000ffffffffffffffffffffffffffffffff",
+                                               "02000000000000000000000000000000",
+                                               "03000000000000000000000000000000");
+    poly1305_test("RFC7539-Appendix.A.3", "7", "0100000000000000000000000000000000000000000000000000000000000000",
+                                               "fffffffffffffffffffffffffffffffff0ffffffffffffffffffffffffffffff"
+                                               "11000000000000000000000000000000",
+                                               "05000000000000000000000000000000");
+    poly1305_test("RFC7539-Appendix.A.3", "8", "0100000000000000000000000000000000000000000000000000000000000000",
+                                               "fffffffffffffffffffffffffffffffffbfefefefefefefefefefefefefefefe"
+                                               "01010101010101010101010101010101",
+                                               "00000000000000000000000000000000");
+    poly1305_test("RFC7539-Appendix.A.3", "9", "0200000000000000000000000000000000000000000000000000000000000000",
+                                               "fdffffffffffffffffffffffffffffff",
+                                               "faffffffffffffffffffffffffffffff");
+    poly1305_test("RFC7539-Appendix.A.3", "10", "0100000000000000040000000000000000000000000000000000000000000000",
+                                                "e33594d7505e43b900000000000000003394d7505e4379cd0100000000000000"
+                                                "0000000000000000000000000000000001000000000000000000000000000000",
+                                                "14000000000000005500000000000000");
+    poly1305_test("RFC7539-Appendix.A.3", "11", "0100000000000000040000000000000000000000000000000000000000000000",
+                                                "e33594d7505e43b900000000000000003394d7505e4379cd0100000000000000"
+                                                "00000000000000000000000000000000",
+                                                "13000000000000000000000000000000");
 }
 
 /* Legacy tests */
@@ -2502,6 +2614,7 @@ main(void)
 {
     aes_tests();
     chacha_tests();
+    poly1305_tests();
     return failures == 0 && aes_gcm_vec1() && chacha20poly1305_vec1() ?
            EXIT_SUCCESS : EXIT_FAILURE;
 }

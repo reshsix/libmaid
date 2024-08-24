@@ -36,7 +36,10 @@ extern struct maid_mac *
 maid_mac_del(maid_mac *m)
 {
     if (m)
+    {
         m->def.del(m->ctx);
+        free(m->buffer);
+    }
     free(m);
 
     return NULL;
