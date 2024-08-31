@@ -20,6 +20,8 @@
 
 #include <maid/types.h>
 
+/* Not documented on this version */
+
 void maid_mem_clear(void *dest, const size_t length);
 
 #ifndef NDEBUG

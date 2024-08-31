@@ -9,7 +9,7 @@ make test
 ```
 
 ## Development status
-Currently: **1.0 beta**, needs docs and a polished interface
+Currently: **1.0 pre-release**
 
 ### Implemented algorithms
 | Category       | Algorithms                |

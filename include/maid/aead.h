@@ -22,6 +22,8 @@
 #include <maid/stream.h>
 #include <maid/mac.h>
 
+/* Internal interface */
+
 struct maid_aead_def
 {
     union
@@ -47,6 +49,8 @@ struct maid_aead_def
     bool s_bits, s_big, block;
 };
 
+/* External interface */
+
 typedef struct maid_aead maid_aead;
 maid_aead *maid_aead_new(struct maid_aead_def def, u8 *key, u8 *nonce);
 maid_aead *maid_aead_del(maid_aead *ae);
@@ -55,7 +59,7 @@ void maid_aead_crypt(maid_aead *ae, u8 *buffer,
                      size_t size, bool decrypt);
 void maid_aead_digest(maid_aead *ae, u8 *output);
 
-/* Provided algorithms */
+/* External algorithms */
 
 extern const struct maid_aead_def maid_aes_gcm_128;
 extern const struct maid_aead_def maid_aes_gcm_192;

@@ -20,6 +20,8 @@
 
 #include <maid/types.h>
 
+/* Internal interface */
+
 struct maid_block_def
 {
     void * (*new)(const u8, const u8 *);
@@ -30,6 +32,8 @@ struct maid_block_def
     const u8 version;
 };
 
+/* External interface */
+
 typedef struct maid_block maid_block;
 maid_block *maid_block_new(struct maid_block_def def,
                            const u8 *restrict key,
@@ -38,7 +42,7 @@ maid_block *maid_block_del(maid_block *bl);
 void maid_block_ecb(maid_block *bl, u8 *buffer, bool decrypt);
 void maid_block_ctr(maid_block *bl, u8 *buffer, size_t size);
 
-/* Provided algorithms */
+/* External algorithms */
 
 extern const struct maid_block_def maid_aes_128;
 extern const struct maid_block_def maid_aes_192;

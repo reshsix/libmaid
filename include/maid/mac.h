@@ -20,6 +20,8 @@
 
 #include <maid/types.h>
 
+/* Internal interface */
+
 struct maid_mac_def
 {
     void * (*new)(const u8 *);
@@ -29,15 +31,20 @@ struct maid_mac_def
     size_t state_s;
 };
 
+/* Internal algorithms */
+
+extern const struct maid_mac_def maid_gcm;
+
+/* External interface */
+
 typedef struct maid_mac maid_mac;
 maid_mac *maid_mac_new(struct maid_mac_def def, const u8 *key);
 maid_mac *maid_mac_del(maid_mac *m);
 void maid_mac_update(maid_mac *m, u8 *buffer, size_t size);
 void maid_mac_digest(maid_mac *m, u8 *output);
 
-/* Provided algorithms */
+/* External algorithms */
 
-extern const struct maid_mac_def maid_gcm;
 extern const struct maid_mac_def maid_poly1305;
 
 #endif

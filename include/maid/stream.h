@@ -20,6 +20,8 @@
 
 #include <maid/types.h>
 
+/* Internal interface */
+
 struct maid_stream_def
 {
     void * (*new)(const u8, const u8 *, const u8 *, const u64);
@@ -29,6 +31,8 @@ struct maid_stream_def
     const u8 version;
 };
 
+/* External interface */
+
 typedef struct maid_stream maid_stream;
 maid_stream *maid_stream_new(struct maid_stream_def def,
                              const u8 *restrict key,
@@ -37,7 +41,7 @@ maid_stream *maid_stream_new(struct maid_stream_def def,
 maid_stream *maid_stream_del(maid_stream *st);
 void maid_stream_xor(maid_stream *st, u8 *buffer, size_t size);
 
-/* Provided algorithms */
+/* External algorithms */
 
 extern const struct maid_stream_def maid_chacha20;
 
