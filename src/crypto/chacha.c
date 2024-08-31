@@ -20,8 +20,6 @@
 
 #include <maid/utils.h>
 
-#include <maid/crypto/poly1305.h>
-
 #include <maid/stream.h>
 #include <maid/mac.h>
 #include <maid/aead.h>

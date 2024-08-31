@@ -55,4 +55,12 @@ void maid_aead_crypt(maid_aead *ae, u8 *buffer,
                      size_t size, bool decrypt);
 void maid_aead_digest(maid_aead *ae, u8 *output);
 
+/* Provided algorithms */
+
+extern const struct maid_aead_def maid_aes_gcm_128;
+extern const struct maid_aead_def maid_aes_gcm_192;
+extern const struct maid_aead_def maid_aes_gcm_256;
+
+extern const struct maid_aead_def maid_chacha20poly1305;
+
 #endif

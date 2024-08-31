@@ -35,4 +35,9 @@ maid_mac *maid_mac_del(maid_mac *m);
 void maid_mac_update(maid_mac *m, u8 *buffer, size_t size);
 void maid_mac_digest(maid_mac *m, u8 *output);
 
+/* Provided algorithms */
+
+extern const struct maid_mac_def maid_gcm;
+extern const struct maid_mac_def maid_poly1305;
+
 #endif

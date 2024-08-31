@@ -20,8 +20,6 @@
 
 #include <maid/utils.h>
 
-#include <maid/crypto/gcm.h>
-
 #include <maid/block.h>
 #include <maid/mac.h>
 #include <maid/aead.h>

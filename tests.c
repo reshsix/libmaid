@@ -19,10 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/crypto/aes.h>
-#include <maid/crypto/chacha.h>
-#include <maid/crypto/poly1305.h>
-
 #include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>

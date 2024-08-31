@@ -38,4 +38,10 @@ maid_block *maid_block_del(maid_block *bl);
 void maid_block_ecb(maid_block *bl, u8 *buffer, bool decrypt);
 void maid_block_ctr(maid_block *bl, u8 *buffer, size_t size);
 
+/* Provided algorithms */
+
+extern const struct maid_block_def maid_aes_128;
+extern const struct maid_block_def maid_aes_192;
+extern const struct maid_block_def maid_aes_256;
+
 #endif
