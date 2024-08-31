@@ -15,10 +15,10 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_CRYPTO_GMAC
-#define MAID_CRYPTO_GMAC
+#ifndef MAID_CRYPTO_GCM
+#define MAID_CRYPTO_GCM
 
 #include <maid/mac.h>
-extern const struct maid_mac_def maid_gmac;
+extern const struct maid_mac_def maid_gcm;
 
 #endif

@@ -62,26 +62,26 @@ gf128_mul(const u8 *a, const u8 *b, u8 *out)
 
 /* Maid MAC definition */
 
-struct gmac
+struct gcm
 {
     u8 h[16], nonce[16];
     u8 acc[16], buffer[16];
 };
 
 static void *
-gmac_del(void *ctx)
+gcm_del(void *ctx)
 {
     if (ctx)
-        maid_mem_clear(ctx, sizeof(struct gmac));
+        maid_mem_clear(ctx, sizeof(struct gcm));
     free(ctx);
 
     return NULL;
 }
 
 static void *
-gmac_new(const u8 *key)
+gcm_new(const u8 *key)
 {
-    struct gmac *ret = calloc(1, sizeof(struct gmac));
+    struct gcm *ret = calloc(1, sizeof(struct gcm));
 
     if (ret)
     {
@@ -93,11 +93,11 @@ gmac_new(const u8 *key)
 }
 
 static void
-gmac_update(void *ctx, u8 *block, size_t size)
+gcm_update(void *ctx, u8 *block, size_t size)
 {
     if (ctx && block)
     {
-        struct gmac *g = ctx;
+        struct gcm *g = ctx;
         memcpy(g->buffer, block, size);
         memset(&(g->buffer[size]), 0, sizeof(g->buffer) - size);
 
@@ -108,11 +108,11 @@ gmac_update(void *ctx, u8 *block, size_t size)
 }
 
 static void
-gmac_digest(void *ctx, u8 *output)
+gcm_digest(void *ctx, u8 *output)
 {
     if (ctx && output)
     {
-        struct gmac *g = ctx;
+        struct gcm *g = ctx;
 
         for (u8 i = 0; i < 16; i++)
             g->acc[i] ^= g->nonce[i];
@@ -120,11 +120,11 @@ gmac_digest(void *ctx, u8 *output)
     }
 }
 
-const struct maid_mac_def maid_gmac =
+const struct maid_mac_def maid_gcm =
 {
-    .new = gmac_new,
-    .del = gmac_del,
-    .update = gmac_update,
-    .digest = gmac_digest,
+    .new = gcm_new,
+    .del = gcm_del,
+    .update = gcm_update,
+    .digest = gcm_digest,
     .state_s = 16
 };

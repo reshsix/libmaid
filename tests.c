@@ -20,7 +20,6 @@
 #include <string.h>
 
 #include <maid/crypto/aes.h>
-#include <maid/crypto/gmac.h>
 #include <maid/crypto/chacha.h>
 #include <maid/crypto/poly1305.h>
 
@@ -284,18 +283,14 @@ aes_gcm_test(struct maid_aead_def def, char *key_h, char *nonce_h, char *ad_h,
 static u8
 aes_gcm_tests(void)
 {
-    u8 ret = 18;
+    u8 ret = 12;
 
     char  *key_z = (char *)32;
     char   key[] = "feffe9928665731c6d6a8f9467308308"
                    "feffe9928665731c6d6a8f9467308308";
 
-    char      *iv_z = (char *)12;
-    char    iv_96[] = "cafebabefacedbaddecaf888";
-    char iv_small[] = "cafebabefacedbad";
-    char   iv_big[] = "9313225df88406e555909c5aff5269aa6a7a9538534f7da1e4c303d"
-                      "2a318a728c3c0c95156809539fcf0e2429a6b525416aedbf5a0de6a"
-                      "57a637b39b";
+    char   *iv_z = (char *)12;
+    char iv_96[] = "cafebabefacedbaddecaf888";
 
     char     ad[] = "feedfacedeadbeeffeedfacedeadbeefabaddad2";
 
@@ -369,10 +364,6 @@ aes_gcm_tests(void)
                             ciphers[i][1], tags[i][2]),
         ret -= aes_gcm_test(defs[i], key,   iv_96,    ad, data_s,
                             ciphers[i][2], tags[i][3]);
-        ret -= aes_gcm_test(defs[i], key,   iv_small, ad, data_s,
-                            ciphers[i][3], tags[i][4]);
-        ret -= aes_gcm_test(defs[i], key,   iv_big,   ad, data_s,
-                            ciphers[i][4], tags[i][5]);
     }
 
     return ret;

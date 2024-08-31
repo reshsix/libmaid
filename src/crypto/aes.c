@@ -20,7 +20,7 @@
 
 #include <maid/utils.h>
 
-#include <maid/crypto/gmac.h>
+#include <maid/crypto/gcm.h>
 
 #include <maid/block.h>
 #include <maid/mac.h>
@@ -538,11 +538,15 @@ const struct maid_block_def maid_aes_256 =
 /* Maid AEAD definitions */
 
 static void
-gcm_init(struct maid_block_def def,
+aes_gcm_init(struct maid_block_def def,
          const u8 *key, const u8 *nonce,
          maid_block **bl, maid_mac **m)
 {
-    *bl = maid_block_new(def, key, nonce);
+    u8 iv[16] = {0};
+    memcpy(iv, nonce, 12);
+    iv[15] = 0x1;
+
+    *bl = maid_block_new(def, key, iv);
     if (*bl)
     {
         /* GMAC H and encrypted IV */
@@ -550,18 +554,18 @@ gcm_init(struct maid_block_def def,
         maid_block_ecb(*bl, key, false);
         maid_block_ctr(*bl, &(key[16]), sizeof(key) - 16);
 
-        *m = maid_mac_new(maid_gmac, key);
+        *m = maid_mac_new(maid_gcm, key);
         maid_mem_clear(key, sizeof(key));
     }
 }
 
 const struct maid_aead_def maid_aes_gcm_128 =
 {
-    .init.block = gcm_init,
+    .init.block = aes_gcm_init,
     .mode.block = maid_block_ctr,
     .c_def.block = maid_aes_128,
 
-    .m_def = &maid_gmac,
+    .m_def = &maid_gcm,
     .s_big = true,
     .s_bits = true,
 
@@ -570,11 +574,11 @@ const struct maid_aead_def maid_aes_gcm_128 =
 
 const struct maid_aead_def maid_aes_gcm_192 =
 {
-    .init.block = gcm_init,
+    .init.block = aes_gcm_init,
     .mode.block = maid_block_ctr,
     .c_def.block = maid_aes_192,
 
-    .m_def = &maid_gmac,
+    .m_def = &maid_gcm,
     .s_big = true,
     .s_bits = true,
 
@@ -583,11 +587,11 @@ const struct maid_aead_def maid_aes_gcm_192 =
 
 const struct maid_aead_def maid_aes_gcm_256 =
 {
-    .init.block = gcm_init,
+    .init.block = aes_gcm_init,
     .mode.block = maid_block_ctr,
     .c_def.block = maid_aes_256,
 
-    .m_def = &maid_gmac,
+    .m_def = &maid_gcm,
     .s_big = true,
     .s_bits = true,
 

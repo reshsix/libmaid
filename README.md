@@ -17,7 +17,7 @@ Currently: **1.0 beta**, needs docs and a polished interface
 | Block ciphers  | AES (128, 192, 256)       |
 | Block modes    | ECB, CTR                  |
 | Stream ciphers | Chacha20                  |
-| MACs           | GMAC, Poly1305            |
+| MACs           | Poly1305                  |
 | AEADs          | AES-GCM, Chacha20Poly1305 |
 
 ### Planned for the next version
