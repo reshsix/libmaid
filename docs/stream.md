@@ -41,7 +41,7 @@ Opaque type that contains the state of a stream cipher
 <summary>maid_stream *maid_stream_new(struct maid_stream_def def,
                                       const u8 *restrict key,
                                       const u8 *restrict nonce,
-                                      const u64 counter)</summary>
+                                      u64 counter)</summary>
 Creates a stream cipher instance
 
 ### Parameters

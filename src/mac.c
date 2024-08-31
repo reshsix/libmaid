@@ -64,7 +64,7 @@ maid_mac_new(struct maid_mac_def def, const u8 *key)
 }
 
 extern void
-maid_mac_update(struct maid_mac *m, u8 *buffer, size_t size)
+maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
 {
     if (m && buffer && size && !(m->finished))
     {

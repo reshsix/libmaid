@@ -81,7 +81,7 @@ Deletes a MAC instance
 
 <details>
 <summary>void maid_mac_update(maid_mac *m,
-                              u8 *buffer, size_t size)</summary>
+                              const u8 *buffer, size_t size)</summary>
 Updates the MAC state
 
 ### Parameters

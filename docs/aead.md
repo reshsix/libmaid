@@ -76,7 +76,7 @@ Deletes an AEAD instance
 
 <details>
 <summary>void maid_aead_update(maid_aead *ae,
-                              u8 *buffer, size_t size)</summary>
+                               const u8 *buffer, size_t size)</summary>
 Updates the AEAD state with additional data (Step 1)
 
 ### Parameters

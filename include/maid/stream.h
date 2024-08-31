@@ -37,7 +37,7 @@ typedef struct maid_stream maid_stream;
 maid_stream *maid_stream_new(struct maid_stream_def def,
                              const u8 *restrict key,
                              const u8 *restrict nonce,
-                             const u64 counter);
+                             u64 counter);
 maid_stream *maid_stream_del(maid_stream *st);
 void maid_stream_xor(maid_stream *st, u8 *buffer, size_t size);
 

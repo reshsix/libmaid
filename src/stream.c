@@ -52,7 +52,7 @@ extern struct maid_stream *
 maid_stream_new(struct maid_stream_def def,
                 const u8 *restrict key,
                 const u8 *restrict nonce,
-                const u64 counter)
+                u64 counter)
 {
     struct maid_stream *ret = calloc(1, sizeof(struct maid_stream));
 

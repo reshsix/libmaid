@@ -61,7 +61,9 @@ maid_aead_del(struct maid_aead *ae)
 }
 
 extern struct maid_aead *
-maid_aead_new(struct maid_aead_def def, u8 *key, u8 *nonce)
+maid_aead_new(struct maid_aead_def def,
+              const u8 *restrict key,
+              const u8 *restrict nonce)
 {
     struct maid_aead *ret = calloc(1, sizeof(struct maid_aead));
 
@@ -92,7 +94,7 @@ maid_aead_new(struct maid_aead_def def, u8 *key, u8 *nonce)
 }
 
 extern void
-maid_aead_update(struct maid_aead *ae, u8 *buffer, size_t size)
+maid_aead_update(struct maid_aead *ae, const u8 *buffer, size_t size)
 {
     if (ae && buffer && size && ae->step == 0)
     {

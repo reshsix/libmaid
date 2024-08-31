@@ -24,8 +24,11 @@ extern void
 maid_mem_clear(void *addr, const size_t length)
 {
     volatile u8 *dest = addr;
-    for (size_t i = 0; i < length; i++)
-        dest[i] = 0x0;
+    if (dest)
+    {
+        for (size_t i = 0; i < length; i++)
+            dest[i] = 0x0;
+    }
 }
 
 #ifndef NDEBUG
