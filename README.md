@@ -11,17 +11,10 @@ make test
 ## Development status
 Currently: **1.0 pre-release**
 
-### Implemented algorithms
-| Category       | Algorithms                |
-| -------------- |:-------------------------:|
-| Block ciphers  | AES (128, 192, 256)       |
-| Block modes    | ECB, CTR                  |
-| Stream ciphers | Chacha20                  |
-| MACs           | Poly1305                  |
-| AEADs          | AES-GCM, Chacha20Poly1305 |
-
-### Planned for the next version
-| Category  | Algorithms |
-| --------- |:----------:|
-| Hashes    | SHA-2      |
-| CSPRNG    | CTR-DRBG   |
+## Library Reference
+| Category       | Algorithms                | Documentation               | Examples                        |
+| -------------- |:-------------------------:|:---------------------------:|:-------------------------------:|
+| Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   | [block.md](examples/block.md)   |
+| Stream ciphers | Chacha20                  | [stream.md](docs/stream.md) | [stream.md](examples/stream.md) |
+| MACs           | Poly1305                  | [mac.md](docs/mac.md)       | [mac.md](examples/mac.md)       |
+| AEADs          | AES-GCM, Chacha20Poly1305 | [aead.md](docs/aead.md)     | [aead.md](examples/aead.md)     |
