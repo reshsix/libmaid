@@ -548,12 +548,12 @@ aes_gcm_init(struct maid_block_def def,
     if (*bl)
     {
         /* GMAC H and encrypted IV */
-        u8 key[32] = {0};
-        maid_block_ecb(*bl, key, false);
-        maid_block_ctr(*bl, &(key[16]), sizeof(key) - 16);
+        u8 gkey[32] = {0};
+        maid_block_ecb(*bl, gkey, false);
+        maid_block_ctr(*bl, &(gkey[16]), sizeof(gkey) - 16);
 
-        *m = maid_mac_new(maid_gcm, key);
-        maid_mem_clear(key, sizeof(key));
+        *m = maid_mac_new(maid_gcm, gkey);
+        maid_mem_clear(gkey, sizeof(gkey));
     }
 }
 

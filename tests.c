@@ -222,11 +222,10 @@ aes_gcm_test(struct maid_aead_def def, char *key_h, char *nonce_h, char *ad_h,
     u8  input[64] = {0};
     u8 output[64] = {0};
     u8    tag[16] = {0};
-    u8   tag2[16] = {0};
 
     hex_read(key,   key_h);
     hex_read(input, input_h);
-    hex_read(tag2,  tag_h);
+    hex_read(tag,  tag_h);
 
     size_t length  = hex_read(nonce,  nonce_h);
     size_t length2 = hex_read(output, output_h);
@@ -263,12 +262,14 @@ aes_gcm_test(struct maid_aead_def def, char *key_h, char *nonce_h, char *ad_h,
     maid_aead *ae = maid_aead_new(def, key, iv);
     if (ae)
     {
+        u8 tag2[16] = {0};
+
         maid_aead_update(ae, ad, length3);
         maid_aead_crypt(ae, input, length2, false);
-        maid_aead_digest(ae, tag);
+        maid_aead_digest(ae, tag2);
 
         if (memcmp(input, output, length2)  == 0 &&
-            memcmp(tag, tag2, sizeof(tag2)) == 0 )
+            memcmp(tag2, tag, sizeof(tag)) == 0 )
             ret = 1;
     }
     maid_aead_del(ae);
@@ -513,19 +514,20 @@ poly1305_test(char *key_h, char *input_h, char *tag_h)
     u8     key[32] = {0};
     u8 input[1024] = {0};
     u8     tag[16] = {0};
-    u8    tag2[16] = {0};
 
-    hex_read(key,  key_h);
-    hex_read(tag2, tag_h);
+    hex_read(key, key_h);
+    hex_read(tag, tag_h);
 
     size_t length = hex_read(input, input_h);
 
     maid_mac *m = maid_mac_new(maid_poly1305, key);
     if (m)
     {
+        u8 tag2[16] = {0};
+
         maid_mac_update(m, input, length);
-        maid_mac_digest(m, tag);
-        if (memcmp(tag, tag2, sizeof(tag2)) == 0)
+        maid_mac_digest(m, tag2);
+        if (memcmp(tag2, tag, sizeof(tag)) == 0)
             ret = 1;
     }
     maid_mac_del(m);
@@ -640,12 +642,11 @@ chacha20poly1305_test(char *key_h, char *nonce_h, char *ad_h,
     u8  input[1024] = {0};
     u8 output[1024] = {0};
     u8      tag[16] = {0};
-    u8     tag2[16] = {0};
 
     hex_read(key,    key_h);
     hex_read(nonce,  nonce_h);
     hex_read(output, output_h);
-    hex_read(tag2,   tag_h);
+    hex_read(tag,    tag_h);
 
     size_t length  = hex_read(input, input_h);
     size_t length2 = hex_read(ad,    ad_h);
@@ -653,12 +654,14 @@ chacha20poly1305_test(char *key_h, char *nonce_h, char *ad_h,
     maid_aead *ae = maid_aead_new(maid_chacha20poly1305, key, nonce);
     if (ae)
     {
+        u8 tag2[16] = {0};
+
         maid_aead_update(ae, ad, length2);
         maid_aead_crypt(ae, input, length, decrypt);
-        maid_aead_digest(ae, tag);
+        maid_aead_digest(ae, tag2);
 
         if (memcmp(input, output, length)   == 0 &&
-            memcmp(tag, tag2, sizeof(tag2)) == 0 )
+            memcmp(tag2, tag, sizeof(tag)) == 0 )
             ret = 1;
     }
     maid_aead_del(ae);

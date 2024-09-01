@@ -22,7 +22,7 @@
 
 /* Not documented on this version */
 
-void maid_mem_clear(void *dest, const size_t length);
+void maid_mem_clear(void *addr, const size_t length);
 
 #ifndef NDEBUG
 void maid_mp_debug(const char *name, const u32 *x, const size_t s);

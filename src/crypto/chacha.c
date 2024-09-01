@@ -197,10 +197,10 @@ chacha20poly1305_init(struct maid_stream_def def,
     {
         /* Poly1305 ephemeral key (32 bytes)
          * Uses a chacha block to increase the counter */
-        u8 key[64] = {0};
-        maid_stream_xor(*st, key, sizeof(key));
-        *m = maid_mac_new(maid_poly1305, key);
-        maid_mem_clear(key, sizeof(key));
+        u8 ekey[64] = {0};
+        maid_stream_xor(*st, ekey, sizeof(ekey));
+        *m = maid_mac_new(maid_poly1305, ekey);
+        maid_mem_clear(ekey, sizeof(ekey));
     }
 }
 
