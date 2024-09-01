@@ -1,22 +1,33 @@
-# libmaid
-A Cryptography Library for Maids
+<div align="center">
+    <h3 align="center">A Cryptography Library for Maids</h3>
+    <a href="https://github.com/reshsix/libmaid">
+        <img src="logo.png" width="100" height="100">
+    </a>
+</div>
 
-## Compilation
-Needs only a C99 compiler, files are created in `build`
+## ☕ About
+Version: **1.0**
+
+## 🎬 Getting Started
+
+### Prerequisites
+- A C99 compiler
+
+### Build
+Files are created in `build`
 ```sh
-# Build
 make
 make test
+```
 
-# Installation
+### Installation
+Files are installed in `/usr/local`
+```sh
 sudo make install
 sudo ldconfig
 ```
 
-## Development status
-Currently: **1.0 pre-release**
-
-## Library Reference
+## 📖 Library Reference
 | Category       | Algorithms                | Documentation               | Example                         |
 | -------------- |:-------------------------:|:---------------------------:|:-------------------------------:|
 | Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   | [block.md](examples/block.md)   |
