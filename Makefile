@@ -52,7 +52,7 @@ OBJS = utils.o crypto/aes.o crypto/chacha.o \
        crypto/poly1305.o crypto/gcm.o block.o stream.o mac.o aead.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
 build/libmaid.a: $(OBJS) | build
 	ar ruv $@ $^

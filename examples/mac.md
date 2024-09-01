@@ -49,6 +49,12 @@ int main(void)
 }
 ```
 
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
 ```sh
 cc example.c -lmaid
 ```

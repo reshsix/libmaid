@@ -2,17 +2,22 @@
 A Cryptography Library for Maids
 
 ## Compilation
-Files are created in `build`, and can be installed with `make install`
+Needs only a C99 compiler, files are created in `build`
 ```sh
+# Build
 make
 make test
+
+# Installation
+sudo make install
+sudo ldconfig
 ```
 
 ## Development status
 Currently: **1.0 pre-release**
 
 ## Library Reference
-| Category       | Algorithms                | Documentation               | Examples                        |
+| Category       | Algorithms                | Documentation               | Example                         |
 | -------------- |:-------------------------:|:---------------------------:|:-------------------------------:|
 | Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   | [block.md](examples/block.md)   |
 | Stream ciphers | Chacha20                  | [stream.md](docs/stream.md) | [stream.md](examples/stream.md) |
