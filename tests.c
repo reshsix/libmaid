@@ -224,51 +224,23 @@ aes_gcm_test(struct maid_aead_def def, char *key_h, char *nonce_h, char *ad_h,
     u8    tag[16] = {0};
 
     hex_read(key,   key_h);
+    hex_read(nonce, nonce_h);
     hex_read(input, input_h);
-    hex_read(tag,  tag_h);
+    hex_read(tag,   tag_h);
 
-    size_t length  = hex_read(nonce,  nonce_h);
-    size_t length2 = hex_read(output, output_h);
-    size_t length3 = hex_read(ad,     ad_h);
+    size_t length  = hex_read(output, output_h);
+    size_t length2 = hex_read(ad,     ad_h);
 
-    /* Allows for variable length IVs */
-    u8 iv[16] = {0};
-    if (length == 12)
-    {
-        memcpy(iv, nonce, 12);
-        iv[15] = 0x1;
-    }
-    else
-    {
-        /* Encrypted nonce is added in the end of AEAD construction,
-         * but not on GHASH, so make it decrypted zeros */
-        maid_block *blk = maid_block_new(def.c_def.block, key, iv);
-        if (blk)
-            maid_block_ecb(blk, iv, true);
-        maid_block_del(blk);
-
-        /* Specs want it GHASHed with length, so it's simpler
-         * to use the AEAD construction already */
-        maid_aead *ae = maid_aead_new(def, key, iv);
-        if (ae)
-        {
-            maid_aead_crypt(ae, nonce, length, true);
-            maid_aead_digest(ae, iv);
-        }
-        maid_aead_del(ae);
-    }
-
-    /* The actual test */
-    maid_aead *ae = maid_aead_new(def, key, iv);
+    maid_aead *ae = maid_aead_new(def, key, nonce);
     if (ae)
     {
         u8 tag2[16] = {0};
 
-        maid_aead_update(ae, ad, length3);
-        maid_aead_crypt(ae, input, length2, false);
+        maid_aead_update(ae, ad, length2);
+        maid_aead_crypt(ae, input, length, false);
         maid_aead_digest(ae, tag2);
 
-        if (memcmp(input, output, length2)  == 0 &&
+        if (memcmp(input, output, length)  == 0 &&
             memcmp(tag2, tag, sizeof(tag)) == 0 )
             ret = 1;
     }
