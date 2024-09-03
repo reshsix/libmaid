@@ -77,6 +77,22 @@ Deletes a stream cipher instance
 </details>
 
 <details>
+<summary>void maid_stream_renew(maid_stream *st, const u8 *restrict key,
+                                const u8 *restrict nonce,
+                                u64 counter)</summary>
+Recreates a stream cipher instance
+
+### Parameters
+| name    | description          |
+|---------|----------------------|
+| st      | maid_stream instance |
+| key     | Algorithm-dependent  |
+| nonce   | Algorithm-dependent  |
+| counter | Algorithm-dependent  |
+
+</details>
+
+<details>
 <summary>void maid_stream_xor(maid_stream *st,
                               u8 *buffer, size_t size)</summary>
 Generates keystream, and applies it with a xor operation

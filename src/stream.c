@@ -71,6 +71,19 @@ maid_stream_new(struct maid_stream_def def,
 }
 
 extern void
+maid_stream_renew(struct maid_stream *st, const u8 *restrict key,
+                  const u8 *restrict nonce, u64 counter)
+{
+    if (st)
+    {
+        st->def.renew(st->ctx, key, nonce, counter);
+        st->buffer_c = 0;
+        st->initialized = false;
+        maid_mem_clear(st->buffer, st->def.state_s);
+    }
+}
+
+extern void
 maid_stream_xor(struct maid_stream *st, u8 *buffer, size_t size)
 {
     if (st && buffer && size)
@@ -92,7 +105,7 @@ maid_stream_xor(struct maid_stream *st, u8 *buffer, size_t size)
                 buffer = &(buffer[aval]);
                 size -= aval;
 
-                st->def.gen(st->ctx, st->buffer);
+                st->def.generate(st->ctx, st->buffer);
                 st->buffer_c = 0;
                 st->initialized = true;
             }

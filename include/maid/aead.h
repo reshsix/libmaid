@@ -29,9 +29,9 @@ struct maid_aead_def
     union
     {
         void (*block)(const struct maid_block_def, const u8 *, const u8 *,
-                      maid_block **, maid_mac **);
+                      maid_block **, maid_mac **, bool);
         void (*stream)(const struct maid_stream_def, const u8 *, const u8 *,
-                       maid_stream **, maid_mac **);
+                       maid_stream **, maid_mac **, bool);
     } init;
     union
     {
@@ -56,6 +56,8 @@ maid_aead *maid_aead_new(struct maid_aead_def def,
                          const u8 *restrict key,
                          const u8 *restrict nonce);
 maid_aead *maid_aead_del(maid_aead *ae);
+void maid_aead_renew(maid_aead *ae, const u8 *restrict key,
+                     const u8 *restrict nonce);
 void maid_aead_update(maid_aead *ae, const u8 *buffer, size_t size);
 void maid_aead_crypt(maid_aead *ae, u8 *buffer,
                      size_t size, bool decrypt);

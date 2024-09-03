@@ -64,6 +64,20 @@ maid_mac_new(struct maid_mac_def def, const u8 *key)
 }
 
 extern void
+maid_mac_renew(struct maid_mac *m, const u8 *key)
+{
+    if (m)
+    {
+        if (key)
+            m->def.renew(m->ctx, key);
+
+        m->buffer_c = 0;
+        m->finished = false;
+        maid_mem_clear(m->buffer, m->def.state_s);
+    }
+}
+
+extern void
 maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
 {
     if (m && buffer && size && !(m->finished))

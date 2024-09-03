@@ -26,6 +26,7 @@ struct maid_block_def
 {
     void * (*new)(const u8, const u8 *);
     void * (*del)(void *);
+    void (*renew)(void *, const u8 *);
     void (*encrypt)(void *, u8 *);
     void (*decrypt)(void *, u8 *);
     const size_t state_s;
@@ -39,6 +40,8 @@ maid_block *maid_block_new(struct maid_block_def def,
                            const u8 *restrict key,
                            const u8 *restrict iv);
 maid_block *maid_block_del(maid_block *bl);
+void maid_block_renew(maid_block *bl, const u8 *restrict key,
+                                      const u8 *restrict iv);
 void maid_block_ecb(maid_block *bl, u8 *buffer, bool decrypt);
 void maid_block_ctr(maid_block *bl, u8 *buffer, size_t size);
 

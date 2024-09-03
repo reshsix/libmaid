@@ -75,6 +75,20 @@ Deletes a block cipher instance
 </details>
 
 <details>
+<summary>void maid_block_renew(maid_block *bl,const u8 *restrict key,
+                               const u8 *restrict iv)</summary>
+Recreates a block cipher instance
+
+### Parameters
+| name    | description          |
+|---------|----------------------|
+| bl      | maid_block instance  |
+| key     | Algorithm-dependent  |
+| iv      | Algorithm-dependent  |
+
+</details>
+
+<details>
 <summary>void maid_block_ecb(maid_block *bl,
                              u8 *buffer, bool decrypt)</summary>
 Applies ECB mode (doesn't change the iv)

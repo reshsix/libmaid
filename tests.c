@@ -71,28 +71,26 @@ hex_read(u8 *data, char *hex)
 /* AES NIST SP 800-38A vectors */
 
 static u8
-aes_test(struct maid_block_def def, char *key_h,
+aes_test(maid_block *bl, char *key_h,
          char *input_h, char *output_h, bool decrypt)
 {
     u8 ret = 0;
 
-    u8    key[32] = {0};
-    u8  input[16] = {0};
-    u8 output[16] = {0};
-
-    hex_read(key,    key_h);
-    hex_read(input,  input_h);
-    hex_read(output, output_h);
-
-    u8 iv[16] = {0};
-    maid_block *bl = maid_block_new(def, key, iv);
     if (bl)
     {
+        u8    key[32] = {0};
+        u8  input[16] = {0};
+        u8 output[16] = {0};
+
+        hex_read(key,    key_h);
+        hex_read(input,  input_h);
+        hex_read(output, output_h);
+
+        maid_block_renew(bl, key, NULL);
         maid_block_ecb(bl, input, decrypt);
         if (memcmp(input, output, sizeof(output)) == 0)
             ret = 1;
     }
-    maid_block_del(bl);
 
     return ret;
 }
@@ -125,17 +123,26 @@ aes_tests(void)
                          "b6ed21b99ca6f4f9f153e7b1beafed1d",
                          "23304b7a39f9f3ff067d8d8f9e24ecc7"};
 
+    u8 zeros[32] = {0};
+    maid_block *aes128 = maid_block_new(maid_aes_128, zeros, zeros);
+    maid_block *aes192 = maid_block_new(maid_aes_192, zeros, zeros);
+    maid_block *aes256 = maid_block_new(maid_aes_256, zeros, zeros);
+
     for (u8 i = 0; i < 4; i++)
     {
-        ret -= aes_test(maid_aes_128, key128, block[i], cipher128[i], false);
-        ret -= aes_test(maid_aes_128, key128, cipher128[i], block[i], true);
+        ret -= aes_test(aes128, key128, block[i], cipher128[i], false);
+        ret -= aes_test(aes128, key128, cipher128[i], block[i], true);
 
-        ret -= aes_test(maid_aes_192, key192, block[i], cipher192[i], false);
-        ret -= aes_test(maid_aes_192, key192, cipher192[i], block[i], true);
+        ret -= aes_test(aes192, key192, block[i], cipher192[i], false);
+        ret -= aes_test(aes192, key192, cipher192[i], block[i], true);
 
-        ret -= aes_test(maid_aes_256, key256, block[i], cipher256[i], false);
-        ret -= aes_test(maid_aes_256, key256, cipher256[i], block[i], true);
+        ret -= aes_test(aes256, key256, block[i], cipher256[i], false);
+        ret -= aes_test(aes256, key256, cipher256[i], block[i], true);
     }
+
+    maid_block_del(aes128);
+    maid_block_del(aes192);
+    maid_block_del(aes256);
 
     return ret;
 }
@@ -143,30 +150,29 @@ aes_tests(void)
 /* AES-CTR NIST SP 800-38A vectors */
 
 static u8
-aes_ctr_test(struct maid_block_def def, char *key_h, char *iv_h,
+aes_ctr_test(maid_block *bl, char *key_h, char *iv_h,
              char *input_h, char *output_h)
 {
     u8 ret = 0;
 
-    u8    key[32] = {0};
-    u8     iv[16] = {0};
-    u8  input[64] = {0};
-    u8 output[64] = {0};
-
-    hex_read(key,   key_h);
-    hex_read(iv,    iv_h);
-    hex_read(input, input_h);
-
-    size_t length = hex_read(output, output_h);
-
-    maid_block *bl = maid_block_new(def, key, iv);
     if (bl)
     {
+        u8    key[32] = {0};
+        u8     iv[16] = {0};
+        u8  input[64] = {0};
+        u8 output[64] = {0};
+
+        hex_read(key,   key_h);
+        hex_read(iv,    iv_h);
+        hex_read(input, input_h);
+
+        size_t length = hex_read(output, output_h);
+
+        maid_block_renew(bl, key, iv);
         maid_block_ctr(bl, input, length);
         if (memcmp(input, output, length) == 0)
             ret = 1;
     }
-    maid_block_del(bl);
 
     return ret;
 }
@@ -196,14 +202,23 @@ aes_ctr_tests(void)
                        "90cacaf5c52b0930daa23de94ce87017ba2d84988ddfc9c58db67a"
                        "ada613c2dd08457941a6";
 
-    ret -= aes_ctr_test(maid_aes_128, key128, iv, block, cipher128);
-    ret -= aes_ctr_test(maid_aes_128, key128, iv, cipher128, block);
+    u8 zeros[32] = {0};
+    maid_block *aes128 = maid_block_new(maid_aes_128, zeros, zeros);
+    maid_block *aes192 = maid_block_new(maid_aes_192, zeros, zeros);
+    maid_block *aes256 = maid_block_new(maid_aes_256, zeros, zeros);
 
-    ret -= aes_ctr_test(maid_aes_192, key192, iv, block, cipher192);
-    ret -= aes_ctr_test(maid_aes_192, key192, iv, cipher192, block);
+    ret -= aes_ctr_test(aes128, key128, iv, block, cipher128);
+    ret -= aes_ctr_test(aes128, key128, iv, cipher128, block);
 
-    ret -= aes_ctr_test(maid_aes_256, key256, iv, block, cipher256);
-    ret -= aes_ctr_test(maid_aes_256, key256, iv, cipher256, block);
+    ret -= aes_ctr_test(aes192, key192, iv, block, cipher192);
+    ret -= aes_ctr_test(aes192, key192, iv, cipher192, block);
+
+    ret -= aes_ctr_test(aes256, key256, iv, block, cipher256);
+    ret -= aes_ctr_test(aes256, key256, iv, cipher256, block);
+
+    maid_block_del(aes128);
+    maid_block_del(aes192);
+    maid_block_del(aes256);
 
     return ret;
 }
@@ -211,40 +226,42 @@ aes_ctr_tests(void)
 /* AES-GCM GCM Spec vectors */
 
 static u8
-aes_gcm_test(struct maid_aead_def def, char *key_h, char *nonce_h, char *ad_h,
+aes_gcm_test(maid_aead *ae, char *key_h, char *nonce_h, char *ad_h,
              char *input_h, char *output_h, char *tag_h)
 {
     u8 ret = 0;
 
-    u8    key[32] = {0};
-    u8  nonce[64] = {0};
-    u8     ad[32] = {0};
-    u8  input[64] = {0};
-    u8 output[64] = {0};
-    u8    tag[16] = {0};
-
-    hex_read(key,   key_h);
-    hex_read(nonce, nonce_h);
-    hex_read(input, input_h);
-    hex_read(tag,   tag_h);
-
-    size_t length  = hex_read(output, output_h);
-    size_t length2 = hex_read(ad,     ad_h);
-
-    maid_aead *ae = maid_aead_new(def, key, nonce);
     if (ae)
     {
-        u8 tag2[16] = {0};
+        u8    key[32] = {0};
+        u8  nonce[64] = {0};
+        u8     ad[32] = {0};
+        u8  input[64] = {0};
+        u8 output[64] = {0};
+        u8    tag[16] = {0};
 
-        maid_aead_update(ae, ad, length2);
-        maid_aead_crypt(ae, input, length, false);
-        maid_aead_digest(ae, tag2);
+        hex_read(key,   key_h);
+        hex_read(nonce, nonce_h);
+        hex_read(input, input_h);
+        hex_read(tag,   tag_h);
 
-        if (memcmp(input, output, length)  == 0 &&
-            memcmp(tag2, tag, sizeof(tag)) == 0 )
-            ret = 1;
+        size_t length  = hex_read(output, output_h);
+        size_t length2 = hex_read(ad,     ad_h);
+
+        if (ae)
+        {
+            maid_aead_renew(ae, key, nonce);
+            maid_aead_update(ae, ad, length2);
+            maid_aead_crypt(ae, input, length, false);
+
+            u8 tag2[16] = {0};
+            maid_aead_digest(ae, tag2);
+
+            if (memcmp(input, output, length)  == 0 &&
+                memcmp(tag2, tag, sizeof(tag)) == 0 )
+                ret = 1;
+        }
     }
-    maid_aead_del(ae);
 
     return ret;
 }
@@ -317,23 +334,30 @@ aes_gcm_tests(void)
                       "3a337dbf46a792c45e454913fe2ea8f2",
                       "a44a8266ee1c8eb0c8b5d4cf5ae9f19a"};
 
-    struct maid_aead_def defs[] = {maid_aes_gcm_128,
-                                   maid_aes_gcm_192,
-                                   maid_aes_gcm_256};
     char **ciphers[] = {cipher128, cipher192, cipher256};
     char    **tags[] = {tag128, tag192, tag256};
 
+    u8 zeros[32] = {0};
+    maid_aead *aes128 = maid_aead_new(maid_aes_gcm_128, zeros, zeros);
+    maid_aead *aes192 = maid_aead_new(maid_aes_gcm_192, zeros, zeros);
+    maid_aead *aes256 = maid_aead_new(maid_aes_gcm_256, zeros, zeros);
+    maid_aead *aeads[] = {aes128, aes192, aes256};
+
     for (u8 i = 0; i < 3; i++)
     {
-        ret -= aes_gcm_test(defs[i], key_z, iv_z,     "", "",
+        ret -= aes_gcm_test(aeads[i], key_z, iv_z,  "", "",
                             "",            tags[i][0]);
-        ret -= aes_gcm_test(defs[i], key_z, iv_z,     "", data_z,
+        ret -= aes_gcm_test(aeads[i], key_z, iv_z,  "", data_z,
                             ciphers[i][0], tags[i][1]);
-        ret -= aes_gcm_test(defs[i], key,   iv_96,    "", data,
+        ret -= aes_gcm_test(aeads[i], key,   iv_96, "", data,
                             ciphers[i][1], tags[i][2]),
-        ret -= aes_gcm_test(defs[i], key,   iv_96,    ad, data_s,
+        ret -= aes_gcm_test(aeads[i], key,   iv_96, ad, data_s,
                             ciphers[i][2], tags[i][3]);
     }
+
+    maid_aead_del(aes128);
+    maid_aead_del(aes192);
+    maid_aead_del(aes256);
 
     return ret;
 }
@@ -341,30 +365,29 @@ aes_gcm_tests(void)
 /* Chacha20 RFC8439 vectors */
 
 static u8
-chacha_test(char *key_h, char *nonce_h, u32 counter,
-            char *input_h, char *output_h)
+chacha_test(maid_stream *st, char *key_h, char *nonce_h,
+            u32 counter, char *input_h, char *output_h)
 {
     u8 ret = 0;
 
-    u8      key[32] = {0};
-    u8    nonce[16] = {0};
-    u8  input[1024] = {0};
-    u8 output[1024] = {0};
-
-    hex_read(key,   key_h);
-    hex_read(nonce, nonce_h);
-    hex_read(input, input_h);
-
-    size_t length = hex_read(output, output_h);
-
-    maid_stream *st = maid_stream_new(maid_chacha20, key, nonce, counter);
     if (st)
     {
+        u8      key[32] = {0};
+        u8    nonce[16] = {0};
+        u8  input[1024] = {0};
+        u8 output[1024] = {0};
+
+        hex_read(key,   key_h);
+        hex_read(nonce, nonce_h);
+        hex_read(input, input_h);
+
+        size_t length = hex_read(output, output_h);
+
+        maid_stream_renew(st, key, nonce, counter);
         maid_stream_xor(st, input, length);
         if (memcmp(input, output, length) == 0)
             ret = 1;
     }
-    maid_stream_del(st);
 
     return ret;
 }
@@ -469,9 +492,12 @@ chacha_tests(void)
                       data_b3, data_b2, data_zs, data_zs, data_zs};
     int counters[] = {1, 0, 1, 1, 2, 0, 1, 42, 0, 0, 0};
 
+    u8 zeros[32] = {0};
+    maid_stream *st = maid_stream_new(maid_chacha20, zeros, zeros, 0);
     for (u8 i = 0; i < 11; i++)
-        ret -= chacha_test(keys[i], nonces[i], counters[i],
+        ret -= chacha_test(st, keys[i], nonces[i], counters[i],
                            datas[i], ciphers[i]);
+    maid_stream_del(st);
 
     return ret;
 }
@@ -479,30 +505,30 @@ chacha_tests(void)
 /* Poly1305 RFC8439 vectors */
 
 static u8
-poly1305_test(char *key_h, char *input_h, char *tag_h)
+poly1305_test(maid_mac *m, char *key_h, char *input_h, char *tag_h)
 {
     u8 ret = 0;
 
-    u8     key[32] = {0};
-    u8 input[1024] = {0};
-    u8     tag[16] = {0};
-
-    hex_read(key, key_h);
-    hex_read(tag, tag_h);
-
-    size_t length = hex_read(input, input_h);
-
-    maid_mac *m = maid_mac_new(maid_poly1305, key);
     if (m)
     {
-        u8 tag2[16] = {0};
+        u8     key[32] = {0};
+        u8 input[1024] = {0};
+        u8     tag[16] = {0};
 
+        hex_read(key, key_h);
+        hex_read(tag, tag_h);
+
+        size_t length = hex_read(input, input_h);
+
+        maid_mac_renew(m, key);
         maid_mac_update(m, input, length);
+
+        u8 tag2[16] = {0};
         maid_mac_digest(m, tag2);
+
         if (memcmp(tag2, tag, sizeof(tag)) == 0)
             ret = 1;
     }
-    maid_mac_del(m);
 
     return ret;
 }
@@ -593,8 +619,13 @@ poly1305_tests(void)
                     "14000000000000005500000000000000",
                     "13000000000000000000000000000000"};
 
+    u8 zeros[32] = {0};
+    maid_mac *m = maid_mac_new(maid_poly1305, zeros);
+
     for (u8 i = 0; i < 11; i++)
-        ret -= poly1305_test(keys[i], datas[i], tags[i]);
+        ret -= poly1305_test(m, keys[i], datas[i], tags[i]);
+
+    maid_mac_del(m);
 
     return ret;
 }
@@ -602,41 +633,40 @@ poly1305_tests(void)
 /* Chacha20Poly1305 RFC8439 vectors */
 
 static u8
-chacha20poly1305_test(char *key_h, char *nonce_h, char *ad_h,
-                      char *input_h, char *output_h, char *tag_h,
-                      bool decrypt)
+chacha20poly1305_test(maid_aead *ae, char *key_h, char *nonce_h,
+                      char *ad_h, char *input_h, char *output_h,
+                      char *tag_h, bool decrypt)
 {
     u8 ret = 0;
 
-    u8      key[32] = {0};
-    u8    nonce[12] = {0};
-    u8       ad[16] = {0};
-    u8  input[1024] = {0};
-    u8 output[1024] = {0};
-    u8      tag[16] = {0};
-
-    hex_read(key,    key_h);
-    hex_read(nonce,  nonce_h);
-    hex_read(output, output_h);
-    hex_read(tag,    tag_h);
-
-    size_t length  = hex_read(input, input_h);
-    size_t length2 = hex_read(ad,    ad_h);
-
-    maid_aead *ae = maid_aead_new(maid_chacha20poly1305, key, nonce);
     if (ae)
     {
-        u8 tag2[16] = {0};
+        u8      key[32] = {0};
+        u8    nonce[12] = {0};
+        u8       ad[16] = {0};
+        u8  input[1024] = {0};
+        u8 output[1024] = {0};
+        u8      tag[16] = {0};
 
+        hex_read(key,    key_h);
+        hex_read(nonce,  nonce_h);
+        hex_read(output, output_h);
+        hex_read(tag,    tag_h);
+
+        size_t length  = hex_read(input, input_h);
+        size_t length2 = hex_read(ad,    ad_h);
+
+        maid_aead_renew(ae, key, nonce);
         maid_aead_update(ae, ad, length2);
         maid_aead_crypt(ae, input, length, decrypt);
+
+        u8 tag2[16] = {0};
         maid_aead_digest(ae, tag2);
 
         if (memcmp(input, output, length)   == 0 &&
             memcmp(tag2, tag, sizeof(tag)) == 0 )
             ret = 1;
     }
-    maid_aead_del(ae);
 
     return ret;
 }
@@ -690,9 +720,14 @@ chacha20poly1305_tests(void)
                     "eead9d67890cbb22392336fea1851f38"};
     bool modes[] = {false, true};
 
+    u8 zeros[32] = {0};
+    maid_aead *ae = maid_aead_new(maid_chacha20poly1305, zeros, zeros);
+
     for (u8 i = 0; i < 2; i++)
-        ret -= chacha20poly1305_test(keys[i], nonces[i], ads[i], inputs[i],
-                                     outputs[i], tags[i], modes[i]);
+        ret -= chacha20poly1305_test(ae, keys[i], nonces[i], ads[i],
+                                     inputs[i], outputs[i], tags[i], modes[i]);
+
+    maid_aead_del(ae);
 
     return ret;
 }

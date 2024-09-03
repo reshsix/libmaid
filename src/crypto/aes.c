@@ -349,6 +349,47 @@ addroundkey(const u8 *ctx, u8 *block, const u8 round)
         block[i] ^= ctx[(round * 16) + i];
 }
 
+static void
+keyschedule(u8 *ctx, const u8 *key, u8 nk, u8 nr)
+{
+    const u8 rcon[10] = {0x01, 0x02, 0x04, 0x08, 0x10,
+                         0x20, 0x40, 0x80, 0x1b, 0x36};
+
+    memcpy(ctx, key, nk * 4);
+
+    u8 tmp[256] = {0};
+    for (u8 i = nk; i < 4 * (nr + 1); i++)
+    {
+        memcpy(tmp, &(ctx[(i - 1) * 4]), 4);
+
+        if (i % nk == 0)
+        {
+            /* RotWord + SubWord */
+            u8 x   = sbox_e[tmp[0]];
+            tmp[0] = sbox_e[tmp[1]];
+            tmp[1] = sbox_e[tmp[2]];
+            tmp[2] = sbox_e[tmp[3]];
+            tmp[3] = x;
+
+            /* Xor with Rcon */
+            tmp[0] ^= rcon[(i / nk) - 1];
+        }
+
+        if (nk == 8 && i % 8 == 4)
+        {
+            /* SubWord */
+            tmp[0] = sbox_e[tmp[0]];
+            tmp[1] = sbox_e[tmp[1]];
+            tmp[2] = sbox_e[tmp[2]];
+            tmp[3] = sbox_e[tmp[3]];
+        }
+
+        for (u8 j = 0; j < 4; j++)
+            ctx[(i * 4) + j] = ctx[((i - nk) * 4) + j] ^ tmp[j];
+    }
+    maid_mem_clear(tmp, sizeof(tmp));
+}
+
 /* Maid block definitions */
 
 enum
@@ -376,8 +417,6 @@ aes_del(void *ctx)
     return NULL;
 }
 
-static const u8 rcon[10] = {0x01, 0x02, 0x04, 0x08, 0x10,
-                            0x20, 0x40, 0x80, 0x1b, 0x36};
 static void *
 aes_new(u8 version, const u8 *key)
 {
@@ -417,46 +456,19 @@ aes_new(u8 version, const u8 *key)
     }
 
     if (ret)
-    {
-        memcpy(ret->ctx, key, ret->nk * 4);
-
-        u8 tmp[256] = {0};
-
-        for (u8 i = ret->nk; i < 4 * (ret->nr + 1); i++)
-        {
-            memcpy(tmp, &(ret->ctx[(i - 1) * 4]), 4);
-
-            if (i % ret->nk == 0)
-            {
-                /* RotWord + SubWord */
-                u8 x   = sbox_e[tmp[0]];
-                tmp[0] = sbox_e[tmp[1]];
-                tmp[1] = sbox_e[tmp[2]];
-                tmp[2] = sbox_e[tmp[3]];
-                tmp[3] = x;
-
-                /* Xor with Rcon */
-                tmp[0] ^= rcon[(i / ret->nk) - 1];
-            }
-
-            if (ret->nk == 8 && i % 8 == 4)
-            {
-                /* SubWord */
-                tmp[0] = sbox_e[tmp[0]];
-                tmp[1] = sbox_e[tmp[1]];
-                tmp[2] = sbox_e[tmp[2]];
-                tmp[3] = sbox_e[tmp[3]];
-            }
-
-            for (u8 j = 0; j < 4; j++)
-                ret->ctx[(i * 4) + j] =
-                    ret->ctx[((i - ret->nk) * 4) + j] ^ tmp[j];
-        }
-
-        maid_mem_clear(tmp, sizeof(tmp));
-    }
+        keyschedule(ret->ctx, key, ret->nk, ret->nr);
 
     return ret;
+}
+
+static void
+aes_renew(void *ctx, const u8 *key)
+{
+    if (ctx)
+    {
+        struct aes *aes = ctx;
+        keyschedule(aes->ctx, key, aes->nk, aes->nr);
+    }
 }
 
 static void
@@ -507,6 +519,7 @@ const struct maid_block_def maid_aes_128 =
 {
     .new = aes_new,
     .del = aes_del,
+    .renew = aes_renew,
     .encrypt = aes_encrypt,
     .decrypt = aes_decrypt,
     .state_s = 16,
@@ -517,6 +530,7 @@ const struct maid_block_def maid_aes_192 =
 {
     .new = aes_new,
     .del = aes_del,
+    .renew = aes_renew,
     .encrypt = aes_encrypt,
     .decrypt = aes_decrypt,
     .state_s = 16,
@@ -527,6 +541,7 @@ const struct maid_block_def maid_aes_256 =
 {
     .new = aes_new,
     .del = aes_del,
+    .renew = aes_renew,
     .encrypt = aes_encrypt,
     .decrypt = aes_decrypt,
     .state_s = 16,
@@ -537,14 +552,19 @@ const struct maid_block_def maid_aes_256 =
 
 static void
 aes_gcm_init(struct maid_block_def def,
-         const u8 *key, const u8 *nonce,
-         maid_block **bl, maid_mac **m)
+             const u8 *key, const u8 *nonce,
+             maid_block **bl, maid_mac **m,
+             bool renew)
 {
     u8 iv[16] = {0};
     memcpy(iv, nonce, 12);
     iv[15] = 0x1;
 
-    *bl = maid_block_new(def, key, iv);
+    if (!renew)
+        *bl = maid_block_new(def, key, iv);
+    else if (*bl)
+        maid_block_renew(*bl, key, iv);
+
     if (*bl)
     {
         /* GMAC H and encrypted IV */
@@ -552,7 +572,11 @@ aes_gcm_init(struct maid_block_def def,
         maid_block_ecb(*bl, gkey, false);
         maid_block_ctr(*bl, &(gkey[16]), sizeof(gkey) - 16);
 
-        *m = maid_mac_new(maid_gcm, gkey);
+        if (!renew)
+            *m = maid_mac_new(maid_gcm, gkey);
+        else if (*m)
+            maid_mac_renew(*m, gkey);
+
         maid_mem_clear(gkey, sizeof(gkey));
     }
 }

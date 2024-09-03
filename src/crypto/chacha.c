@@ -134,7 +134,23 @@ chacha_new(const u8 version, const u8 *restrict key,
 }
 
 static void
-chacha_gen(void *ctx, u8 *out)
+chacha_renew(void *ctx, const u8 *restrict key,
+             const u8 *restrict nonce, u64 counter)
+{
+    if (ctx)
+    {
+        struct chacha *ch = ctx;
+
+        if (key)
+            memcpy(ch->key, key, ch->ks);
+        if (nonce)
+            ch->nonce = (u8*)nonce;
+        ch->counter = counter;
+    }
+}
+
+static void
+chacha_generate(void *ctx, u8 *out)
 {
     if (ctx && out)
     {
@@ -180,7 +196,8 @@ const struct maid_stream_def maid_chacha20 =
 {
     .new = chacha_new,
     .del = chacha_del,
-    .gen = chacha_gen,
+    .renew = chacha_renew,
+    .generate = chacha_generate,
     .state_s = 64,
     .version = CHACHA20_IETF
 };
@@ -190,16 +207,26 @@ const struct maid_stream_def maid_chacha20 =
 static void
 chacha20poly1305_init(struct maid_stream_def def,
                       const u8 *key, const u8 *nonce,
-                      maid_stream **st, maid_mac **m)
+                      maid_stream **st, maid_mac **m,
+                      bool renew)
 {
-    *st = maid_stream_new(def, key, nonce, 0);
+    if (!renew)
+        *st = maid_stream_new(def, key, nonce, 0);
+    else if (*st)
+        maid_stream_renew(*st, key, nonce, 0);
+
     if (*st)
     {
         /* Poly1305 ephemeral key (32 bytes)
          * Uses a chacha block to increase the counter */
         u8 ekey[64] = {0};
         maid_stream_xor(*st, ekey, sizeof(ekey));
-        *m = maid_mac_new(maid_poly1305, ekey);
+
+        if (!renew)
+            *m = maid_mac_new(maid_poly1305, ekey);
+        else if (*m)
+            maid_mac_renew(*m, ekey);
+
         maid_mem_clear(ekey, sizeof(ekey));
     }
 }

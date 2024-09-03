@@ -93,6 +93,24 @@ gcm_new(const u8 *key)
 }
 
 static void
+gcm_renew(void *ctx, const u8 *key)
+{
+    if (ctx)
+    {
+        struct gcm *g = ctx;
+
+        if (key)
+        {
+            memcpy(g->h,            key, sizeof(g->h));
+            memcpy(g->nonce, &(key[16]), sizeof(g->nonce));
+        }
+
+        maid_mem_clear(g->acc,    sizeof(g->acc));
+        maid_mem_clear(g->buffer, sizeof(g->buffer));
+    }
+}
+
+static void
 gcm_update(void *ctx, u8 *block, size_t size)
 {
     if (ctx && block)
@@ -124,6 +142,7 @@ const struct maid_mac_def maid_gcm =
 {
     .new = gcm_new,
     .del = gcm_del,
+    .renew = gcm_renew,
     .update = gcm_update,
     .digest = gcm_digest,
     .state_s = 16

@@ -75,13 +75,13 @@ maid_aead_new(struct maid_aead_def def,
         if (def.block)
         {
             def.init.block(def.c_def.block, key, nonce,
-                           &(ret->c_ctx.block), &(ret->m_ctx));
+                           &(ret->c_ctx.block), &(ret->m_ctx), false);
             initialized = (ret->c_ctx.block && ret->m_ctx);
         }
         else
         {
             def.init.stream(def.c_def.stream, key, nonce,
-                            &(ret->c_ctx.stream), &(ret->m_ctx));
+                            &(ret->c_ctx.stream), &(ret->m_ctx), false);
             initialized = (ret->c_ctx.block && ret->m_ctx);
         }
 
@@ -91,6 +91,26 @@ maid_aead_new(struct maid_aead_def def,
     }
 
     return ret;
+}
+
+extern void
+maid_aead_renew(struct maid_aead *ae, const u8 *restrict key,
+                const u8 *restrict nonce)
+{
+    if (ae)
+    {
+        if (ae->def.block)
+            ae->def.init.block(ae->def.c_def.block, key, nonce,
+                               &(ae->c_ctx.block), &(ae->m_ctx), true);
+        else
+            ae->def.init.stream(ae->def.c_def.stream, key, nonce,
+                                &(ae->c_ctx.stream), &(ae->m_ctx), true);
+
+        ae->step = 0;
+        ae->s_ad = 0;
+        ae->s_ct = 0;
+        maid_mem_clear(ae->buffer, ae->def.m_def->state_s);
+    }
 }
 
 extern void

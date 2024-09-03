@@ -75,6 +75,20 @@ Deletes an AEAD instance
 </details>
 
 <details>
+<summary>void maid_aead_renew(maid_aead *ae, const u8 *restrict key,
+                              const u8 *restrict nonce)</summary>
+Recreates an AEAD instance
+
+### Parameters
+| name    | description          |
+|---------|----------------------|
+| ae      | maid_aead instance   |
+| key     | Algorithm-dependent  |
+| nonce   | Algorithm-dependent  |
+
+</details>
+
+<details>
 <summary>void maid_aead_update(maid_aead *ae,
                                const u8 *buffer, size_t size)</summary>
 Updates the AEAD state with additional data (Step 1)

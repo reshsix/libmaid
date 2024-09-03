@@ -42,8 +42,6 @@ int main(void)
         maid_aead_digest(ae, tag);
     }
 
-    maid_aead_del(ae);
-
     for (size_t i = 0; i < sizeof(data); i++)
         printf("%02x", data[i]);
     printf("\n");
@@ -54,17 +52,17 @@ int main(void)
 
     /* Decryption */
 
-    maid_aead *ae2 = maid_aead_new(maid_aes_gcm_256, key, iv);
+    maid_aead_renew(ae, key, iv);
 
     u8 tag2[16] = {0};
-    if (ae2)
+    if (ae)
     {
-        maid_aead_update(ae2, ad, sizeof(ad));
-        maid_aead_crypt(ae2, data, sizeof(data), true);
-        maid_aead_digest(ae2, tag2);
+        maid_aead_update(ae, ad, sizeof(ad));
+        maid_aead_crypt(ae, data, sizeof(data), true);
+        maid_aead_digest(ae, tag2);
     }
 
-    maid_aead_del(ae2);
+    maid_aead_del(ae);
 
     for (size_t i = 0; i < sizeof(data); i++)
         printf("%02x", data[i]);

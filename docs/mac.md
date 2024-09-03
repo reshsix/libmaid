@@ -80,6 +80,18 @@ Deletes a MAC instance
 </details>
 
 <details>
+<summary>void maid_mac_renew(maid_mac *m, const u8 *key)</summary>
+Recreates a MAC instance
+
+### Parameters
+| name    | description          |
+|---------|----------------------|
+| m       | maid_mac instance    |
+| key     | Algorithm-dependent  |
+
+</details>
+
+<details>
 <summary>void maid_mac_update(maid_mac *m,
                               const u8 *buffer, size_t size)</summary>
 Updates the MAC state

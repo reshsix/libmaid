@@ -79,6 +79,24 @@ maid_block_new(struct maid_block_def def,
 }
 
 extern void
+maid_block_renew(struct maid_block *bl,
+                 const u8 *restrict key,
+                 const u8 *restrict iv)
+{
+    if (bl)
+    {
+        if (key)
+            bl->def.renew(bl->ctx, key);
+        if (iv)
+            memcpy(bl->iv, iv, bl->def.state_s);
+
+        bl->buffer_c = 0;
+        bl->initialized = false;
+        maid_mem_clear(bl->buffer, bl->def.state_s);
+    }
+}
+
+extern void
 maid_block_ecb(struct maid_block *bl, u8 *buffer, bool decrypt)
 {
     if (bl && buffer)

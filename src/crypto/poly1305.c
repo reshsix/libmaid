@@ -33,6 +33,25 @@ struct poly1305
     u32 buffer[5];
 };
 
+static void
+poly1305_init(void *ctx, const u8 *key)
+{
+    if (ctx)
+    {
+        struct poly1305 *p = ctx;
+
+        /* R and S initialization */
+        memcpy(p->r, key, 16);
+        memcpy(p->s, &(key[16]), 16);
+
+        /* R clamping */
+        p->r[0] &= 0x0FFFFFFF;
+        p->r[1] &= 0x0FFFFFFC;
+        p->r[2] &= 0x0FFFFFFC;
+        p->r[3] &= 0x0FFFFFFC;
+    }
+}
+
 static void *
 poly1305_del(void *ctx)
 {
@@ -51,22 +70,28 @@ poly1305_new(const u8 *key)
     if (ret)
     {
         if (key)
-        {
-            /* R and S initialization */
-            memcpy(ret->r, key, 16);
-            memcpy(ret->s, &(key[16]), 16);
-
-            /* R clamping */
-            ret->r[0] &= 0x0FFFFFFF;
-            ret->r[1] &= 0x0FFFFFFC;
-            ret->r[2] &= 0x0FFFFFFC;
-            ret->r[3] &= 0x0FFFFFFC;
-        }
+            poly1305_init(ret, key);
         else
             ret = poly1305_del(ret);
     }
 
     return ret;
+}
+
+static void
+poly1305_renew(void *ctx, const u8 *key)
+{
+    if (ctx)
+    {
+        struct poly1305 *p = ctx;
+        if (key)
+            poly1305_init(p, key);
+
+        maid_mem_clear(p->acc,    sizeof(p->acc));
+        maid_mem_clear(p->acc2,   sizeof(p->acc2));
+        maid_mem_clear(p->acc3,   sizeof(p->acc3));
+        maid_mem_clear(p->buffer, sizeof(p->buffer));
+    }
 }
 
 static void
@@ -120,6 +145,7 @@ const struct maid_mac_def maid_poly1305 =
 {
     .new = poly1305_new,
     .del = poly1305_del,
+    .renew = poly1305_renew,
     .update = poly1305_update,
     .digest = poly1305_digest,
     .state_s = 16
