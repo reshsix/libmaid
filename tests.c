@@ -23,6 +23,7 @@
 #include <maid/stream.h>
 #include <maid/mac.h>
 #include <maid/aead.h>
+#include <maid/rng.h>
 
 /* Helper functions */
 
@@ -732,6 +733,155 @@ chacha20poly1305_tests(void)
     return ret;
 }
 
+/* CTR-DRBG NIST CAVP vectors */
+
+static u8
+ctr_drbg_test(maid_rng *g, char *entropy_h, char *output_h)
+{
+    u8 ret = 0;
+
+    if (g)
+    {
+        u8 entropy[48] = {0};
+        u8 output[128] = {0};
+
+        hex_read(entropy, entropy_h);
+        hex_read(output,  output_h);
+
+        u8 input[128] = {0};
+        maid_rng_renew(g, entropy);
+        maid_rng_generate(g, input, sizeof(input));
+
+        if (memcmp(input, output, sizeof(output)) == 0)
+            ret = 1;
+    }
+
+    return ret;
+}
+
+static u8
+ctr_drbg_tests(void)
+{
+    u8 ret = 9;
+
+    char *entropy128[] = {"ce50f33da5d4c1d3d4004eb35244b7f2"
+                          "cd7f2e5076fbf6780a7ff634b249a5fc",
+                          "a385f70a4d450321dfd18d8379ef8e77"
+                          "36fee5fbf0a0aea53b76696094e8aa93",
+                          "d4f47c385e5ee36915978386a074d413"
+                          "d04a1ce3a13a0fe2b17f3f20f83a93fd"};
+    char *entropy192[] = {"f1ef7eb311c850e189be229df7e6d68f"
+                          "1795aa8e21d93504e75abe78f0413958"
+                          "73540386812a9a2a",
+                          "818d5b460cf0e18faf2441c97eef12eb"
+                          "a4eca4be95a277c4f7ca904da1981cb9"
+                          "05a290601db8b677",
+                          "e45dc4113f01b589e503e7c58f6a7c91"
+                          "0d8a3458b71fb322bbbfee175e15060b"
+                          "278ae692fb39d46e"};
+    char *entropy256[] = {"df5d73faa468649edda33b5cca79b0b0"
+                          "5600419ccb7a879ddfec9db32ee494e5"
+                          "531b51de16a30f769262474c73bec010",
+                          "3b6fb634d35bb386927374f991c1cbc9"
+                          "fafba3a43c432dc411b7b2fa96cfcce8"
+                          "d305e135ff9bc460dbc7ba3990bf8060",
+                          "0217a8acf2f8e2c4ab7bdcd5a694bca2"
+                          "8d038018869dcbe2160d1ce0b4c78ead"
+                          "5592efed98662f2dff87f32f4835c677"};
+
+    /* Second call result was calculated from the Key and V given */
+    char *output128[] = {"6545c0529d372443b392ceb3ae3a99a3"
+                         "0f963eaf313280f1d1a1e87f9db373d3"
+                         "61e75d18018266499cccd64d9bbb8de0"
+                         "185f213383080faddec46bae1f784e5a"
+                         "9b61287a59ab17d5b11fce95eea40850"
+                         "705608f5a6fad9be984c189a39c1b5a0"
+                         "a5d33a5fa62812c8e5ef5c59643fd7c6"
+                         "fcb29bdfc63c402cf33aa010f61f175d",
+                         "1a062553ab60457ed1f1c52f5aca5a3b"
+                         "e564a27545358c112ed92c6eae2cb759"
+                         "7cfcc2e0a5dd81c5bfecc941da5e8152"
+                         "a9010d4845170734676c8c1b6b3073a5"
+                         "575542f1be776061d58eed37371e6798"
+                         "5b769acba93af2b48e84648db6410f97"
+                         "d2956ae08592a33b05bf36cf60fad9b6"
+                         "dd4c6dd3f109bbb790ec1c9b50218d16",
+                         "27f880df4c2907697fb2f594e311559c"
+                         "ea827049327af31fa7f0cbf332c46206"
+                         "74f503d7dc378320d228907151d32ee5"
+                         "e3f5c5eccb13afe58bf6a60192e6d70e"
+                         "1399934a7cd642d0115a4a5410d94da3"
+                         "43030ec5f123605fe3c9ca6e9183f693"
+                         "328d54aa71dbae936065cf2e73987ffe"
+                         "4ee4a9b59c18a5f3933fa6079e849115"};
+    char *output192[] = {"6bb0aa5b4b97ee83765736ad0e9068df"
+                         "ef0ccfc93b71c1d3425302ef7ba4635f"
+                         "fc09981d262177e208a7ec90a557b6d7"
+                         "6112d56c40893892c3034835036d7a69"
+                         "e409eb6a7c074b4b4785972a375cc237"
+                         "ad7ec4f828c3c2bd3938ce998b53f713"
+                         "4402d2884f52c20d2467f10649c48439"
+                         "1f05990b9b3886b08b3c9557651226f8",
+                         "6fd75498e5f38c40e72a0a3c2e2247ca"
+                         "133931bfed4237f0c9a19f6bbf6ab838"
+                         "1f9271337f6de6af53d7d5f67257fce6"
+                         "bc8e602af8b9844f043c78f2d24e4ffb"
+                         "68c2537a7c38dfea7f9194df3d18ad7a"
+                         "55fa5abb78e9076d28a90ea70919f998"
+                         "8943de40143baca544346696b3b282ef"
+                         "63ee7b2e257f01b98161e885c1ba074c",
+                         "65c696c8cd524977eaef54b5f7596f84"
+                         "d9681efc7fee5a41c1479c04b18175e2"
+                         "ec0296c9777ce460ebb6e2c506303142"
+                         "0258391c70f5926be115035dd95155bb"
+                         "6b4bbed4738769b6cb90ea1da9fb3ae0"
+                         "25a35f330121c4705ab4b8329fff1dca"
+                         "56db2e179ae14632234a537338559f23"
+                         "a0364246bc877391b65ead081c96b114"};
+    char *output256[] = {"d1c07cd95af8a7f11012c84ce48bb8cb"
+                         "87189e99d40fccb1771c619bdf82ab22"
+                         "80b1dc2f2581f39164f7ac0c510494b3"
+                         "a43c41b7db17514c87b107ae793e01c5"
+                         "cd66eaabef900f38e817f9211fbf522a"
+                         "23ab7deafd003b30566ec7ac41aced66"
+                         "35b9444f38e0acd56f8b1922364b9841"
+                         "1ffa9317c6984d3130de0cb97c857cc2",
+                         "083a836fe1cde053164555529409337d"
+                         "c4fec6844594fdf15083ba9d1001eb94"
+                         "5c3b96a1bcee3990e1e51f85c80e9f4e"
+                         "04de34e57b640f6cae8ed68e99624712"
+                         "ecdfe4681970e56e13428a174aca9de2"
+                         "5c4ba2f28cf15d9f9a9c1f54a3b2e5f7"
+                         "874064b05e470656e65f2541e3dc20a9"
+                         "9b0df559158f5cfcc0036694cc37a9bd",
+                         "aa36779726f52875312507fb084744d4"
+                         "d7f3f9468a5b246ccde316d2ab91879c"
+                         "2e29f5a0938a3bcd722bb718d01bbfc3"
+                         "5831c9e64f5b6410ae908d3061f76c84"
+                         "2dadf3fd6c886a0aaf707f8a28b4dcac"
+                         "aa500f76758b246992375472be90fdfa"
+                         "20646c3466bde247c0633153d23194cf"
+                         "aca0772d1396209ec9e7506ba23d75dc"};
+
+    u8 zeros[48] = {0};
+    maid_rng *aes128 = maid_rng_new(maid_ctr_drbg_aes_128, zeros);
+    maid_rng *aes192 = maid_rng_new(maid_ctr_drbg_aes_192, zeros);
+    maid_rng *aes256 = maid_rng_new(maid_ctr_drbg_aes_256, zeros);
+
+    for (u8 i = 0; i < 3; i++)
+    {
+        ret -= ctr_drbg_test(aes128, entropy128[i], output128[i]);
+        ret -= ctr_drbg_test(aes192, entropy192[i], output192[i]);
+        ret -= ctr_drbg_test(aes256, entropy256[i], output256[i]);
+    }
+
+    maid_rng_del(aes128);
+    maid_rng_del(aes192);
+    maid_rng_del(aes256);
+
+    return ret;
+}
+
 extern int
 main(void)
 {
@@ -744,6 +894,8 @@ main(void)
     ret += chacha_tests();
     ret += poly1305_tests();
     ret += chacha20poly1305_tests();
+
+    ret += ctr_drbg_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
