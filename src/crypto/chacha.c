@@ -76,8 +76,12 @@ chacha_del(void *ctx)
     if (ctx)
     {
         struct chacha *ch = ctx;
+
         maid_mem_clear(ch->key, ch->ks);
         free(ch->key);
+
+        maid_mem_clear(ch->nonce, ch->ns);
+        free(ch->nonce);
     }
     free(ctx);
 
@@ -117,17 +121,16 @@ chacha_new(const u8 version, const u8 *restrict key,
 
     if (ret)
     {
-        ret->key = malloc(ret->ks);
-        if (ret->key)
-            memcpy(ret->key, key, ret->ks);
+        ret->key = calloc(1, ret->ks);
+        ret->nonce = calloc(1, ret->ns);
+        if (ret->key && ret->nonce)
+        {
+            memcpy(ret->key,     key, ret->ks);
+            memcpy(ret->nonce, nonce, ret->ns);
+            ret->counter = counter;
+        }
         else
             ret = chacha_del(ret);
-    }
-
-    if (ret)
-    {
-        ret->nonce = (u8*)nonce;
-        ret->counter = counter;
     }
 
     return ret;
@@ -144,7 +147,7 @@ chacha_renew(void *ctx, const u8 *restrict key,
         if (key)
             memcpy(ch->key, key, ch->ks);
         if (nonce)
-            ch->nonce = (u8*)nonce;
+            memcpy(ch->nonce, nonce, ch->ns);
         ch->counter = counter;
     }
 }
@@ -169,26 +172,24 @@ chacha_generate(void *ctx, u8 *out)
         }
 
         u8 cs = (sizeof(u32) * 4) - ch->ns;
-        memcpy(&(out[48]),      &ch->counter, cs);
-        memcpy(&(out[48 + cs]), ch->nonce,    ch->ns);
+        maid_mem_write(&(out[48]), 0, cs, false, ch->counter);
+        memcpy(&(out[48 + cs]), ch->nonce, ch->ns);
 
-        u32 tmp[64 / sizeof(u32)] = {0};
-        memcpy(tmp, out, 64);
+        u32 tmp[16] = {0};
+        for (u8 i = 0; i < 16; i++)
+            tmp[i] = maid_mem_read(out, i, sizeof(u32), false);
 
         for (u8 i = 0; i < 10; i++)
             doubleround(tmp);
 
-        /* A second copy to not rely on alignment of out */
-        u32 tmp2[64 / sizeof(u32)] = {0};
-        memcpy(tmp2, out, 64);
-
-        for (u8 i = 0; i < 64 / sizeof(u32); i++)
-            tmp2[i] += tmp[i];
-        memcpy(out, tmp2, 64);
+        for (u8 i = 0; i < 16; i++)
+        {
+            tmp[i] += maid_mem_read(out, i, sizeof(u32), false);
+            maid_mem_write(out, i, sizeof(u32), false, tmp[i]);
+        }
 
         ch->counter++;
         maid_mem_clear(tmp, sizeof(tmp));
-        maid_mem_clear(tmp2, sizeof(tmp2));
     }
 }
 

@@ -22,7 +22,10 @@
 
 /* Not documented on this version */
 
-void maid_mem_clear(void *addr, const size_t length);
+u64 maid_mem_read(const void *addr, size_t index, size_t length, bool big);
+void maid_mem_write(void *addr, size_t index, size_t length, bool big,
+                    u64 data);
+void maid_mem_clear(void *addr, size_t length);
 
 #ifndef NDEBUG
 void maid_mp_debug(const char *name, const u32 *x, const size_t s);

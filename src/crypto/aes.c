@@ -450,7 +450,7 @@ aes_new(u8 version, const u8 *key)
     if (ret)
     {
         /* 128 bits per round */
-        ret->ctx = malloc(16 * (ret->nr + 1));
+        ret->ctx = calloc(1, 16 * (ret->nr + 1));
         if (!(ret->ctx))
             ret = aes_del(ret);
     }
