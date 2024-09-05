@@ -24,6 +24,7 @@
 #include <maid/mac.h>
 #include <maid/aead.h>
 #include <maid/rng.h>
+#include <maid/hash.h>
 
 /* Helper functions */
 
@@ -882,6 +883,104 @@ ctr_drbg_tests(void)
     return ret;
 }
 
+/* SHA-2 NIST CSRC examples */
+
+static u8
+sha2_test(maid_hash *h, char *input, char *output_h)
+{
+    u8 ret = 0;
+
+    if (h)
+    {
+        u8 output[128] = {0};
+
+        size_t length  = strlen(input);
+        size_t length2 = hex_read(output, output_h);
+
+        u8 output2[128] = {0};
+        maid_hash_renew(h);
+        maid_hash_update(h, (u8*)input, length);
+        maid_hash_digest(h, output2);
+
+        if (memcmp(output, output2, length2) == 0)
+            ret = 1;
+    }
+
+    return ret;
+}
+
+static u8
+sha2_tests(void)
+{
+    u8 ret = 12;
+
+    maid_hash *sha224     = maid_hash_new(maid_sha224);
+    maid_hash *sha256     = maid_hash_new(maid_sha256);
+    maid_hash *sha384     = maid_hash_new(maid_sha384);
+    maid_hash *sha512     = maid_hash_new(maid_sha512);
+    maid_hash *sha512_224 = maid_hash_new(maid_sha512_224);
+    maid_hash *sha512_256 = maid_hash_new(maid_sha512_256);
+
+    char *input0 = "abc";
+    char *input1 = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    char *input2 = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmn"
+                   "hijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";
+
+    char *outputs0[] = {"23097d223405d8228642a477bda255b3"
+                        "2aadbce4bda0b3f7e36c9da7",
+                        "ba7816bf8f01cfea414140de5dae2223"
+                        "b00361a396177a9cb410ff61f20015ad",
+                        "cb00753f45a35e8bb5a03d699ac65007"
+                        "272c32ab0eded1631a8b605a43ff5bed"
+                        "8086072ba1e7cc2358baeca134c825a7",
+                        "ddaf35a193617abacc417349ae204131"
+                        "12e6fa4e89a97ea20a9eeee64b55d39a"
+                        "2192992a274fc1a836ba3c23a3feebbd"
+                        "454d4423643ce80e2a9ac94fa54ca49f",
+                        "4634270f707b6a54daae7530460842e2"
+                        "0e37ed265ceee9a43e8924aa",
+                        "53048e2681941ef99b2e29b76b4c7dab"
+                        "e4c2d0c634fc6d46e0e2f13107e7af23"};
+    char *outputs1[] = {"75388b16512776cc5dba5da1fd890150"
+                        "b0c6455cb4f58b1952522525",
+                        "248d6a61d20638b8e5c026930c3e6039"
+                        "a33ce45964ff2167f6ecedd419db06c1"};
+    char *outputs2[] = {"09330c33f71147e83d192fc782cd1b47"
+                        "53111b173b3b05d22fa08086e3b0f712"
+                        "fcc7c71a557e2db966c3e9fa91746039",
+                        "8e959b75dae313da8cf4f72814fc143f"
+                        "8f7779c6eb9f7fa17299aeadb6889018"
+                        "501d289e4900f7e4331b99dec4b5433a"
+                        "c7d329eeb6dd26545e96e55b874be909",
+                        "23fec5bb94d60b23308192640b0c4533"
+                        "35d664734fe40e7268674af9",
+                        "3928e184fb8690f840da3988121d31be"
+                        "65cb9d3ef83ee6146feac861e19b563a"};
+
+    maid_hash *hashes256[] = {sha224, sha256};
+    for (u8 i = 0; i < 2; i++)
+    {
+        ret -= sha2_test(hashes256[i], input0, outputs0[i]);
+        ret -= sha2_test(hashes256[i], input1, outputs1[i]);
+    }
+
+    maid_hash *hashes512[] = {sha384, sha512, sha512_224, sha512_256};
+    for (u8 i = 0; i < 4; i++)
+    {
+        ret -= sha2_test(hashes512[i], input0, outputs0[i + 2]);
+        ret -= sha2_test(hashes512[i], input2, outputs2[i + 0]);
+    }
+
+    maid_hash_del(sha224);
+    maid_hash_del(sha256);
+    maid_hash_del(sha384);
+    maid_hash_del(sha512);
+    maid_hash_del(sha512_224);
+    maid_hash_del(sha512_256);
+
+    return ret;
+}
+
 extern int
 main(void)
 {
@@ -896,6 +995,7 @@ main(void)
     ret += chacha20poly1305_tests();
 
     ret += ctr_drbg_tests();
+    ret += sha2_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

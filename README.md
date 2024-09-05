@@ -35,3 +35,4 @@ sudo ldconfig
 | MACs           | Poly1305                  | [mac.md](docs/mac.md)       | [mac.md](examples/mac.md)       |
 | AEADs          | AES-GCM, Chacha20Poly1305 | [aead.md](docs/aead.md)     | [aead.md](examples/aead.md)     |
 | CSPRNGs        | CTR-DRBG-AES              | [rng.md](docs/rng.md)       | [rng.md](examples/rng.md)       |
+| Hash functions | SHA-2                     | [hash.md](docs/hash.md)     | [hash.md](examples/hash.md)     |
