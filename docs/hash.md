@@ -138,3 +138,44 @@ SHA-2 512-bits hash, truncated to 224-bits (NIST)
 <summary>const struct maid_hash_def maid_sha512_256</summary>
 SHA-2 512-bits hash, truncated to 256-bits (NIST)
 </details>
+
+## Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <maid/hash.h>
+
+int main(void)
+{
+    maid_hash *h = maid_hash_new(maid_sha256);
+
+    char *data = "abc";
+    u8 output[32] = {0};
+    if (h)
+    {
+        maid_hash_update(h, (u8*)data, strlen(data));
+        maid_hash_digest(h, output);
+    }
+
+    maid_hash_del(h);
+
+    for (size_t i = 0; i < sizeof(output); i++)
+        printf("%02x", output[i]);
+    printf("\n");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
+```sh
+cc example.c -lmaid
+```

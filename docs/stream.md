@@ -119,3 +119,42 @@ Chacha20 stream cipher (IETF version)
 | nonce   | 96-bit nonce |
 | counter | 0 to 2^32    |
 </details>
+
+## Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <maid/stream.h>
+
+int main(void)
+{
+    u8 key[32] = {0};
+    u8 iv [16] = {0};
+
+    maid_stream *st = maid_stream_new(maid_chacha20, key, iv, 0);
+
+    u8 data[64] = {0};
+    if (st)
+        maid_stream_xor(st, data, sizeof(data));
+
+    maid_stream_del(st);
+
+    for (size_t i = 0; i < sizeof(data); i++)
+        printf("%02x", data[i]);
+    printf("\n");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
+```sh
+cc example.c -lmaid
+```

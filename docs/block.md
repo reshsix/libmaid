@@ -150,3 +150,42 @@ AES-256 block cipher (NIST)
 | key  | 256-bit key |
 | iv   | 128-bit iv  |
 </details>
+
+## Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <maid/block.h>
+
+int main(void)
+{
+    u8 key[32] = {0};
+    u8 iv [16] = {0};
+
+    maid_block *bl = maid_block_new(maid_aes_256, key, iv);
+
+    u8 data[64] = {0};
+    if (bl)
+        maid_block_ctr(bl, data, sizeof(data));
+
+    maid_block_del(bl);
+
+    for (size_t i = 0; i < sizeof(data); i++)
+        printf("%02x", data[i]);
+    printf("\n");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
+```sh
+cc example.c -lmaid
+```

@@ -28,15 +28,12 @@ sudo ldconfig
 ```
 
 ## 📖 Library Reference
-| Category     | Documentation         | Example                   |
-| ------------ |:---------------------:|:-------------------------:|
-| Memory utils | [mem.md](docs/mem.md) | [mem.md](examples/mem.md) |
-
-| Category       | Algorithms                | Documentation               | Example                         |
-| -------------- |:-------------------------:|:---------------------------:|:-------------------------------:|
-| Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   | [block.md](examples/block.md)   |
-| Stream ciphers | Chacha20                  | [stream.md](docs/stream.md) | [stream.md](examples/stream.md) |
-| MACs           | Poly1305                  | [mac.md](docs/mac.md)       | [mac.md](examples/mac.md)       |
-| AEADs          | AES-GCM, Chacha20Poly1305 | [aead.md](docs/aead.md)     | [aead.md](examples/aead.md)     |
-| CSPRNGs        | CTR-DRBG-AES              | [rng.md](docs/rng.md)       | [rng.md](examples/rng.md)       |
-| Hash functions | SHA-2                     | [hash.md](docs/hash.md)     | [hash.md](examples/hash.md)     |
+| Category       | Algorithms                | Documentation               |
+| -------------- |:-------------------------:|:---------------------------:|
+| Memory utils   |                           | [mem.md](docs/mem.md)       |
+| Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   |
+| Stream ciphers | Chacha20                  | [stream.md](docs/stream.md) |
+| MACs           | Poly1305                  | [mac.md](docs/mac.md)       |
+| AEADs          | AES-GCM, Chacha20Poly1305 | [aead.md](docs/aead.md)     |
+| CSPRNGs        | CTR-DRBG-AES              | [rng.md](docs/rng.md)       |
+| Hash functions | SHA-2                     | [hash.md](docs/hash.md)     |

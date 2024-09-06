@@ -68,3 +68,35 @@ Clears memory
 | length  | Length to clear      |
 
 </details>
+
+## Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <maid/mem.h>
+
+int main(void)
+{
+    u8 memory[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    u32 integer = maid_mem_read(memory, 0, sizeof(u32), true);
+    maid_mem_write(memory, 1, sizeof(u32), false, integer ^ 0xed0cee0e);
+
+    for (size_t i = 0; i < sizeof(memory); i++)
+        printf("%02x", memory[i]);
+    printf("\n");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
+```sh
+cc example.c -lmaid
+```

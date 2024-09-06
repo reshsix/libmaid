@@ -128,3 +128,47 @@ Poly1305 128-bit MAC (IETF)
 |------|-------------|
 | key  | 256-bit key |
 </details>
+
+## Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <maid/mac.h>
+
+int main(void)
+{
+    u8 key[32] = {0};
+    for (size_t i = 0; i < sizeof(key); i++)
+        key[i] = i;
+
+    maid_mac *m = maid_mac_new(maid_poly1305, key);
+
+    u8 data[64] = {0};
+    u8  tag[16] = {0};
+    if (m)
+    {
+        maid_mac_update(m, data, sizeof(data));
+        maid_mac_digest(m, tag);
+    }
+
+    maid_mac_del(m);
+
+    for (size_t i = 0; i < sizeof(tag); i++)
+        printf("%02x", tag[i]);
+    printf("\n");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
+```sh
+cc example.c -lmaid
+```
