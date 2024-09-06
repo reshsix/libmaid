@@ -28,8 +28,8 @@ struct maid_rng_def
     void * (*del)(void *);
     void (*renew)(void *, const u8 *);
     void (*generate)(void *, u8 *);
-    const size_t state_s;
-    const u8 version;
+    size_t state_s;
+    u8 version;
 };
 
 /* External interface */

@@ -23,17 +23,17 @@
 /* Not documented on this version */
 
 #ifndef NDEBUG
-void maid_mp_debug(const char *name, const u32 *x, const size_t s);
+void maid_mp_debug(const char *name, const u32 *x, size_t s);
 #endif
 
 void maid_mp_add(u32 *out, const u32 *a, const u32 *b,
-                 const size_t so, const size_t sa, const size_t sb);
+                 size_t so, size_t sa, size_t sb);
 void maid_mp_sub(u32 *out, const u32 *a, const u32 *b,
-                 const size_t so, const size_t sa, const size_t sb);
+                 size_t so, size_t sa, size_t sb);
 void maid_mp_mul(u32 *restrict out, const u32 *restrict a,
-                 const u32 *restrict b, const size_t so,
-                 const size_t sa, const size_t sb);
+                 const u32 *restrict b, size_t so,
+                 size_t sa, size_t sb);
 void maid_mp_shr(u32 *restrict out, const u32 *restrict a,
-                 const size_t n, const size_t so, const size_t sa);
+                 size_t n, size_t so, size_t sa);
 
 #endif

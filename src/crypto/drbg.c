@@ -31,6 +31,7 @@ enum
 
 struct ctr_drbg
 {
+    u8 entropy[48];
     maid_block *bl;
     size_t k_s;
 };
@@ -74,6 +75,9 @@ ctr_drbg_init(void *ctx, const u8 *entropy)
 
         maid_mem_clear(key, sizeof(key));
         maid_mem_clear(iv,  sizeof(iv));
+
+        /* Save entropy for renew */
+        memcpy(ctr->entropy, entropy, ctr->k_s + 16);
     }
 }
 
@@ -132,7 +136,11 @@ ctr_drbg_new(u8 version, const u8 *entropy)
 static void
 ctr_drbg_renew(void *ctx, const u8 *entropy)
 {
-    ctr_drbg_init(ctx, entropy);
+    if (ctx)
+    {
+        struct ctr_drbg *ctr = ctx;
+        ctr_drbg_init(ctx, entropy ? entropy : ctr->entropy);
+    }
 }
 
 static void

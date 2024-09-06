@@ -24,13 +24,13 @@
 
 struct maid_hash_def
 {
-    void * (*new)(const u8);
+    void * (*new)(u8);
     void * (*del)(void *);
     void (*renew)(void *);
     void (*update)(void *, u8 *, size_t);
     void (*digest)(void *, u8 *);
-    const size_t state_s;
-    const u8 version;
+    size_t state_s;
+    u8 version;
 };
 
 /* External interface */

@@ -47,7 +47,9 @@ maid_mac_del(maid_mac *m)
 extern struct maid_mac *
 maid_mac_new(struct maid_mac_def def, const u8 *key)
 {
-    struct maid_mac *ret = calloc(1, sizeof(struct maid_mac));
+    struct maid_mac *ret = NULL;
+    if (key)
+        ret = calloc(1, sizeof(struct maid_mac));
 
     if (ret)
     {
@@ -67,8 +69,7 @@ maid_mac_renew(struct maid_mac *m, const u8 *key)
 {
     if (m)
     {
-        if (key)
-            m->def.renew(m->ctx, key);
+        m->def.renew(m->ctx, key);
 
         m->buffer_c = 0;
         m->finished = false;

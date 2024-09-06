@@ -41,7 +41,7 @@ uninstall:
 	rm -rf "$(DESTDIR)/lib/libmaid.so"
 
 test:
-	$(CC) $(CFLAGS) tests.c -o build/tests -Lbuild -lmaid
+	$(CC) $(CFLAGS) -static tests.c -o build/tests -Lbuild -lmaid
 	build/tests
 
 FOLDERS = build build/crypto

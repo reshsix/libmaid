@@ -28,9 +28,9 @@ struct maid_aead_def
 {
     union
     {
-        void (*block)(const struct maid_block_def, const u8 *, const u8 *,
+        void (*block)(struct maid_block_def, const u8 *, const u8 *,
                       maid_block **, maid_mac **, bool);
-        void (*stream)(const struct maid_stream_def, const u8 *, const u8 *,
+        void (*stream)(struct maid_stream_def, const u8 *, const u8 *,
                        maid_stream **, maid_mac **, bool);
     } init;
     union

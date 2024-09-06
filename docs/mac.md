@@ -120,7 +120,7 @@ Outputs the authentication tag (One time, ending the MAC instance)
 ## External Algorithms
 
 <details>
-<summary>struct maid_mac_def maid_poly1305</summary>
+<summary>const struct maid_mac_def maid_poly1305</summary>
 Poly1305 128-bit MAC (IETF)
 
 ### Parameters

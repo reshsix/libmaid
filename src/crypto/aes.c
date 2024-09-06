@@ -342,7 +342,7 @@ mixcolumn_d(u8 *block)
 }
 
 static void
-addroundkey(const u8 *ctx, u8 *block, const u8 round)
+addroundkey(const u8 *ctx, u8 *block, u8 round)
 {
     for (u8 i = 0; i < 16; i++)
         block[i] ^= ctx[(round * 16) + i];

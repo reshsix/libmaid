@@ -59,7 +59,9 @@ maid_block_new(struct maid_block_def def,
                const u8 *restrict key,
                const u8 *restrict iv)
 {
-    struct maid_block *ret = calloc(1, sizeof(struct maid_block));
+    struct maid_block *ret = NULL;
+    if (key && iv)
+        ret = calloc(1, sizeof(struct maid_block));
 
     if (ret)
     {

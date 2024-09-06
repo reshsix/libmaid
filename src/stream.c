@@ -53,7 +53,9 @@ maid_stream_new(struct maid_stream_def def,
                 const u8 *restrict nonce,
                 u64 counter)
 {
-    struct maid_stream *ret = calloc(1, sizeof(struct maid_stream));
+    struct maid_stream *ret = NULL;
+    if (key && nonce)
+        ret = calloc(1, sizeof(struct maid_stream));
 
     if (ret)
     {

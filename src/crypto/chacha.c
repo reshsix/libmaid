@@ -88,7 +88,7 @@ chacha_del(void *ctx)
 }
 
 static void *
-chacha_new(const u8 version, const u8 *restrict key,
+chacha_new(u8 version, const u8 *restrict key,
            const u8 *restrict nonce, u64 counter)
 {
     struct chacha *ret = calloc(1, sizeof(struct chacha));

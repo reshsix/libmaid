@@ -24,12 +24,12 @@
 
 struct maid_stream_def
 {
-    void * (*new)(const u8, const u8 *, const u8 *, const u64);
+    void * (*new)(u8, const u8 *, const u8 *, const u64);
     void * (*del)(void *);
     void (*renew)(void *, const u8 *, const u8 *, const u64);
     void (*generate)(void *, u8 *);
-    const size_t state_s;
-    const u8 version;
+    size_t state_s;
+    u8 version;
 };
 
 /* External interface */

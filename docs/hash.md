@@ -110,31 +110,31 @@ Outputs the hash (One time, ending the hash function instance)
 ## External Algorithms
 
 <details>
-<summary>struct maid_hash_def maid_sha224</summary>
+<summary>const struct maid_hash_def maid_sha224</summary>
 SHA-2 224-bits hash (NIST)
 </details>
 
 <details>
-<summary>struct maid_hash_def maid_sha256</summary>
+<summary>const struct maid_hash_def maid_sha256</summary>
 SHA-2 256-bits hash (NIST)
 </details>
 
 <details>
-<summary>struct maid_hash_def maid_sha384</summary>
+<summary>const struct maid_hash_def maid_sha384</summary>
 SHA-2 384-bits hash (NIST)
 </details>
 
 <details>
-<summary>struct maid_hash_def maid_sha512</summary>
+<summary>const struct maid_hash_def maid_sha512</summary>
 SHA-2 512-bits hash (NIST)
 </details>
 
 <details>
-<summary>struct maid_hash_def maid_sha512_244</summary>
+<summary>const struct maid_hash_def maid_sha512_244</summary>
 SHA-2 512-bits hash, truncated to 224-bits (NIST)
 </details>
 
 <details>
-<summary>struct maid_hash_def maid_sha512_256</summary>
+<summary>const struct maid_hash_def maid_sha512_256</summary>
 SHA-2 512-bits hash, truncated to 256-bits (NIST)
 </details>

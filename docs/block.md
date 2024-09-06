@@ -119,7 +119,7 @@ Applies CTR mode (increases iv accordingly)
 ## External Algorithms
 
 <details>
-<summary>struct maid_block_def maid_aes_128</summary>
+<summary>const struct maid_block_def maid_aes_128</summary>
 AES-128 block cipher (NIST)
 
 ### Parameters
@@ -130,7 +130,7 @@ AES-128 block cipher (NIST)
 </details>
 
 <details>
-<summary>struct maid_block_def maid_aes_192</summary>
+<summary>const struct maid_block_def maid_aes_192</summary>
 AES-192 block cipher (NIST)
 
 ### Parameters
@@ -141,7 +141,7 @@ AES-192 block cipher (NIST)
 </details>
 
 <details>
-<summary>struct maid_block_def maid_aes_256</summary>
+<summary>const struct maid_block_def maid_aes_256</summary>
 AES-256 block cipher (NIST)
 
 ### Parameters

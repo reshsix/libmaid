@@ -64,7 +64,9 @@ maid_aead_new(struct maid_aead_def def,
               const u8 *restrict key,
               const u8 *restrict nonce)
 {
-    struct maid_aead *ret = calloc(1, sizeof(struct maid_aead));
+    struct maid_aead *ret = NULL;
+    if (key && nonce)
+        ret = calloc(1, sizeof(struct maid_aead));
 
     if (ret)
     {

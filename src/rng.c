@@ -50,7 +50,9 @@ maid_rng_del(struct maid_rng *g)
 extern struct maid_rng *
 maid_rng_new(struct maid_rng_def def, const u8 *entropy)
 {
-    struct maid_rng *ret = calloc(1, sizeof(struct maid_rng));
+    struct maid_rng *ret = NULL;
+    if (entropy)
+        ret = calloc(1, sizeof(struct maid_rng));
 
     if (ret)
     {
@@ -70,8 +72,7 @@ maid_rng_renew(struct maid_rng *g, const u8 *entropy)
 {
     if (g)
     {
-        if (entropy)
-            g->def.renew(g->ctx, entropy);
+        g->def.renew(g->ctx, entropy);
 
         g->buffer_c = 0;
         g->initialized = false;

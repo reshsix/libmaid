@@ -132,7 +132,7 @@ Outputs the authentication tag (Step 3, ending the AEAD instance)
 ## External Algorithms
 
 <details>
-<summary>struct maid_aead_def maid_aes_gcm_128</summary>
+<summary>const struct maid_aead_def maid_aes_gcm_128</summary>
 AES-128 on GCM mode (NIST)
 
 ### Parameters
@@ -143,7 +143,7 @@ AES-128 on GCM mode (NIST)
 </details>
 
 <details>
-<summary>struct maid_aead_def maid_aes_gcm_192</summary>
+<summary>const struct maid_aead_def maid_aes_gcm_192</summary>
 AES-192 on GCM mode (NIST)
 
 ### Parameters
@@ -154,7 +154,7 @@ AES-192 on GCM mode (NIST)
 </details>
 
 <details>
-<summary>struct maid_aead_def maid_aes_gcm_256</summary>
+<summary>const struct maid_aead_def maid_aes_gcm_256</summary>
 AES-256 on GCM mode (NIST)
 
 ### Parameters
@@ -165,7 +165,7 @@ AES-256 on GCM mode (NIST)
 </details>
 
 <details>
-<summary>struct maid_aead_def maid_chacha20poly1305</summary>
+<summary>const struct maid_aead_def maid_chacha20poly1305</summary>
 Chacha20 with Poly1305 (IETF)
 
 ### Parameters

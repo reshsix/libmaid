@@ -109,7 +109,7 @@ Generates keystream, and applies it with a xor operation
 ## External Algorithms
 
 <details>
-<summary>struct maid_stream_def maid_chacha20</summary>
+<summary>const struct maid_stream_def maid_chacha20</summary>
 Chacha20 stream cipher (IETF version)
 
 ### Parameters

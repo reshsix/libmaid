@@ -101,7 +101,7 @@ Generates pseudorandom bytes
 ## External Algorithms
 
 <details>
-<summary>struct maid_rng_def maid_ctr_drbg_aes_128</summary>
+<summary>const struct maid_rng_def maid_ctr_drbg_aes_128</summary>
 CTR-DRBG with AES-128 (NIST)
 
 ### Parameters
@@ -111,7 +111,7 @@ CTR-DRBG with AES-128 (NIST)
 </details>
 
 <details>
-<summary>struct maid_rng_def maid_ctr_drbg_aes_192</summary>
+<summary>const struct maid_rng_def maid_ctr_drbg_aes_192</summary>
 CTR-DRBG with AES-192 (NIST)
 
 ### Parameters
@@ -121,7 +121,7 @@ CTR-DRBG with AES-192 (NIST)
 </details>
 
 <details>
-<summary>struct maid_rng_def maid_ctr_drbg_aes_256</summary>
+<summary>const struct maid_rng_def maid_ctr_drbg_aes_256</summary>
 CTR-DRBG with AES-256 (NIST)
 
 ### Parameters
