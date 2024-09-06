@@ -28,6 +28,10 @@ sudo ldconfig
 ```
 
 ## 📖 Library Reference
+| Category     | Documentation         | Example                   |
+| ------------ |:---------------------:|:-------------------------:|
+| Memory utils | [mem.md](docs/mem.md) | [mem.md](examples/mem.md) |
+
 | Category       | Algorithms                | Documentation               | Example                         |
 | -------------- |:-------------------------:|:---------------------------:|:-------------------------------:|
 | Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   | [block.md](examples/block.md)   |

@@ -15,25 +15,14 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_UTILS_H
-#define MAID_UTILS_H
+#ifndef MAID_MEM_H
+#define MAID_MEM_H
 
 #include <maid/types.h>
 
-/* Not documented on this version */
-
-#ifndef NDEBUG
-void maid_mp_debug(const char *name, const u32 *x, const size_t s);
-#endif
-
-void maid_mp_add(u32 *out, const u32 *a, const u32 *b,
-                 const size_t so, const size_t sa, const size_t sb);
-void maid_mp_sub(u32 *out, const u32 *a, const u32 *b,
-                 const size_t so, const size_t sa, const size_t sb);
-void maid_mp_mul(u32 *restrict out, const u32 *restrict a,
-                 const u32 *restrict b, const size_t so,
-                 const size_t sa, const size_t sb);
-void maid_mp_shr(u32 *restrict out, const u32 *restrict a,
-                 const size_t n, const size_t so, const size_t sa);
+u64 maid_mem_read(const void *addr, size_t index, size_t length, bool big);
+void maid_mem_write(void *addr, size_t index, size_t length, bool big,
+                    u64 data);
+void maid_mem_clear(void *addr, size_t length);
 
 #endif

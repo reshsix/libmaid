@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mem.h>
 #include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
@@ -68,6 +69,37 @@ hex_read(u8 *data, char *hex)
     }
 
     return ret;
+}
+
+/* Memory utilities */
+
+static u8
+mem_tests(void)
+{
+    u8 ret = 4;
+
+    u8 mem[24] = {0x00, 0x00, 0x00, 0x00, 0xb0, 0x0b, 0x00, 0x00};
+
+    maid_mem_write(mem, 3, sizeof(u8),  false, 0xef);
+    maid_mem_write(mem, 3, sizeof(u32), false, 0x0df0ad0b);
+    maid_mem_write(mem, 2, sizeof(u64), true,  0xdec03713edacef0d);
+
+    ret -= (maid_mem_read(mem, 3, sizeof(u8),  true)   == 0xef);
+    ret -= (maid_mem_read(mem, 2, sizeof(u16), false)  == 0x0bb0);
+    ret -= (maid_mem_read(mem, 3, sizeof(u32), true)   == 0x0badf00d);
+    ret -= (maid_mem_read(mem, 2, sizeof(u64), false)  == 0x0defaced1337c0de);
+
+    maid_mem_clear(mem, sizeof(mem));
+    for (size_t i = 0; i < sizeof(mem); i++)
+    {
+        if (mem[i] != 0x0)
+        {
+            ret++;
+            break;
+        }
+    }
+
+   return ret;
 }
 
 /* AES NIST SP 800-38A vectors */
@@ -985,6 +1017,12 @@ extern int
 main(void)
 {
     u8 ret = 0;
+
+    /* Utilities */
+
+    ret += mem_tests();
+
+    /* Algorithms */
 
     ret += aes_tests();
     ret += aes_ctr_tests();

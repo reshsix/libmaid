@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mem.h>
 #include <maid/mac.h>
 #include <maid/utils.h>
 

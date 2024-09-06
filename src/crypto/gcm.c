@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mem.h>
 #include <maid/mac.h>
-#include <maid/utils.h>
 
 static void
 gf128_mul(const u8 *a, const u8 *b, u8 *out)

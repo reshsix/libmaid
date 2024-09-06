@@ -18,8 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/utils.h>
-
+#include <maid/mem.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
 #include <maid/aead.h>
