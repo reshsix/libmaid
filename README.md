@@ -28,12 +28,14 @@ sudo ldconfig
 ```
 
 ## 📖 Library Reference
-| Category       | Algorithms                | Documentation               |
-| -------------- |:-------------------------:|:---------------------------:|
-| Memory utils   |                           | [mem.md](docs/mem.md)       |
-| Block ciphers  | AES-ECB, AES-CTR          | [block.md](docs/block.md)   |
-| Stream ciphers | Chacha20                  | [stream.md](docs/stream.md) |
-| MACs           | Poly1305                  | [mac.md](docs/mac.md)       |
-| AEADs          | AES-GCM, Chacha20Poly1305 | [aead.md](docs/aead.md)     |
-| CSPRNGs        | CTR-DRBG-AES              | [rng.md](docs/rng.md)       |
-| Hash functions | SHA-2                     | [hash.md](docs/hash.md)     |
+| Category                         | Algorithms                |
+| --------------------------------:|---------------------------|
+| [Type aliases](docs/types.md)    |                           |
+| [Memory utils](docs/mem.md)      |                           |
+|                                  |                           |
+| [Block ciphers](docs/block.md)   | AES-ECB, AES-CTR          |
+| [Stream ciphers](docs/stream.md) | Chacha20                  |
+| [MACs](docs/mac.md)              | Poly1305                  |
+| [AEADs](docs/aead.md)            | AES-GCM, Chacha20Poly1305 |
+| [CSPRNGs](docs/rng.md)           | CTR-DRBG-AES              |
+| [Hash functions](docs/hash.md)   | SHA-2                     |

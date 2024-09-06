@@ -1,4 +1,4 @@
-/*
+<!---
  *  This file is part of libmaid
  *
  *  Libmaid is free software; you can redistribute it and/or
@@ -13,11 +13,16 @@
  *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
-*/
+--->
 
-#ifndef MAID_TYPES_H
-#define MAID_TYPES_H
+# Type Aliases
 
+```c
+#include <maid/types.h>
+```
+
+Is the same as:
+```c
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -31,5 +36,4 @@ typedef int8_t  s8;
 typedef int16_t s16;
 typedef int32_t s32;
 typedef int64_t s64;
-
-#endif
+```
