@@ -26,14 +26,15 @@
 void maid_mp_debug(const char *name, const u32 *x, size_t s);
 #endif
 
-void maid_mp_add(u32 *out, const u32 *a, const u32 *b,
-                 size_t so, size_t sa, size_t sb);
-void maid_mp_sub(u32 *out, const u32 *a, const u32 *b,
-                 size_t so, size_t sa, size_t sb);
-void maid_mp_mul(u32 *restrict out, const u32 *restrict a,
-                 const u32 *restrict b, size_t so,
-                 size_t sa, size_t sb);
-void maid_mp_shr(u32 *restrict out, const u32 *restrict a,
-                 size_t n, size_t so, size_t sa);
+void maid_mp_clr(size_t words, u32 *a);
+void maid_mp_mov(size_t words, u32 *a, const u32 *b);
+
+void maid_mp_add(size_t words, u32 *a, const u32 *b);
+void maid_mp_sub(size_t words, u32 *a, const u32 *b);
+
+void maid_mp_shl(size_t words, u32 *a, u64 shift);
+void maid_mp_shr(size_t words, u32 *a, u64 shift);
+
+void maid_mp_mul(size_t words, u32 *a, const u32 *b, u32 *tmp);
 
 #endif

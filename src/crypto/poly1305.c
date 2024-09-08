@@ -29,9 +29,9 @@ struct poly1305
     /* 416 bits, to handle multiplication and reduction */
     u32 acc[13], acc2[13], acc3[13];
     /* R and S key parts */
-    u32 r[4], s[4];
+    u32 r[13], s[13];
     /* Block buffer */
-    u32 buffer[5];
+    u32 buffer[13];
 };
 
 static void
@@ -99,11 +99,11 @@ static void
 poly1305_update(void *ctx, u8 *block, size_t size)
 {
     /* 2^130 - 5 little endian */
-    const u32 prime[5] = {0xfffffffb, 0xffffffff,
-                          0xffffffff, 0xffffffff, 0x3};
+    const u32 prime[13] = {0xfffffffb, 0xffffffff,
+                           0xffffffff, 0xffffffff, 0x3};
     /* 2^260 // prime, for Barret's reduction */
-    const u32 m[5] = {0x00000005, 0x00000000,
-                      0x00000000, 0x00000000, 0x4};
+    const u32 m[13] = {0x00000005, 0x00000000,
+                       0x00000000, 0x00000000, 0x4};
     if (ctx && block)
     {
         struct poly1305 *p = ctx;
@@ -114,16 +114,17 @@ poly1305_update(void *ctx, u8 *block, size_t size)
         p->buffer[size / 4] |= 0x1 << ((size % 4) * 8);
 
         /* Adds block to the accumulator */
-        maid_mp_add(p->acc2, p->acc, p->buffer, 13, 13, 5);
+        maid_mp_add(13, p->acc, p->buffer);
 
         /* Multiplies accumulator by r */
-        maid_mp_mul(p->acc3, p->acc2, p->r, 13, 13, 4);
+        maid_mp_mul(13, p->acc, p->r, p->acc2);
 
         /* Barret reduction by prime */
-        maid_mp_mul(p->acc2, p->acc3,       m, 13, 13, 5);
-        maid_mp_shr(p->acc,  p->acc2,     260, 13, 13);
-        maid_mp_mul(p->acc2, p->acc,    prime, 13, 13, 5);
-        maid_mp_sub(p->acc,  p->acc3, p->acc2, 13, 13, 13);
+        maid_mp_mov(13, p->acc2, p->acc);
+        maid_mp_mul(13, p->acc2, m, p->acc3);
+        maid_mp_shr(13, p->acc2, 260);
+        maid_mp_mul(13, p->acc2, prime, p->acc3);
+        maid_mp_sub(13, p->acc, p->acc2);
     }
 }
 
@@ -135,10 +136,10 @@ poly1305_digest(void *ctx, u8 *output)
         struct poly1305 *p = ctx;
 
         /* Adds s to the accumulator */
-        maid_mp_add(p->acc2, p->acc, p->s, 13, 13, 4);
+        maid_mp_add(13, p->acc, p->s);
 
         /* Exports 128 bits */
-        memcpy(output, p->acc2, 16);
+        memcpy(output, p->acc, 16);
     }
 }
 
