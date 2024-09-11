@@ -30,8 +30,9 @@ sudo ldconfig
 ## 📖 Library Reference
 | Category                         | Algorithms                |
 | --------------------------------:|---------------------------|
-| [Type aliases](docs/types.md)    |                           |
-| [Memory utils](docs/mem.md)      |                           |
+| [Type aliases](docs/types.md)    | ------------------------- |
+| [Memory utils](docs/mem.md)      | ------------------------- |
+| [Multiprecision](docs/mp.md)     | ------------------------- |
 |                                  |                           |
 | [Block ciphers](docs/block.md)   | AES-ECB, AES-CTR          |
 | [Stream ciphers](docs/stream.md) | Chacha20                  |

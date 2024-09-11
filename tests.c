@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include <maid/mem.h>
+#include <maid/mp.h>
 #include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
@@ -100,6 +101,105 @@ mem_tests(void)
     }
 
    return ret;
+}
+
+/* Multiprecision utilities */
+
+static void
+mp_test(size_t words, u32 *val, u32 *a, u32 *b, u32 *c,
+        size_t ia, size_t ib, size_t ic)
+{
+    for (u8 i = 0; i < words; i++)
+    {
+        maid_mem_write(a, i, sizeof(u32), false, val[(ia * words) + i]);
+        maid_mem_write(b, i, sizeof(u32), false, val[(ib * words) + i]);
+        maid_mem_write(c, i, sizeof(u32), false, val[(ic * words) + i]);
+    }
+}
+
+static u8
+mp_tests(void)
+{
+    u8 ret = 22;
+
+    u32 zeros[2] = {0};
+    u32 val[] = {0x0de1f1ed, 0xcafebabe, 0xc0d1f1ed, 0x0011b1d0,
+                 0xdeadbea7, 0xcafebe7a, 0x9f7fb094, 0xcb10704b,
+                 0x919dbea7, 0x0011b58d, 0x00000000, 0x233b7d4e,
+                 0x000119db, 0x00000000, 0xd16a1569, 0x4bc9057c,
+                 0x00000b78, 0x00000000, 0xa6135bd5, 0x000f689a,
+                 0xe65b0ddd, 0x44067ebe};
+
+    u32 a[2] = {0};
+    u32 b[2] = {0};
+    u32 c[2] = {0};
+
+    mp_test(2, val, a, b, c, 0, 1, 0);
+    ret -= maid_mp_cmp(2, a, b)    == -1;
+    ret -= maid_mp_cmp(2, b, a)    ==  1;
+    ret -= maid_mp_cmp(2, a, a)    ==  0;
+    ret -= maid_mp_cmp(2, a, NULL) == -1;
+
+    maid_mp_mov(2, a, NULL);
+    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 0, 2, 2);
+    maid_mp_mov(2, a, b);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 2, 1, 3);
+    maid_mp_add(2, a, b);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_add(2, a, NULL);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 3, 0, 4);
+    maid_mp_sub(2, a, b);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_sub(2, a, NULL);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 4, 0, 5);
+    maid_mp_shl(2, a, 33);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_shl(2, a, 128);
+    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 5, 0, 6);
+    maid_mp_shr(2, a, 45);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_shl(2, a, 128);
+    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+
+    u32 tmp[2] = {0};
+    u32 tmp2[2] = {0};
+    u32 tmp3[2] = {0};
+
+    mp_test(2, val, a, b, c, 0, 1, 7);
+    maid_mp_mul(2, a, b, tmp);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_mul(2, a, NULL, tmp);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 0, 1, 8);
+    maid_mp_div(2, a, b, tmp, tmp2);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_div(2, a, NULL, tmp2, tmp);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 0, 1, 9);
+    maid_mp_mod(2, a, b, tmp3, tmp, tmp2);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_mod(2, a, NULL, tmp2, tmp3, tmp);
+    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, 0, 1, 10);
+    maid_mp_exp(2, a, b, tmp3, tmp2, tmp);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    maid_mp_exp(2, a, NULL, tmp, tmp3, tmp2);
+    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+
+    return ret;
 }
 
 /* AES NIST SP 800-38A vectors */
@@ -1021,6 +1121,7 @@ main(void)
     /* Utilities */
 
     ret += mem_tests();
+    ret += mp_tests();
 
     /* Algorithms */
 

@@ -19,19 +19,19 @@
 #include <string.h>
 
 #include <maid/mem.h>
+#include <maid/mp.h>
 #include <maid/mac.h>
-#include <maid/utils.h>
 
 /* Maid MAC definition */
 
 struct poly1305
 {
-    /* 416 bits, to handle multiplication and reduction */
-    u32 acc[13], acc2[13], acc3[13];
+    /* 320 bits, to handle multiplication */
+    u32 acc[10], acc2[10], acc3[10];
     /* R and S key parts */
-    u32 r[13], s[13];
+    u32 r[10], s[10];
     /* Block buffer */
-    u32 buffer[13];
+    u32 buffer[10];
 };
 
 static void
@@ -99,32 +99,31 @@ static void
 poly1305_update(void *ctx, u8 *block, size_t size)
 {
     /* 2^130 - 5 little endian */
-    const u32 prime[13] = {0xfffffffb, 0xffffffff,
-                           0xffffffff, 0xffffffff, 0x3};
-    /* 2^260 // prime, for Barret's reduction */
-    const u32 m[13] = {0x00000005, 0x00000000,
-                       0x00000000, 0x00000000, 0x4};
+    const u32 prime[5] = {0xfffffffb, 0xffffffff,
+                          0xffffffff, 0xffffffff, 0x3};
+
+    u32 pr[10] = {0};
+    for (size_t i = 0; i < 5; i++)
+        maid_mem_write(pr, i, sizeof(u32), false, prime[i]);
+
     if (ctx && block)
     {
         struct poly1305 *p = ctx;
 
+        /* Read data into buffer */
         memcpy(p->buffer, block, size);
+
+        /* Pad buffer accordingly */
         if (sizeof(p->buffer) > size)
             memset(&(((u8*)p->buffer)[size]), 0, sizeof(p->buffer) - size);
         p->buffer[size / 4] |= 0x1 << ((size % 4) * 8);
 
         /* Adds block to the accumulator */
-        maid_mp_add(13, p->acc, p->buffer);
-
+        maid_mp_add(10, p->acc, p->buffer);
         /* Multiplies accumulator by r */
-        maid_mp_mul(13, p->acc, p->r, p->acc2);
-
-        /* Barret reduction by prime */
-        maid_mp_mov(13, p->acc2, p->acc);
-        maid_mp_mul(13, p->acc2, m, p->acc3);
-        maid_mp_shr(13, p->acc2, 260);
-        maid_mp_mul(13, p->acc2, prime, p->acc3);
-        maid_mp_sub(13, p->acc, p->acc2);
+        maid_mp_mul(10, p->acc, p->r, p->acc2);
+        /* Reduction by prime */
+        maid_mp_mod(10, p->acc, pr, p->buffer, p->acc2, p->acc3);
     }
 }
 
@@ -136,8 +135,7 @@ poly1305_digest(void *ctx, u8 *output)
         struct poly1305 *p = ctx;
 
         /* Adds s to the accumulator */
-        maid_mp_add(13, p->acc, p->s);
-
+        maid_mp_add(10, p->acc, p->s);
         /* Exports 128 bits */
         memcpy(output, p->acc, 16);
     }

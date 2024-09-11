@@ -15,18 +15,15 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_UTILS_H
-#define MAID_UTILS_H
+#ifndef MAID_MP_H
+#define MAID_MP_H
 
 #include <maid/types.h>
 
-/* Not documented on this version */
+void maid_mp_debug(size_t words, const char *name, const u32 *a);
 
-#ifndef NDEBUG
-void maid_mp_debug(const char *name, const u32 *x, size_t s);
-#endif
+s8 maid_mp_cmp(size_t words, const u32 *a, const u32 *b);
 
-void maid_mp_clr(size_t words, u32 *a);
 void maid_mp_mov(size_t words, u32 *a, const u32 *b);
 
 void maid_mp_add(size_t words, u32 *a, const u32 *b);
@@ -36,5 +33,11 @@ void maid_mp_shl(size_t words, u32 *a, u64 shift);
 void maid_mp_shr(size_t words, u32 *a, u64 shift);
 
 void maid_mp_mul(size_t words, u32 *a, const u32 *b, u32 *tmp);
+void maid_mp_div(size_t words, u32 *a, const u32 *b, u32 *tmp, u32 *tmp2);
+void maid_mp_mod(size_t words, u32 *a, const u32 *b,
+                 u32 *tmp, u32 *tmp2, u32 *tmp3);
+
+void maid_mp_exp(size_t words, u32 *a, const u32 *b,
+                 u32 *tmp, u32 *tmp2, u32 *tmp3);
 
 #endif
