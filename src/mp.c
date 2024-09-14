@@ -35,6 +35,27 @@ maid_mp_debug(size_t words, const char *name, const u32 *a)
     fprintf(stderr, "\n\n");
 }
 
+extern void
+maid_mp_read(size_t words, u32 *a, const u8 *addr, bool big)
+{
+    for (size_t i = 0; i < words; i++)
+    {
+        u32 val = maid_mem_read(addr, (!big) ? i : words - i - 1,
+                                sizeof(u32), big);
+        maid_mem_write(a, i, sizeof(u32), false, val);
+    }
+}
+
+extern void
+maid_mp_write(size_t words, const u32 *a, u8 *addr, bool big)
+{
+    for (size_t i = 0; i < words; i++)
+    {
+        maid_mem_write(addr, (!big) ? i : words - i - 1,
+                       sizeof(u32), big, a[i]);
+    }
+}
+
 extern s8
 maid_mp_cmp(size_t words, const u32 *a, const u32 *b)
 {
@@ -73,13 +94,6 @@ maid_mp_cmp(size_t words, const u32 *a, const u32 *b)
     }
 
     return ret;
-}
-
-extern void
-maid_mp_clr(size_t words, u32 *a)
-{
-    if (a)
-        maid_mem_clear(a, words * sizeof(u32));
 }
 
 extern void
@@ -216,10 +230,11 @@ maid_mp_mul(size_t words, u32 *a, const u32 *b, u32 *tmp)
 }
 
 extern void
-maid_mp_div(size_t words, u32 *a, const u32 *b, u32 *tmp, u32 *tmp2)
+maid_mp_div(size_t words, u32 *a, const u32 *b, u32 *tmp)
 {
-    if (words && a && tmp && tmp2)
+    if (words && a && tmp)
     {
+        u32 *tmp2 = &(tmp[words]);
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
 
@@ -273,22 +288,27 @@ maid_mp_div(size_t words, u32 *a, const u32 *b, u32 *tmp, u32 *tmp2)
 }
 
 extern void
-maid_mp_mod(size_t words, u32 *a, const u32 *b, u32 *tmp, u32 *tmp2, u32 *tmp3)
+maid_mp_mod(size_t words, u32 *a, const u32 *b, u32 *tmp)
 {
-    if (words && a && tmp && tmp2)
+    if (words && a && tmp)
     {
+        u32 *tmp2 = &(tmp[words]);
+
         maid_mp_mov(words, tmp, a);
-        maid_mp_div(words, tmp, b, tmp2, tmp3);
+        maid_mp_div(words, tmp, b, tmp2);
         maid_mp_mul(words, tmp, b, tmp2);
         maid_mp_sub(words, a, tmp);
     }
 }
 
 extern void
-maid_mp_exp(size_t words, u32 *a, const u32 *b, u32 *tmp, u32 *tmp2, u32 *tmp3)
+maid_mp_exp(size_t words, u32 *a, const u32 *b, u32 *tmp)
 {
     if (words && a && tmp)
     {
+        u32 *tmp2 = &(tmp[words]);
+        u32 *tmp3 = &(tmp[words * 2]);
+
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
         a[0] = 0x1;
@@ -315,18 +335,99 @@ maid_mp_exp(size_t words, u32 *a, const u32 *b, u32 *tmp, u32 *tmp2, u32 *tmp3)
             u8     d = ii % 32;
             bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1 << d);
 
-            maid_mp_mov(words, tmp3, a);
+            maid_mp_mov(words, tmp2, a);
             if (msb && i == 0)
-                maid_mp_mul(words, a, tmp, tmp2);
+                maid_mp_mul(words, a, tmp, tmp3);
             else if (msb && ii < (msb - 1))
-                maid_mp_mul(words, a, tmp3, tmp2);
+                maid_mp_mul(words, a, tmp2, tmp3);
             else
-                maid_mp_mul(words, a, NULL, tmp2);
+                maid_mp_mul(words, a, NULL, tmp3);
 
             if (bit)
-                maid_mp_mul(words, a, tmp, tmp2);
+                maid_mp_mul(words, a, tmp, tmp3);
             else
-                maid_mp_mul(words, a, NULL, tmp2);
+                maid_mp_mul(words, a, NULL, tmp3);
+        }
+
+        msb = 0;
+        bit = false;
+    }
+}
+
+extern void
+maid_mp_mulmod(size_t words, u32 *a, const u32 *b, const u32 *mod, u32 *tmp)
+{
+    if (words && a && tmp)
+    {
+        u32 *a2   = &(tmp[words * 0]);
+        u32 *b2   = &(tmp[words * 2]);
+        u32 *mod2 = &(tmp[words * 4]);
+        u32 *tmp2 = &(tmp[words * 6]);
+
+        maid_mp_mov(words, a2,   a);
+        maid_mp_mov(words, b2,   b);
+        maid_mp_mov(words, mod2, mod);
+
+        maid_mp_mov(words, &(a2[words]),   NULL);
+        maid_mp_mov(words, &(b2[words]),   NULL);
+        maid_mp_mov(words, &(mod2[words]), NULL);
+
+        if (b)
+            maid_mp_mul(words * 2, a2, b2, tmp2);
+        else
+            maid_mp_mul(words * 2, a2, NULL, tmp2);
+
+        maid_mp_mod(words * 2, a2, mod2, tmp2);
+        maid_mp_mov(words, a, a2);
+    }
+}
+
+extern void
+maid_mp_expmod(size_t words, u32 *a, const u32 *b, const u32 *mod, u32 *tmp)
+{
+    if (words && a && mod && tmp)
+    {
+        u32 *tmp2 = &(tmp[words]);
+        u32 *tmp3 = &(tmp[words * 2]);
+
+        maid_mp_mov(words, tmp, a);
+        maid_mp_mov(words, a, NULL);
+        a[0] = 0x1;
+
+        maid_mp_mov(words, tmp2, NULL);
+        maid_mp_mov(words, tmp3, NULL);
+
+        volatile size_t msb = 0;
+        volatile bool bit = false;
+
+        for (size_t i = 0; i < words * 32; i++)
+        {
+            size_t c = i / 32;
+            u8     d = i % 32;
+            bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1 << d);
+            msb = (bit) ? i : msb;
+        }
+
+        for (size_t i = 0; i < words * 32; i++)
+        {
+            size_t ii = (words * 32) - i - 1;
+
+            size_t c = ii / 32;
+            u8     d = ii % 32;
+            bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1 << d);
+
+            maid_mp_mov(words, tmp2, a);
+            if (msb && i == 0)
+                maid_mp_mulmod(words, a, tmp, mod, tmp3);
+            else if (msb && ii < (msb - 1))
+                maid_mp_mulmod(words, a, tmp2, mod, tmp3);
+            else
+                maid_mp_mulmod(words, a, NULL, mod, tmp3);
+
+            if (bit)
+                maid_mp_mulmod(words, a, tmp, mod, tmp3);
+            else
+                maid_mp_mulmod(words, a, NULL, mod, tmp3);
         }
 
         msb = 0;

@@ -27,11 +27,11 @@
 struct poly1305
 {
     /* 320 bits, to handle multiplication */
-    u32 acc[10], acc2[10], acc3[10];
+    u32 acc[10];
     /* R and S key parts */
     u32 r[10], s[10];
-    /* Block buffer */
-    u32 buffer[10];
+    /* Temporary buffer */
+    u32 tmp[30];
 };
 
 static void
@@ -88,10 +88,8 @@ poly1305_renew(void *ctx, const u8 *key)
         if (key)
             poly1305_init(p, key);
 
-        maid_mem_clear(p->acc,    sizeof(p->acc));
-        maid_mem_clear(p->acc2,   sizeof(p->acc2));
-        maid_mem_clear(p->acc3,   sizeof(p->acc3));
-        maid_mem_clear(p->buffer, sizeof(p->buffer));
+        maid_mem_clear(p->acc, sizeof(p->acc));
+        maid_mem_clear(p->tmp, sizeof(p->tmp));
     }
 }
 
@@ -111,19 +109,19 @@ poly1305_update(void *ctx, u8 *block, size_t size)
         struct poly1305 *p = ctx;
 
         /* Read data into buffer */
-        memcpy(p->buffer, block, size);
+        memcpy(p->tmp, block, size);
 
         /* Pad buffer accordingly */
-        if (sizeof(p->buffer) > size)
-            memset(&(((u8*)p->buffer)[size]), 0, sizeof(p->buffer) - size);
-        p->buffer[size / 4] |= 0x1 << ((size % 4) * 8);
+        if (sizeof(p->acc) > size)
+            memset(&(((u8*)p->tmp)[size]), 0, sizeof(p->acc) - size);
+        p->tmp[size / 4] |= 0x1 << ((size % 4) * 8);
 
         /* Adds block to the accumulator */
-        maid_mp_add(10, p->acc, p->buffer);
+        maid_mp_add(10, p->acc, p->tmp);
         /* Multiplies accumulator by r */
-        maid_mp_mul(10, p->acc, p->r, p->acc2);
+        maid_mp_mul(10, p->acc, p->r, p->tmp);
         /* Reduction by prime */
-        maid_mp_mod(10, p->acc, pr, p->buffer, p->acc2, p->acc3);
+        maid_mp_mod(10, p->acc, pr, p->tmp);
     }
 }
 

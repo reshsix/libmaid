@@ -21,7 +21,7 @@
 #include <maid/mp.h>
 ```
 
-Numbers are represented in a little-endian way
+32-bit words are used in a little-endian way
 Temporary values are not cleared by the end of functions
 
 <details>
@@ -35,6 +35,36 @@ Prints a biginteger
 | words | Amount of u32 words |
 | name  | Name to print       |
 | a     | Number to print     |
+
+</details>
+
+<details>
+<summary>void maid_mp_read(size_t words, u32 *a,
+                           const u8 *addr, bool big);</summary>
+Reads a biginteger from memory
+
+### Parameters
+| name  | description         |
+|-------|---------------------|
+| words | Amount of u32 words |
+| a     | Destination         |
+| addr  | Memory to read      |
+| big   | Little/Big endian   |
+
+</details>
+
+<details>
+<summary>void maid_mp_write(size_t words, const u32 *a,
+                            u8 *addr, bool big);</summary>
+Writes a biginteger to memory
+
+### Parameters
+| name  | description          |
+|-------|----------------------|
+| words | Amount of u32 words  |
+| a     | Source               |
+| addr  | Memory to be written |
+| big   | Little/Big endian    |
 
 </details>
 
@@ -79,8 +109,8 @@ Adds a biginteger to another
 | name  | description         |
 |-------|---------------------|
 | words | Amount of u32 words |
-| a     | Addend 1 -> Total   |
-| b     | Addend 2 (NULL = 0) |
+| a     | Augend -> Total     |
+| b     | Addend (NULL = 0)   |
 
 </details>
 
@@ -129,61 +159,88 @@ Shifts a biginteger right
 Multiplies a biginteger by another
 
 ### Parameters
-| name  | description             |
-|-------|-------------------------|
-| words | Amount of u32 words     |
-| a     | Multiplicand -> Product |
-| b     | Multiplier (NULL = 1)   |
-| tmp   | Temporary buffer        |
+| name  | description              |
+|-------|--------------------------|
+| words | Amount of u32 words      |
+| a     | Multiplicand -> Product  |
+| b     | Multiplier (NULL = 1)    |
+| tmp   | Temporary buffer (words) |
 
 </details>
 
 <details>
 <summary>void maid_mp_div(size_t words, u32 *a, const u32 *b,
-                          u32 *tmp, u32 *tmp2);</summary>
+                          u32 *tmp);</summary>
 Divides a biginteger by another
 
 ### Parameters
-| name  | description          |
-|-------|----------------------|
-| words | Amount of u32 words  |
-| a     | Dividend -> Quotient |
-| b     | Divisor (NULL = 1)   |
-| tmp   | Temporary buffer 1   |
-| tmp2  | Temporary buffer 2   |
+| name  | description                  |
+|-------|------------------------------|
+| words | Amount of u32 words          |
+| a     | Dividend -> Quotient         |
+| b     | Divisor (NULL = 1)           |
+| tmp   | Temporary buffer (words * 2) |
 
 </details>
 
 <details>
 <summary>void maid_mp_mod(size_t words, u32 *a, const u32 *b,
-                          u32 *tmp, u32 *tmp2, u32 *tmp3);</summary>
+                          u32 *tmp);</summary>
 Gets the remainder of a biginteger divided by another
 
 ### Parameters
-| name  | description           |
-|-------|-----------------------|
-| words | Amount of u32 words   |
-| a     | Dividend -> Remainder |
-| b     | Divisor (NULL = 1)    |
-| tmp   | Temporary buffer 1    |
-| tmp2  | Temporary buffer 2    |
-| tmp3  | Temporary buffer 3    |
+| name  | description                  |
+|-------|------------------------------|
+| words | Amount of u32 words          |
+| a     | Dividend -> Remainder        |
+| b     | Divisor (NULL = 1)           |
+| tmp   | Temporary buffer (words * 3) |
 
 </details>
 
 <details>
 <summary>void maid_mp_exp(size_t words, u32 *a, const u32 *b,
-                          u32 *tmp, u32 *tmp2, u32 *tmp3);</summary>
+                          u32 *tmp);</summary>
 Raises a big integer to the power of another
 
 ### Parameters
-| name  | description           |
-|-------|-----------------------|
-| words | Amount of u32 words   |
-| a     | Base -> Power         |
-| b     | Exponent (NULL = 1)   |
-| tmp   | Temporary buffer 1    |
-| tmp2  | Temporary buffer 2    |
-| tmp3  | Temporary buffer 3    |
+| name  | description                  |
+|-------|------------------------------|
+| words | Amount of u32 words          |
+| a     | Base -> Power                |
+| b     | Exponent (NULL = 1)          |
+| tmp   | Temporary buffer (words * 3) |
+
+</details>
+
+<details>
+<summary>void maid_mp_mulmod(size_t words, u32 *a, const u32 *b,
+                             const u32 *mod, u32 *tmp);</summary>
+Modular multiplies a biginteger by another
+
+### Parameters
+| name  | description                   |
+|-------|-------------------------------|
+| words | Amount of u32 words           |
+| a     | Multiplicand -> Product       |
+| b     | Multiplier (NULL = 1)         |
+| mod   | Modulo divisor                |
+| tmp   | Temporary buffer (words * 12) |
+
+</details>
+
+<details>
+<summary>void maid_mp_expmod(size_t words, u32 *a, const u32 *b,
+                             const u32 *mod, u32 *tmp);</summary>
+Raises a big integer to the modular power of another
+
+### Parameters
+| name  | description                   |
+|-------|-------------------------------|
+| words | Amount of u32 words           |
+| a     | Base -> Power                 |
+| b     | Exponent (NULL = 1)           |
+| mod   | Modulo divisor                |
+| tmp   | Temporary buffer (words * 14) |
 
 </details>

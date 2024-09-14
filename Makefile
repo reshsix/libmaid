@@ -22,7 +22,7 @@ CFLAGS += --std=c99 -Iinclude -Wall -Wextra
 TARGETS = build/libmaid.a build/libmaid.so
 all: CFLAGS += -O2 -DNDEBUG=1
 all: $(TARGETS)
-debug: CFLAGS += -Og -ggdb3
+debug: CFLAGS += -Og -pg -ggdb3
 debug: $(TARGETS) test
 	gdb build/tests
 clean:
