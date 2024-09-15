@@ -355,6 +355,111 @@ maid_mp_exp(size_t words, u32 *a, const u32 *b, u32 *tmp)
 }
 
 extern void
+maid_mp_div2(size_t words, u32 *a, u32 *rem, const u32 *b, u32 *tmp)
+{
+    if (words && a && rem && tmp)
+    {
+        u32 *tmp2 = &(tmp[words]);
+
+        maid_mp_mov(words, rem, a);
+        maid_mp_div(words, a, b, tmp2);
+        maid_mp_mov(words, tmp, a);
+
+        maid_mp_mul(words, tmp, b, tmp2);
+        maid_mp_sub(words, rem, tmp);
+    }
+}
+
+extern void
+maid_mp_egcd(size_t words, u32 *a, u32 *b, u32 *gcd, u32 *tmp)
+{
+    if (words && a && b && gcd && tmp)
+    {
+        u32 *or = a;
+        u32 *r  = b;
+
+        u32 *os = &(tmp[words * 0]);
+        u32 *s  = &(tmp[words * 1]);
+        u32 *ot = &(tmp[words * 2]);
+        u32 *t  = &(tmp[words * 3]);
+
+        maid_mp_mov(words, os, NULL);
+        maid_mp_mov(words, s,  NULL);
+        maid_mp_mov(words, ot, NULL);
+        maid_mp_mov(words, t,  NULL);
+        os[0] = 0x1;
+        t[0] = 0x1;
+
+        u32 *quot  = &(tmp[words * 4]);
+        u32 *quot2 = &(tmp[words * 5]);
+        u32 *tmp2  = &(tmp[words * 6]);
+
+        for (size_t i = 0; i < words * 32; i++)
+        {
+            maid_mp_mov(words, quot, or);
+            maid_mp_div(words, quot, r, tmp2);
+
+            if (maid_mp_cmp(words, r, NULL) != 0)
+            {
+                maid_mp_mov(words, quot2, quot);
+                maid_mp_mul(words, quot2, r, tmp2);
+                maid_mp_sub(words, or, quot2);
+
+                maid_mp_mov(words, quot2, quot);
+                maid_mp_mul(words, quot2, s, tmp2);
+                maid_mp_sub(words, os, quot2);
+
+                maid_mp_mov(words, quot2, quot);
+                maid_mp_mul(words, quot2, t, tmp2);
+                maid_mp_sub(words, ot, quot2);
+
+                maid_mp_mov(words, quot2, r);
+                maid_mp_mov(words, r, or);
+                maid_mp_mov(words, or, quot2);
+
+                maid_mp_mov(words, quot2, s);
+                maid_mp_mov(words, s, os);
+                maid_mp_mov(words, os, quot2);
+
+                maid_mp_mov(words, quot2, t);
+                maid_mp_mov(words, t, ot);
+                maid_mp_mov(words, ot, quot2);
+            }
+            else
+            {
+                maid_mp_mov(words, quot2, quot);
+                maid_mp_mul(words, quot2, r, tmp2);
+                maid_mp_sub(words, or, NULL);
+
+                maid_mp_mov(words, quot2, quot);
+                maid_mp_mul(words, quot2, s, tmp2);
+                maid_mp_sub(words, os, NULL);
+
+                maid_mp_mov(words, quot2, quot);
+                maid_mp_mul(words, quot2, t, tmp2);
+                maid_mp_sub(words, ot, NULL);
+
+                maid_mp_mov(words, quot2, or);
+                maid_mp_mov(words, or, r);
+                maid_mp_mov(words, or, quot2);
+
+                maid_mp_mov(words, quot2, os);
+                maid_mp_mov(words, os, s);
+                maid_mp_mov(words, os, quot2);
+
+                maid_mp_mov(words, quot2, ot);
+                maid_mp_mov(words, ot, t);
+                maid_mp_mov(words, ot, quot2);
+            }
+        }
+
+        maid_mp_mov(words, gcd, or);
+        maid_mp_mov(words, a,   os);
+        maid_mp_mov(words, b,   ot);
+    }
+}
+
+extern void
 maid_mp_mulmod(size_t words, u32 *a, const u32 *b, const u32 *mod, u32 *tmp)
 {
     if (words && a && tmp)

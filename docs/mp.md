@@ -15,13 +15,14 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 --->
 
-# Memory Utils
+# Multiprecision Utils
 
 ```c
 #include <maid/mp.h>
 ```
 
 32-bit words are used in a little-endian way
+
 Temporary values are not cleared by the end of functions
 
 <details>
@@ -210,6 +211,39 @@ Raises a big integer to the power of another
 | a     | Base -> Power                |
 | b     | Exponent (NULL = 1)          |
 | tmp   | Temporary buffer (words * 3) |
+
+</details>
+
+<details>
+<summary>void maid_mp_div2(size_t words, u32 *a, u32 *rem, const u32 *b,
+                           u32 *tmp);</summary>
+Divides a biginteger by another, and returns the remainder
+
+### Parameters
+| name  | description                  |
+|-------|------------------------------|
+| words | Amount of u32 words          |
+| a     | Dividend -> Quotient         |
+| rem   | Remainder                    |
+| b     | Divisor (NULL = 1)           |
+| tmp   | Temporary buffer (words * 2) |
+
+</details>
+
+<details>
+<summary>void maid_mp_egcd(size_t words, u32 *a, u32 *b,
+                           u32 *gcd, u32 *tmp);</summary>
+Extended Euclidean algorithm, calculates Bezout's coefficients and
+the greatest common divisor
+
+### Parameters
+| name  | description                  |
+|-------|------------------------------|
+| words | Amount of u32 words          |
+| a     | Variable x -> Coefficient a  |
+| b     | Variable y -> Coefficient b  |
+| gcd   | Greatest common divisor      |
+| tmp   | Temporary buffer (words * 7) |
 
 </details>
 

@@ -40,6 +40,9 @@ void maid_mp_div(size_t words, u32 *a, const u32 *b, u32 *tmp);
 void maid_mp_mod(size_t words, u32 *a, const u32 *b, u32 *tmp);
 void maid_mp_exp(size_t words, u32 *a, const u32 *b, u32 *tmp);
 
+void maid_mp_div2(size_t words, u32 *a, u32 *rem, const u32 *b, u32 *tmp);
+void maid_mp_egcd(size_t words, u32 *a, u32 *b, u32 *gcd, u32 *tmp);
+
 void maid_mp_mulmod(size_t words, u32 *a, const u32 *b,
                     const u32 *mod, u32 *tmp);
 void maid_mp_expmod(size_t words, u32 *a, const u32 *b,
