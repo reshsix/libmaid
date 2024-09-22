@@ -231,23 +231,6 @@ Divides a biginteger by another, and returns the remainder
 </details>
 
 <details>
-<summary>void maid_mp_egcd(size_t words, u32 *a, u32 *b,
-                           u32 *gcd, u32 *tmp);</summary>
-Extended Euclidean algorithm, calculates Bezout's coefficients and
-the greatest common divisor
-
-### Parameters
-| name  | description                  |
-|-------|------------------------------|
-| words | Amount of u32 words          |
-| a     | Variable x -> Coefficient a  |
-| b     | Variable y -> Coefficient b  |
-| gcd   | Greatest common divisor      |
-| tmp   | Temporary buffer (words * 7) |
-
-</details>
-
-<details>
 <summary>void maid_mp_mulmod(size_t words, u32 *a, const u32 *b,
                              const u32 *mod, u32 *tmp);</summary>
 Modular multiplies a biginteger by another
@@ -276,5 +259,42 @@ Raises a big integer to the modular power of another
 | b     | Exponent (NULL = 1)           |
 | mod   | Modulo divisor                |
 | tmp   | Temporary buffer (words * 14) |
+
+</details>
+
+<details>
+<summary>bool maid_mp_invmod(size_t words, u32 *a,
+                             const u32 *mod, u32 *tmp);</summary>
+Modular multiplicative inverse of a biginteger
+
+### Parameters
+| name  | description                   |
+|-------|-------------------------------|
+| words | Amount of u32 words           |
+| a     | Number                        |
+| mod   | Modulo divisor                |
+| tmp   | Temporary buffer (words * 21) |
+
+### Return value
+| case           | description |
+|----------------|-------------|
+| Exists         | true        |
+| Doesn't exist  | false       |
+
+</details>
+
+<details>
+<summary>void maid_mp_expmod2(size_t words, u32 *a, const u32 *b,
+                              const u32 *mod, u32 *tmp);</summary>
+Raises a big integer to the modular power of another (using Montgomery method)
+
+### Parameters
+| name  | description                   |
+|-------|-------------------------------|
+| words | Amount of u32 words           |
+| a     | Base -> Power                 |
+| b     | Exponent (NULL = 1)           |
+| mod   | Odd modulo divisor            |
+| tmp   | Temporary buffer (words * 49) |
 
 </details>

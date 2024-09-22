@@ -121,7 +121,7 @@ mp_test(size_t words, u32 *val, u32 *a, u32 *b, u32 *c, u32 *d,
 static u8
 mp_tests(void)
 {
-    u8 ret = 37;
+    u8 ret = 42;
 
     u32 zeros[2] = {0};
     u32 val[] = {0x0de1f1ed, 0xcafebabe, 0xc0d1f1ed, 0x0011b1d0,
@@ -131,15 +131,14 @@ mp_tests(void)
                  0x00000b78, 0x00000000, 0xa6135bd5, 0x000f689a,
                  0xe65b0ddd, 0x44067ebe, 0x323519d8, 0xb8de599f,
                  0x13f095c4, 0x30a8ee50, 0x67452301, 0xefcdab89,
-                 0x89abcdef, 0x01234567, 0x00000003, 0x00000000,
-                 0xf7a11f90, 0x00028c3d, 0x90c11c1f, 0xe2c56155};
+                 0x89abcdef, 0x01234567, 0x2cd4a20a, 0x000f7587};
 
     u32 a[2] = {0};
     u32 b[2] = {0};
     u32 c[2] = {0};
     u32 d[2] = {0};
 
-    u32 tmp[26] = {0};
+    u32 tmp[128] = {0};
 
     u8 input[8] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
     u8 output[8] = {0};
@@ -228,16 +227,6 @@ mp_tests(void)
     maid_mp_div2(2, a, d, NULL, tmp);
     ret -= memcmp(d, zeros, sizeof(u32) * 2) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 15, 0);
-    maid_mp_egcd(2, a, b, d, tmp);
-    ret -= memcmp(d, c, sizeof(u32) * 2) == 0;
-    mp_test(2, val, a, b, c, d, 0, 1, 16, 0);
-    maid_mp_egcd(2, a, b, d, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    mp_test(2, val, a, b, c, d, 0, 1, 17, 0);
-    maid_mp_egcd(2, a, b, d, tmp);
-    ret -= memcmp(b, c, sizeof(u32) * 2) == 0;
-
     mp_test(2, val, a, b, c, d, 0, 1, 2, 11);
     maid_mp_mulmod(2, a, b, c, tmp);
     ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
@@ -248,6 +237,25 @@ mp_tests(void)
     maid_mp_expmod(2, a, b, c, tmp);
     ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
     maid_mp_expmod(2, a, NULL, c, tmp);
+    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, d, 0, 1, 0, 0);
+    ret -= !maid_mp_invmod(2, a, b, tmp);
+    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+    mp_test(2, val, a, b, c, d, 2, 1, 0, 15);
+    ret -= maid_mp_invmod(2, a, b, tmp);
+    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, d, 0, 1, 2, 12);
+    maid_mp_expmod2(2, a, b, c, tmp, false);
+    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+    maid_mp_expmod2(2, a, NULL, c, tmp, false);
+    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+
+    mp_test(2, val, a, b, c, d, 0, 1, 2, 12);
+    maid_mp_expmod2(2, a, b, c, tmp, true);
+    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+    maid_mp_expmod2(2, a, NULL, c, tmp, true);
     ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
 
     return ret;
