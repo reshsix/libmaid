@@ -26,12 +26,14 @@
 
 struct poly1305
 {
-    /* 320 bits, to handle multiplication */
-    u32 acc[10];
+    /* Amount of words */
+    size_t words;
+    /* Accumulator */
+    maid_mp_word *acc;
     /* R and S key parts */
-    u32 r[10], s[10];
+    maid_mp_word *r, *s;
     /* Temporary buffer */
-    u32 tmp[30];
+    maid_mp_word *tmp;
 };
 
 static void
@@ -46,10 +48,10 @@ poly1305_init(void *ctx, const u8 *key)
         memcpy(p->s, &(key[16]), 16);
 
         /* R clamping */
-        p->r[0] &= 0x0FFFFFFF;
-        p->r[1] &= 0x0FFFFFFC;
-        p->r[2] &= 0x0FFFFFFC;
-        p->r[3] &= 0x0FFFFFFC;
+        ((u32*)p->r)[0] &= 0x0FFFFFFF;
+        ((u32*)p->r)[1] &= 0x0FFFFFFC;
+        ((u32*)p->r)[2] &= 0x0FFFFFFC;
+        ((u32*)p->r)[3] &= 0x0FFFFFFC;
     }
 }
 
@@ -57,7 +59,20 @@ static void *
 poly1305_del(void *ctx)
 {
     if (ctx)
+    {
+        struct poly1305 *p = ctx;
+        maid_mem_clear(p->acc,     p->words * sizeof(maid_mp_word));
+        maid_mem_clear(p->r,       p->words * sizeof(maid_mp_word));
+        maid_mem_clear(p->s,       p->words * sizeof(maid_mp_word));
+        maid_mem_clear(p->tmp, 3 * p->words * sizeof(maid_mp_word));
+
+        free(p->acc);
+        free(p->r);
+        free(p->s);
+        free(p->tmp);
+
         maid_mem_clear(ctx, sizeof(struct poly1305));
+    }
     free(ctx);
 
     return NULL;
@@ -70,7 +85,20 @@ poly1305_new(const u8 *key)
 
     if (ret)
     {
-        if (key)
+        /* 320 bits, to handle multiplication */
+        ret->words = maid_mp_words(320);
+
+        ret->acc = calloc(ret->words,     sizeof(maid_mp_word));
+        ret->r   = calloc(ret->words,     sizeof(maid_mp_word));
+        ret->s   = calloc(ret->words,     sizeof(maid_mp_word));
+        ret->tmp = calloc(ret->words * 3, sizeof(maid_mp_word));
+
+        maid_mp_mov(ret->words, ret->acc, NULL);
+        maid_mp_mov(ret->words, ret->r,   NULL);
+        maid_mp_mov(ret->words, ret->s,   NULL);
+        maid_mp_mov(ret->words, ret->tmp, NULL);
+
+        if (key && ret->acc && ret->r && ret->s && ret->tmp)
             poly1305_init(ret, key);
         else
             ret = poly1305_del(ret);
@@ -88,8 +116,8 @@ poly1305_renew(void *ctx, const u8 *key)
         if (key)
             poly1305_init(p, key);
 
-        maid_mem_clear(p->acc, sizeof(p->acc));
-        maid_mem_clear(p->tmp, sizeof(p->tmp));
+        maid_mem_clear(p->acc,     p->words * sizeof(maid_mp_word));
+        maid_mem_clear(p->tmp, 3 * p->words * sizeof(maid_mp_word));
     }
 }
 
@@ -97,31 +125,31 @@ static void
 poly1305_update(void *ctx, u8 *block, size_t size)
 {
     /* 2^130 - 5 little endian */
-    const u32 prime[5] = {0xfffffffb, 0xffffffff,
-                          0xffffffff, 0xffffffff, 0x3};
-
-    u32 pr[10] = {0};
-    for (size_t i = 0; i < 5; i++)
-        maid_mem_write(pr, i, sizeof(u32), false, prime[i]);
+    const u8 prime[80] =
+        {0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03};
 
     if (ctx && block)
     {
         struct poly1305 *p = ctx;
 
+        maid_mp_word pr[10] = {0};
+        maid_mp_read(p->words, pr, prime, false);
+
         /* Read data into buffer */
+        maid_mp_mov(p->words, p->tmp, NULL);
         memcpy(p->tmp, block, size);
 
         /* Pad buffer accordingly */
-        if (sizeof(p->acc) > size)
-            memset(&(((u8*)p->tmp)[size]), 0, sizeof(p->acc) - size);
-        p->tmp[size / 4] |= 0x1 << ((size % 4) * 8);
+        p->tmp[size / sizeof(maid_mp_word)] |=
+            1ULL << ((size % sizeof(maid_mp_word)) * 8);
 
         /* Adds block to the accumulator */
-        maid_mp_add(10, p->acc, p->tmp);
+        maid_mp_add(p->words, p->acc, p->tmp);
         /* Multiplies accumulator by r */
-        maid_mp_mul(10, p->acc, p->r, p->tmp);
+        maid_mp_mul(p->words, p->acc, p->r, p->tmp);
         /* Reduction by prime */
-        maid_mp_mod(10, p->acc, pr, p->tmp);
+        maid_mp_mod(p->words, p->acc, pr, p->tmp);
     }
 }
 
@@ -133,7 +161,7 @@ poly1305_digest(void *ctx, u8 *output)
         struct poly1305 *p = ctx;
 
         /* Adds s to the accumulator */
-        maid_mp_add(10, p->acc, p->s);
+        maid_mp_add(p->words, p->acc, p->s);
         /* Exports 128 bits */
         memcpy(output, p->acc, 16);
     }

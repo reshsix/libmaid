@@ -106,157 +106,185 @@ mem_tests(void)
 /* Multiprecision utilities */
 
 static void
-mp_test(size_t words, u32 *val, u32 *a, u32 *b, u32 *c, u32 *d,
+mp_test(size_t words, u8 *val, maid_mp_word *a, maid_mp_word *b,
+        maid_mp_word *c, maid_mp_word *d,
         size_t ia, size_t ib, size_t ic, size_t id)
 {
+    size_t size = sizeof(maid_mp_word) * words;
+
     for (u8 i = 0; i < words; i++)
     {
-        maid_mem_write(a, i, sizeof(u32), false, val[(ia * words) + i]);
-        maid_mem_write(b, i, sizeof(u32), false, val[(ib * words) + i]);
-        maid_mem_write(c, i, sizeof(u32), false, val[(ic * words) + i]);
-        maid_mem_write(d, i, sizeof(u32), false, val[(id * words) + i]);
+        maid_mp_read(words, a, &(val[ia * size]), true);
+        maid_mp_read(words, b, &(val[ib * size]), true);
+        maid_mp_read(words, c, &(val[ic * size]), true);
+        maid_mp_read(words, d, &(val[id * size]), true);
     }
 }
 
 static u8
 mp_tests(void)
 {
-    u8 ret = 42;
+    u8 ret = 51;
 
-    u32 zeros[2] = {0};
-    u32 val[] = {0x0de1f1ed, 0xcafebabe, 0xc0d1f1ed, 0x0011b1d0,
-                 0xdeadbea7, 0xcafebe7a, 0x9f7fb094, 0xcb10704b,
-                 0x919dbea7, 0x0011b58d, 0x00000000, 0x233b7d4e,
-                 0x000119db, 0x00000000, 0xd16a1569, 0x4bc9057c,
-                 0x00000b78, 0x00000000, 0xa6135bd5, 0x000f689a,
-                 0xe65b0ddd, 0x44067ebe, 0x323519d8, 0xb8de599f,
-                 0x13f095c4, 0x30a8ee50, 0x67452301, 0xefcdab89,
-                 0x89abcdef, 0x01234567, 0x2cd4a20a, 0x000f7587};
+    size_t words = maid_mp_words(128);
+    ret -= (sizeof(maid_mp_word) == 4) ? (words == 4) : (words == 2);
 
-    u32 a[2] = {0};
-    u32 b[2] = {0};
-    u32 c[2] = {0};
-    u32 d[2] = {0};
+    u8 val[] = {
+    /* a */            0xc0, 0xd1, 0xf1, 0xed, 0x00, 0x11, 0xb1, 0xd0,
+                       0xca, 0xfe, 0xba, 0xbe, 0x0d, 0xe1, 0xf1, 0xed,
+    /* b */            0x11, 0xb1, 0xd0, 0xde, 0xc0, 0xd1, 0xf1, 0xed,
+                       0xde, 0xad, 0xbe, 0xa7, 0xca, 0xfe, 0xbe, 0x7a,
+    /* c = a(le) */    0xed, 0xf1, 0xe1, 0x0d, 0xbe, 0xba, 0xfe, 0xca,
+                       0xd0, 0xb1, 0x11, 0x00, 0xed, 0xf1, 0xd1, 0xc0,
+    /* !a */           0x3f, 0x2e, 0x0e, 0x12, 0xff, 0xee, 0x4e, 0x2f,
+                       0x35, 0x01, 0x45, 0x41, 0xf2, 0x1e, 0x0e, 0x12,
+    /* a & b */        0x00, 0x91, 0xd0, 0xcc, 0x00, 0x11, 0xb1, 0xc0,
+                       0xca, 0xac, 0xba, 0xa6, 0x08, 0xe0, 0xb0, 0x68,
+    /* a | b */        0xd1, 0xf1, 0xf1, 0xff, 0xc0, 0xd1, 0xf1, 0xfd,
+                       0xde, 0xff, 0xbe, 0xbf, 0xcf, 0xff, 0xff, 0xff,
+    /* a ^ b */        0xd1, 0x60, 0x21, 0x33, 0xc0, 0xc0, 0x40, 0x3d,
+                       0x14, 0x53, 0x04, 0x19, 0xc7, 0x1f, 0x4f, 0x97,
+    /* a + b */        0xd2, 0x83, 0xc2, 0xcb, 0xc0, 0xe3, 0xa3, 0xbe,
+                       0xa9, 0xac, 0x79, 0x65, 0xd8, 0xe0, 0xb0, 0x67,
+    /* a - b */        0xaf, 0x20, 0x21, 0x0e, 0x3f, 0x3f, 0xbf, 0xe2,
+                       0xec, 0x50, 0xfc, 0x16, 0x42, 0xe3, 0x33, 0x73,
+    /* a << 33 */      0x00, 0x23, 0x63, 0xa1, 0x95, 0xfd, 0x75, 0x7c,
+                       0x1b, 0xc3, 0xe3, 0xda, 0x00, 0x00, 0x00, 0x00,
+    /* a >> 45 */      0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x06, 0x8f,
+                       0x8f, 0x68, 0x00, 0x8d, 0x8e, 0x86, 0x57, 0xf5,
+    /* a <<< 33 */     0x00, 0x23, 0x63, 0xa1, 0x95, 0xfd, 0x75, 0x7c,
+                       0x1b, 0xc3, 0xe3, 0xda, 0x00, 0x00, 0x00, 0x00,
+    /* a >>> 45 */     0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x06, 0x8f,
+                       0x8f, 0x68, 0x00, 0x8d, 0x8e, 0x86, 0x57, 0xf5,
+    /* a * b */        0x84, 0x05, 0x36, 0x41, 0xa6, 0x66, 0x63, 0x6e,
+                       0xce, 0x9f, 0xd3, 0x8e, 0x5a, 0x61, 0x30, 0xf2,
+    /* a / b */        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
+    /* a % b */        0x0f, 0xdf, 0xc9, 0x39, 0x77, 0xde, 0x3e, 0x86,
+                       0x18, 0x35, 0x48, 0x30, 0x1f, 0xee, 0x81, 0x29,
+    /* a ^ b */        0x7c, 0x2f, 0x55, 0x6f, 0x88, 0xbe, 0x1b, 0x8e,
+                       0x49, 0x05, 0xc9, 0x0b, 0x4b, 0x83, 0x83, 0x49,
+    /* (a * b) % c */  0x86, 0x1b, 0xa5, 0x38, 0x59, 0x6f, 0xc4, 0x9e,
+                       0xd3, 0x5b, 0x9d, 0x91, 0x53, 0x54, 0x79, 0x32,
+    /* (a ^ b) % c */  0x80, 0x12, 0xde, 0x12, 0x3b, 0x22, 0x46, 0x5f,
+                       0xf9, 0xf1, 0x93, 0x51, 0xc2, 0x4c, 0x90, 0xc9,
+    /* (a ^ -1) % b */ 0x0d, 0x9e, 0xbe, 0x15, 0xeb, 0x7f, 0xd5, 0x8e,
+                       0x40, 0xef, 0xba, 0x9a, 0xe0, 0x11, 0xa3, 0xcb,
+    /* (b ^ c) % a */  0x71, 0x57, 0xe9, 0xfb, 0xb7, 0x15, 0x7f, 0x01,
+                       0xeb, 0x11, 0x23, 0x7a, 0xac, 0x1c, 0x17, 0x42};
 
-    u32 tmp[128] = {0};
+    size_t size = sizeof(maid_mp_word) * words;
 
-    u8 input[8] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
-    u8 output[8] = {0};
-    u8 inverted[8] = {0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01};
+    maid_mp_word z[words];
+    maid_mp_word f[words];
+    memset(z, 0x00, size);
+    memset(f, 0xff, size);
 
-    mp_test(2, val, a, b, c, d, 13, 14, 0, 0);
-    maid_mp_read(2, c, input, false);
-    maid_mp_read(2, d, input, true);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    ret -= memcmp(b, d, sizeof(u32) * 2) == 0;
+    maid_mp_word a[words];
+    maid_mp_word b[words];
+    maid_mp_word c[words];
+    maid_mp_word d[words];
+    maid_mp_word tmp[words * 49];
 
-    maid_mp_write(2, a, output, false);
-    ret -= memcmp(input, output, sizeof(input)) == 0;
-    maid_mp_write(2, a, output, true);
-    ret -= memcmp(output, inverted, sizeof(input)) == 0;
+    /* read/write */
+    mp_test(words, val, a, b, c, d, 0, 1, 2, 0);
+    maid_mp_write(words, a, &(val[2 * 16]), false);
+    maid_mp_read(words, a, &(val[2 * 16]), true);
+    ret -= memcmp(a, c, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 0, 0);
-    ret -= maid_mp_cmp(2, a, b)    == -1;
-    ret -= maid_mp_cmp(2, b, a)    ==  1;
-    ret -= maid_mp_cmp(2, a, a)    ==  0;
-    ret -= maid_mp_cmp(2, a, NULL) == -1;
+    mp_test(words, val, a, b, c, d, 0, 3, 0, 0);
+    maid_mp_not(words, a);
+    ret -= memcmp(a, b, size) == 0;
 
-    maid_mp_mov(2, a, NULL);
-    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+    #define MAID_MP_TEST_A(id, r, zn) \
+    mp_test(words, val, a, b, c, d, 0, 1, r, 0); \
+    maid_mp_##id(words, a, b); \
+    ret -= memcmp(a, c, size) == 0; \
+    maid_mp_##id(words, a, NULL); \
+    ret -= memcmp(a, (zn) ? z : c, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 2, 2, 0);
-    maid_mp_mov(2, a, b);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    MAID_MP_TEST_A(and, 4, false);
+    MAID_MP_TEST_A(orr, 5, false);
+    MAID_MP_TEST_A(xor, 6, false);
 
-    mp_test(2, val, a, b, c, d, 2, 1, 3, 0);
-    maid_mp_add(2, a, b);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_add(2, a, NULL);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    /* cmp */
+    mp_test(words, val, a, b, c, d, 0, 1, 0, 0);
+    ret -= maid_mp_cmp(words, a, b)    == -1;
+    ret -= maid_mp_cmp(words, b, a)    ==  1;
+    ret -= maid_mp_cmp(words, a, a)    ==  0;
+    ret -= maid_mp_cmp(words, a, NULL) == -1;
 
-    mp_test(2, val, a, b, c, d, 3, 0, 4, 0);
-    maid_mp_sub(2, a, b);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_sub(2, a, NULL);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    MAID_MP_TEST_A(mov, 1, true);
+    MAID_MP_TEST_A(add, 7, false);
+    MAID_MP_TEST_A(sub, 8, false);
 
-    mp_test(2, val, a, b, c, d, 4, 0, 5, 0);
-    maid_mp_shl(2, a, 33);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_shl(2, a, 128);
-    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+    #define MAID_MP_TEST_S(id, s, r, zn) \
+    mp_test(words, val, a, b, c, d, 0, 0, r, 0); \
+    maid_mp_##id(words, a, s); \
+    ret -= memcmp(a, c, size) == 0; \
+    maid_mp_##id(words, a, 128); \
+    ret -= memcmp(a, (zn) ? z : f, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 5, 0, 6, 0);
-    maid_mp_shr(2, a, 45);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_shl(2, a, 128);
-    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+    MAID_MP_TEST_S(shl, 33, 9,  true)
+    MAID_MP_TEST_S(shr, 45, 10, true)
+    MAID_MP_TEST_S(sal, 33, 11, true)
+    MAID_MP_TEST_S(sar, 45, 12, false)
 
-    mp_test(2, val, a, b, c, d, 0, 1, 7, 0);
-    maid_mp_mul(2, a, b, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_mul(2, a, NULL, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    #define MAID_MP_TEST_T(id, r, zn) \
+    mp_test(words, val, a, b, c, d, 0, 1, r, 0); \
+    maid_mp_##id(words, a, b, tmp); \
+    ret -= memcmp(a, c, size) == 0; \
+    maid_mp_##id(words, a, NULL, tmp); \
+    ret -= memcmp(a, (zn) ? z : c, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 8, 0);
-    maid_mp_div(2, a, b, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_div(2, a, NULL, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    MAID_MP_TEST_T(mul, 13, false);
+    MAID_MP_TEST_T(div, 14, false);
+    MAID_MP_TEST_T(mod, 15, true);
+    MAID_MP_TEST_T(exp, 16, false);
 
-    mp_test(2, val, a, b, c, d, 0, 1, 9, 0);
-    maid_mp_mod(2, a, b, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_mod(2, a, NULL, tmp);
-    ret -= memcmp(a, zeros, sizeof(u32) * 2) == 0;
+    /* div2 */
+    mp_test(words, val, a, b, c, d, 0, 1, 14, 0);
+    maid_mp_div2(words, a, d, b, tmp);
+    ret -= memcmp(a, c, size) == 0;
+    maid_mp_div2(words, a, d, NULL, tmp);
+    ret -= memcmp(a, c, size) == 0;
+    mp_test(words, val, a, b, c, d, 0, 1, 15, 0);
+    maid_mp_div2(words, a, d, b, tmp);
+    ret -= memcmp(d, c, size) == 0;
+    maid_mp_div2(words, a, d, NULL, tmp);
+    ret -= memcmp(d, z, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 10, 0);
-    maid_mp_exp(2, a, b, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_exp(2, a, NULL, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
+    #define MAID_MP_TEST_M(id, aa, bb, cc, r) \
+    mp_test(words, val, a, b, c, d, aa, bb, cc, r); \
+    maid_mp_##id(words, a, b, c, tmp); \
+    ret -= memcmp(a, d, size) == 0; \
+    maid_mp_##id(words, a, NULL, c, tmp); \
+    ret -= memcmp(a, d, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 8, 0);
-    maid_mp_div2(2, a, d, b, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    maid_mp_div2(2, a, d, NULL, tmp);
-    ret -= memcmp(a, c, sizeof(u32) * 2) == 0;
-    mp_test(2, val, a, b, c, d, 0, 1, 9, 0);
-    maid_mp_div2(2, a, d, b, tmp);
-    ret -= memcmp(d, c, sizeof(u32) * 2) == 0;
-    maid_mp_div2(2, a, d, NULL, tmp);
-    ret -= memcmp(d, zeros, sizeof(u32) * 2) == 0;
+    MAID_MP_TEST_M(mulmod, 0, 1, 2, 17);
+    MAID_MP_TEST_M(expmod, 0, 1, 2, 18);
 
-    mp_test(2, val, a, b, c, d, 0, 1, 2, 11);
-    maid_mp_mulmod(2, a, b, c, tmp);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-    maid_mp_mulmod(2, a, NULL, c, tmp);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+    /* invmod */
+    mp_test(words, val, a, b, c, d, 0, 2, 0, 0);
+    ret -= !maid_mp_invmod(words, a, b, tmp);
+    ret -= memcmp(a, d, size) == 0;
+    mp_test(words, val, a, b, c, d, 0, 1, 0, 19);
+    ret -= maid_mp_invmod(words, a, b, tmp);
+    ret -= memcmp(a, d, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 2, 12);
-    maid_mp_expmod(2, a, b, c, tmp);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-    maid_mp_expmod(2, a, NULL, c, tmp);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+    /* expmod2 fast */
+    mp_test(words, val, a, b, c, d, 1, 2, 0, 20); \
+    maid_mp_expmod2(words, a, b, c, tmp, false); \
+    ret -= memcmp(a, d, size) == 0; \
+    maid_mp_expmod2(words, a, NULL, c, tmp, false); \
+    ret -= memcmp(a, d, size) == 0;
 
-    mp_test(2, val, a, b, c, d, 0, 1, 0, 0);
-    ret -= !maid_mp_invmod(2, a, b, tmp);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-    mp_test(2, val, a, b, c, d, 2, 1, 0, 15);
-    ret -= maid_mp_invmod(2, a, b, tmp);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-
-    mp_test(2, val, a, b, c, d, 0, 1, 2, 12);
-    maid_mp_expmod2(2, a, b, c, tmp, false);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-    maid_mp_expmod2(2, a, NULL, c, tmp, false);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-
-    mp_test(2, val, a, b, c, d, 0, 1, 2, 12);
-    maid_mp_expmod2(2, a, b, c, tmp, true);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
-    maid_mp_expmod2(2, a, NULL, c, tmp, true);
-    ret -= memcmp(a, d, sizeof(u32) * 2) == 0;
+    /* expmod2 const */
+    mp_test(words, val, a, b, c, d, 1, 2, 0, 20); \
+    maid_mp_expmod2(words, a, b, c, tmp, true); \
+    ret -= memcmp(a, d, size) == 0; \
+    maid_mp_expmod2(words, a, NULL, c, tmp, true); \
+    ret -= memcmp(a, d, size) == 0;
 
     return ret;
 }

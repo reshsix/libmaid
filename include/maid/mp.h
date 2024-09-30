@@ -20,34 +20,57 @@
 
 #include <maid/types.h>
 
-void maid_mp_debug(size_t words, const char *name, const u32 *a);
+#ifdef __SIZEOF_INT128__
+typedef u64 maid_mp_word;
+#else
+typedef u32 maid_mp_word;
+#endif
 
-void maid_mp_read(size_t words, u32 *a, const u8 *addr, bool big);
-void maid_mp_write(size_t words, const u32 *a, u8 *addr, bool big);
+size_t maid_mp_words(size_t bits);
 
-s8 maid_mp_cmp(size_t words, const u32 *a, const u32 *b);
+void maid_mp_read(size_t words, maid_mp_word *a, const u8 *addr, bool big);
+void maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big);
 
-void maid_mp_mov(size_t words, u32 *a, const u32 *b);
+void maid_mp_debug(size_t words, const char *name, const maid_mp_word *a);
 
-void maid_mp_add(size_t words, u32 *a, const u32 *b);
-void maid_mp_sub(size_t words, u32 *a, const u32 *b);
+void maid_mp_not(size_t words, maid_mp_word *a);
+void maid_mp_and(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_orr(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_xor(size_t words, maid_mp_word *a, const maid_mp_word *b);
 
-void maid_mp_shl(size_t words, u32 *a, u64 shift);
-void maid_mp_shr(size_t words, u32 *a, u64 shift);
+s8 maid_mp_cmp(size_t words, const maid_mp_word *a, const maid_mp_word *b);
 
-void maid_mp_mul(size_t words, u32 *a, const u32 *b, u32 *tmp);
-void maid_mp_div(size_t words, u32 *a, const u32 *b, u32 *tmp);
-void maid_mp_mod(size_t words, u32 *a, const u32 *b, u32 *tmp);
-void maid_mp_exp(size_t words, u32 *a, const u32 *b, u32 *tmp);
+void maid_mp_mov(size_t words, maid_mp_word *a, const maid_mp_word *b);
 
-void maid_mp_div2(size_t words, u32 *a, u32 *rem, const u32 *b, u32 *tmp);
+void maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b);
 
-void maid_mp_mulmod(size_t words, u32 *a, const u32 *b,
-                    const u32 *mod, u32 *tmp);
-void maid_mp_expmod(size_t words, u32 *a, const u32 *b,
-                    const u32 *mod, u32 *tmp);
-bool maid_mp_invmod(size_t words, u32 *a, const u32 *mod, u32 *tmp);
-void maid_mp_expmod2(size_t words, u32 *a, const u32 *b,
-                     const u32 *mod, u32 *tmp, bool constant);
+void maid_mp_shl(size_t words, maid_mp_word *a, u64 shift);
+void maid_mp_shr(size_t words, maid_mp_word *a, u64 shift);
+
+void maid_mp_sal(size_t words, maid_mp_word *a, u64 shift);
+void maid_mp_sar(size_t words, maid_mp_word *a, u64 shift);
+
+void maid_mp_mul(size_t words, maid_mp_word *a,
+                 const maid_mp_word *b, maid_mp_word *tmp);
+void maid_mp_div(size_t words, maid_mp_word *a,
+                 const maid_mp_word *b, maid_mp_word *tmp);
+void maid_mp_mod(size_t words, maid_mp_word *a,
+                 const maid_mp_word *b, maid_mp_word *tmp);
+void maid_mp_exp(size_t words, maid_mp_word *a,
+                 const maid_mp_word *b, maid_mp_word *tmp);
+
+void maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
+                  const maid_mp_word *b, maid_mp_word *tmp);
+
+void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
+                    const maid_mp_word *mod, maid_mp_word *tmp);
+void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
+                    const maid_mp_word *mod, maid_mp_word *tmp);
+bool maid_mp_invmod(size_t words, maid_mp_word *a,
+                    const maid_mp_word *mod, maid_mp_word *tmp);
+void maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
+                     const maid_mp_word *mod, maid_mp_word *tmp,
+                     bool constant);
 
 #endif
