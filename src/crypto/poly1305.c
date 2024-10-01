@@ -42,16 +42,21 @@ poly1305_init(void *ctx, const u8 *key)
     if (ctx)
     {
         struct poly1305 *p = ctx;
+        size_t words = maid_mp_words(128);
 
         /* R and S initialization */
-        memcpy(p->r, key, 16);
-        memcpy(p->s, &(key[16]), 16);
+        maid_mp_read(words, p->r, key,        false);
+        maid_mp_read(words, p->s, &(key[16]), false);
 
         /* R clamping */
-        ((u32*)p->r)[0] &= 0x0FFFFFFF;
-        ((u32*)p->r)[1] &= 0x0FFFFFFC;
-        ((u32*)p->r)[2] &= 0x0FFFFFFC;
-        ((u32*)p->r)[3] &= 0x0FFFFFFC;
+        static const u8 clamp[16] = {0xff, 0xff, 0xff, 0x0f,
+                                     0xfc, 0xff, 0xff, 0x0f,
+                                     0xfc, 0xff, 0xff, 0x0f,
+                                     0xfc, 0xff, 0xff, 0x0f};
+        maid_mp_word cl[p->words];
+        maid_mp_mov(words, cl, NULL);
+        maid_mp_read(words, cl, clamp, false);
+        maid_mp_and(words, p->r, cl);
     }
 }
 
@@ -85,8 +90,8 @@ poly1305_new(const u8 *key)
 
     if (ret)
     {
-        /* 320 bits, to handle multiplication */
-        ret->words = maid_mp_words(320);
+        /* 256 bits, to handle multiplication */
+        ret->words = maid_mp_words(256);
 
         ret->acc = calloc(ret->words,     sizeof(maid_mp_word));
         ret->r   = calloc(ret->words,     sizeof(maid_mp_word));
@@ -124,8 +129,8 @@ poly1305_renew(void *ctx, const u8 *key)
 static void
 poly1305_update(void *ctx, u8 *block, size_t size)
 {
-    /* 2^130 - 5 little endian */
-    const u8 prime[80] =
+    /* 2^130 - 5 little endian (256 bits) */
+    static const u8 prime[32] =
         {0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03};
 
@@ -133,16 +138,21 @@ poly1305_update(void *ctx, u8 *block, size_t size)
     {
         struct poly1305 *p = ctx;
 
-        maid_mp_word pr[10] = {0};
+        /* Read prime data as number */
+        maid_mp_word pr[p->words];
+        maid_mp_mov(p->words, pr, NULL);
         maid_mp_read(p->words, pr, prime, false);
 
-        /* Read data into buffer */
-        maid_mp_mov(p->words, p->tmp, NULL);
-        memcpy(p->tmp, block, size);
+        /* Read data into buffer (256 bits) */
+        u8 buf[32] = {0};
+        memcpy(buf, block, size);
 
         /* Pad buffer accordingly */
-        p->tmp[size / sizeof(maid_mp_word)] |=
-            1ULL << ((size % sizeof(maid_mp_word)) * 8);
+        buf[size] |= 1;
+
+        /* Read buffer as number */
+        maid_mp_read(p->words, p->tmp, buf, false);
+        maid_mem_clear(buf, sizeof(buf));
 
         /* Adds block to the accumulator */
         maid_mp_add(p->words, p->acc, p->tmp);
@@ -163,7 +173,7 @@ poly1305_digest(void *ctx, u8 *output)
         /* Adds s to the accumulator */
         maid_mp_add(p->words, p->acc, p->s);
         /* Exports 128 bits */
-        memcpy(output, p->acc, 16);
+        maid_mp_write(maid_mp_words(128), p->acc, output, false);
     }
 }
 
