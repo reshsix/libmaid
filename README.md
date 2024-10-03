@@ -40,3 +40,5 @@ sudo ldconfig
 | [AEADs](docs/aead.md)            | AES-GCM, Chacha20Poly1305 |
 | [CSPRNGs](docs/rng.md)           | CTR-DRBG-AES              |
 | [Hash functions](docs/hash.md)   | SHA-2                     |
+|                                  |                           |
+| [Public-key crypto](docs/pub.md) | RSA                       |

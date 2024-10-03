@@ -27,6 +27,7 @@
 #include <maid/aead.h>
 #include <maid/rng.h>
 #include <maid/hash.h>
+#include <maid/pub.h>
 
 /* Helper functions */
 
@@ -1200,6 +1201,100 @@ sha2_tests(void)
     return ret;
 }
 
+/* RSA Primitives NIST test vectors */
+
+static u8
+rsa_test(maid_pub *pub, maid_pub *prv, char *e_h, char *d_h, char *N_h,
+         char *input_h, char *output_h)
+{
+    u8 ret = 0;
+
+    if (pub && prv)
+    {
+        u8 e8    [128] = {0};
+        u8 d8    [128] = {0};
+        u8 N8    [128] = {0};
+        u8 input [128] = {0};
+        u8 output[128] = {0};
+
+        hex_read(e8,     e_h);
+        hex_read(d8,     d_h);
+        hex_read(N8,     N_h);
+        hex_read(input,  input_h);
+        hex_read(output, output_h);
+
+        size_t words = maid_mp_words(1024);
+        maid_mp_word e[words], d[words], N[words];
+        maid_mp_read(words, e, e8, true);
+        maid_mp_read(words, d, d8, true);
+        maid_mp_read(words, N, N8, true);
+
+        struct maid_rsa_key pub_k = {.exponent = e, .modulo = N};
+        struct maid_rsa_key prv_k = {.exponent = d, .modulo = N};
+        maid_pub_renew(pub, &pub_k);
+        maid_pub_renew(prv, &prv_k);
+
+        u8 tmp[128] = {0};
+        memcpy(tmp, input, sizeof(input));
+        maid_pub_apply(pub, tmp);
+
+        if (memcmp(tmp, output, sizeof(output)) == 0)
+        {
+            maid_pub_apply(prv, tmp);
+            ret = memcmp(tmp, input, sizeof(input)) == 0;
+        }
+    }
+
+    return ret;
+}
+
+static u8
+rsa_tests(void)
+{
+    u8 ret = 1;
+
+    u8 zeros[128] = {0};
+    struct maid_rsa_key zkey = {.exponent = (void *)zeros,
+                                .modulo   = (void *)zeros};
+
+    maid_pub *pub = maid_pub_new(maid_rsa_public,  &zkey, 1024);
+    maid_pub *prv = maid_pub_new(maid_rsa_private, &zkey, 1024);
+
+    char *e[] =
+        {"0000000000000000000000000000000000000000859e499b8a186c8ee6196954"
+         "170eb8068593f0d764150a6d2e5d3fea7d9d0d33ac553eecd5c3f27a310115d2"
+         "83e49377820195c8e67781b6f112a625b14b747fa4cc13d06eba0917246c775f"
+         "5c732865701ae9349ea8729cde0bbade38204e63359a46e672a8d0a2fd530069"};
+    char *d[] =
+        {"27b7119a09edb827c13418c820b522a1ee08de0e4bb28106db6bb91498a3b361"
+         "ab293af83fefcdd8a6bd2134ca4afacf64a0e33c014f48f47530f8847cc9185c"
+         "bedec0d9238c8f1d5498f71c7c0cff48dc213421742e34350ca94007753cc0e5"
+         "a783264cf49ff644ffea94253cfe86859acd2a2276ca4e7215f8ebaa2f188f51"};
+    char *n[] =
+        {"d0b750c8554b64c7a9d34d068e020fb52fea1b39c47971a359f0eec5da0437ea"
+         "3fc94597d8dbff5444f6ce5a3293ac89b1eebb3f712b3ad6a06386e6401985e1"
+         "9898715b1ea32ac03456fe1796d31ed4af389f4f675c23c421a125491e740fda"
+         "c4322ec2d46ec945ddc349227b492191c9049145fb2f8c2998c486a840eac4d3"};
+    char *input[] =
+        {"5c7bce723cf4da053e503147242c60678c67e8c22467f0336b6d5c31f14088cb"
+         "3d6cefb648db132cb32e95092f3d9bcd1cab51e68bd3a892ab359cdff556785a"
+         "e06708633d39a0618f9d6d70f6bdeb6b777e7dd9acc41f19560c71a68479c8a0"
+         "7b14fb9a4c765fd292ae56dd2f2143b62649cc70fb604fdc5cc1ade6e29de235"};
+    char *output[] =
+        {"6cf87c6a65925df6719eef5f1262edc6f8a0a0a0d21c535c64580745d9a268a9"
+         "5b50ff3be24ba8b649ca47c3a760b71ddc3903f36aa1d98e87c53b3370be784b"
+         "ffcb5bc180dea2acc15bb12e681c889b89b8f3de78050019dcdbb68c051b04b8"
+         "80f0f8c4e855321ffed89767fc9d4a8a27a5d82ba450b2478c21e11843c2f539"};
+
+    for (u8 i = 0; i < 1; i++)
+        ret -= rsa_test(pub, prv, e[i], d[i], n[i], input[i], output[i]);
+
+    maid_pub_del(pub);
+    maid_pub_del(prv);
+
+    return ret;
+}
+
 extern int
 main(void)
 {
@@ -1222,6 +1317,8 @@ main(void)
 
     ret += ctr_drbg_tests();
     ret += sha2_tests();
+
+    ret += rsa_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
