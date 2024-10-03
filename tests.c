@@ -125,7 +125,7 @@ mp_test(size_t words, u8 *val, maid_mp_word *a, maid_mp_word *b,
 static u8
 mp_tests(void)
 {
-    u8 ret = 51;
+    u8 ret = 53;
 
     size_t words = maid_mp_words(128);
     ret -= (sizeof(maid_mp_word) == 4) ? (words == 4) : (words == 2);
@@ -255,15 +255,16 @@ mp_tests(void)
     maid_mp_div2(words, a, d, NULL, tmp);
     ret -= memcmp(d, z, size) == 0;
 
-    #define MAID_MP_TEST_M(id, aa, bb, cc, r) \
+    #define MAID_MP_TEST_M(id, aa, bb, cc, r, ...) \
     mp_test(words, val, a, b, c, d, aa, bb, cc, r); \
-    maid_mp_##id(words, a, b, c, tmp); \
+    maid_mp_##id(words, a, b, c, tmp,##__VA_ARGS__); \
     ret -= memcmp(a, d, size) == 0; \
-    maid_mp_##id(words, a, NULL, c, tmp); \
+    maid_mp_##id(words, a, NULL, c, tmp,##__VA_ARGS__); \
     ret -= memcmp(a, d, size) == 0;
 
     MAID_MP_TEST_M(mulmod, 0, 1, 2, 17);
-    MAID_MP_TEST_M(expmod, 0, 1, 2, 18);
+    MAID_MP_TEST_M(expmod, 0, 1, 2, 18, false);
+    MAID_MP_TEST_M(expmod, 0, 1, 2, 18, true);
 
     /* invmod */
     mp_test(words, val, a, b, c, d, 0, 2, 0, 0);
@@ -273,19 +274,8 @@ mp_tests(void)
     ret -= maid_mp_invmod(words, a, b, tmp);
     ret -= memcmp(a, d, size) == 0;
 
-    /* expmod2 fast */
-    mp_test(words, val, a, b, c, d, 1, 2, 0, 20); \
-    maid_mp_expmod2(words, a, b, c, tmp, false); \
-    ret -= memcmp(a, d, size) == 0; \
-    maid_mp_expmod2(words, a, NULL, c, tmp, false); \
-    ret -= memcmp(a, d, size) == 0;
-
-    /* expmod2 const */
-    mp_test(words, val, a, b, c, d, 1, 2, 0, 20); \
-    maid_mp_expmod2(words, a, b, c, tmp, true); \
-    ret -= memcmp(a, d, size) == 0; \
-    maid_mp_expmod2(words, a, NULL, c, tmp, true); \
-    ret -= memcmp(a, d, size) == 0;
+    MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, false);
+    MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, true);
 
     return ret;
 }

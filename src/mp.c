@@ -518,7 +518,7 @@ maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 
 extern void
 maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-               const maid_mp_word *mod, maid_mp_word *tmp)
+               const maid_mp_word *mod, maid_mp_word *tmp, bool constant)
 {
     if (words && a && mod && tmp)
     {
@@ -556,12 +556,12 @@ maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                 maid_mp_mulmod(words, a, tmp, mod, tmp3);
             else if (msb && ii < (msb - 1))
                 maid_mp_mulmod(words, a, tmp2, mod, tmp3);
-            else
+            else if (constant)
                 maid_mp_mulmod(words, a, NULL, mod, tmp3);
 
             if (bit)
                 maid_mp_mulmod(words, a, tmp, mod, tmp3);
-            else
+            else if (constant)
                 maid_mp_mulmod(words, a, NULL, mod, tmp3);
         }
 

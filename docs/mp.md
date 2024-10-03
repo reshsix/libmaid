@@ -331,17 +331,18 @@ Modular multiplies a biginteger by another
 <details>
 <summary>void maid_mp_expmod(size_t words, maid_mp_word *a,
                              const maid_mp_word *b, const maid_mp_word *mod,
-                             maid_mp_word *tmp);</summary>
+                             maid_mp_word *tmp, bool constant);</summary>
 Raises a big integer to the modular power of another
 
 ### Parameters
-| name  | description                   |
-|-------|-------------------------------|
-| words | Amount of words               |
-| a     | Base -> Power                 |
-| b     | Exponent (NULL = 1)           |
-| mod   | Modulo divisor                |
-| tmp   | Temporary buffer (words * 14) |
+| name     | description                     |
+|----------|---------------------------------|
+| words    | Amount of words                 |
+| a        | Base -> Power                   |
+| b        | Exponent (NULL = 1)             |
+| mod      | Modulo divisor                  |
+| tmp      | Temporary buffer (words * 14)   |
+| constant | Constant time for all exponents |
 
 </details>
 
@@ -370,16 +371,67 @@ Modular multiplicative inverse of a biginteger
 <details>
 <summary>void maid_mp_expmod2(size_t words, maid_mp_word *a,
                               const maid_mp_word *b, const maid_mp_word *mod,
-                              maid_mp_word *tmp);</summary>
+                              maid_mp_word *tmp, bool constant);</summary>
 Raises a big integer to the modular power of another (using Montgomery method)
 
 ### Parameters
-| name  | description                   |
-|-------|-------------------------------|
-| words | Amount of words               |
-| a     | Base -> Power                 |
-| b     | Exponent (NULL = 1)           |
-| mod   | Odd modulo divisor            |
-| tmp   | Temporary buffer (words * 49) |
+| name     | description                     |
+|----------|---------------------------------|
+| words    | Amount of words                 |
+| a        | Base -> Power                   |
+| b        | Exponent (NULL = 1)             |
+| mod      | Odd modulo divisor              |
+| tmp      | Temporary buffer (words * 49)   |
+| constant | Constant time for all exponents |
 
 </details>
+
+## Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <maid/mem.h>
+
+#include <maid/mp.h>
+
+int main(void)
+{
+    size_t words = maid_mp_words(128);
+
+    /* Little endian */
+    u8 base    [128 / 8] = {3};
+    u8 exponent[128 / 8] = {63};
+
+    maid_mp_word b[words];
+    maid_mp_word e[words];
+    maid_mp_word tmp[words * 14];
+
+    maid_mp_read(words, b, base,     false);
+    maid_mp_read(words, e, exponent, false);
+
+    u8 power[128 / 8] = {0};
+    maid_mp_exp(words, b, e, tmp);
+    maid_mem_clear(tmp, sizeof(tmp));
+
+    /* Big endian */
+    maid_mp_write(words, b, power, true);
+
+    for (size_t i = 0; i < sizeof(power); i++)
+        printf("%02x", power[i]);
+    printf("\n");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Without installation:
+```sh
+cc -static -Iinclude example.c -Lbuild -lmaid
+```
+
+With installation:
+```sh
+cc example.c -lmaid
+```

@@ -28,17 +28,17 @@ sudo ldconfig
 ```
 
 ## 📖 Library Reference
-| Category                         | Algorithms                |
-| --------------------------------:|---------------------------|
-| [Type aliases](docs/types.md)    | ------------------------- |
-| [Memory utils](docs/mem.md)      | ------------------------- |
-| [Multiprecision](docs/mp.md)     | ------------------------- |
-|                                  |                           |
-| [Block ciphers](docs/block.md)   | AES-ECB, AES-CTR          |
-| [Stream ciphers](docs/stream.md) | Chacha20                  |
-| [MACs](docs/mac.md)              | Poly1305                  |
-| [AEADs](docs/aead.md)            | AES-GCM, Chacha20Poly1305 |
-| [CSPRNGs](docs/rng.md)           | CTR-DRBG-AES              |
-| [Hash functions](docs/hash.md)   | SHA-2                     |
-|                                  |                           |
-| [Public-key crypto](docs/pub.md) | RSA                       |
+| Category                             | Algorithms                |
+| ------------------------------------:|---------------------------|
+| [Type aliases](docs/types.md)        | ------------------------- |
+| [Memory utils](docs/mem.md)          | ------------------------- |
+| [Multiprecision](docs/mp.md)         | ------------------------- |
+|                                      |                           |
+| [Block ciphers](docs/block.md)       | AES-ECB, AES-CTR          |
+| [Stream ciphers](docs/stream.md)     | Chacha20                  |
+| [MACs](docs/mac.md)                  | Poly1305                  |
+| [AEADs](docs/aead.md)                | AES-GCM, Chacha20Poly1305 |
+| [CSPRNGs](docs/rng.md)               | CTR-DRBG-AES              |
+| [Hash functions](docs/hash.md)       | SHA-2                     |
+|                                      |                           |
+| [Public-key primitives](docs/pub.md) | RSA                       |

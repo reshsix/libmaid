@@ -66,7 +66,8 @@ void maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
 void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod, maid_mp_word *tmp);
 void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod, maid_mp_word *tmp);
+                    const maid_mp_word *mod, maid_mp_word *tmp,
+                    bool constant);
 bool maid_mp_invmod(size_t words, maid_mp_word *a,
                     const maid_mp_word *mod, maid_mp_word *tmp);
 void maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
