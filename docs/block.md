@@ -44,11 +44,11 @@ Opaque type that contains the state of a block cipher
 Creates a block cipher instance
 
 ### Parameters
-| name    | description          |
-|---------|----------------------|
-| def     | Algorithm definition |
-| key     | Algorithm-dependent  |
-| iv      | Algorithm-dependent  |
+| name | description          |
+|------|----------------------|
+| def  | Algorithm definition |
+| key  | Algorithm-dependent  |
+| iv   | Algorithm-dependent  |
 
 ### Return value
 | case    | description         |
@@ -80,11 +80,11 @@ Deletes a block cipher instance
 Recreates a block cipher instance
 
 ### Parameters
-| name    | description          |
-|---------|----------------------|
-| bl      | maid_block instance  |
-| key     | Algorithm-dependent  |
-| iv      | Algorithm-dependent  |
+| name | description          |
+|------|----------------------|
+| bl   | maid_block instance  |
+| key  | Algorithm-dependent  |
+| iv   | Algorithm-dependent  |
 
 </details>
 
@@ -103,7 +103,7 @@ Applies ECB mode (doesn't change the iv)
 </details>
 
 <details>
-<summary>void maid_block_ecb(maid_block *bl,
+<summary>void maid_block_ctr(maid_block *bl,
                              u8 *buffer, size_t size)</summary>
 Applies CTR mode (increases iv accordingly)
 
