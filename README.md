@@ -42,3 +42,4 @@ sudo ldconfig
 | [Hash functions](docs/hash.md)       | SHA-2                     |
 |                                      |                           |
 | [Public-key primitives](docs/pub.md) | RSA                       |
+| [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |

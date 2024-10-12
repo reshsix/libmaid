@@ -28,6 +28,7 @@
 #include <maid/rng.h>
 #include <maid/hash.h>
 #include <maid/pub.h>
+#include <maid/sign.h>
 
 /* Helper functions */
 
@@ -1285,6 +1286,208 @@ rsa_tests(void)
     return ret;
 }
 
+/* PKCS1 NIST test vectors */
+
+static u8
+pkcs1_test(struct maid_sign_def def, maid_pub *pub, maid_pub *prv,
+           char *input_h, char *output_h)
+{
+    u8 ret = 0;
+
+    if (pub && prv)
+    {
+        u8 input [256] = {0};
+        u8 output[256] = {0};
+
+        hex_read(input,  input_h);
+        hex_read(output, output_h);
+
+        maid_sign *s = maid_sign_new(def, (maid_pub *)0x1,
+                                          (maid_pub *)0x1, 2048);
+        maid_sign_renew(s, pub, prv);
+
+        u8 tmp[256] = {0};
+        memcpy(tmp, input, sizeof(input));
+        maid_sign_generate(s, tmp, NULL);
+
+        if (memcmp(tmp, output, sizeof(output)) == 0)
+        {
+            if (maid_sign_verify(s, tmp, NULL))
+                ret = memcmp(tmp, input, sizeof(input)) == 0;
+        }
+
+        maid_sign_del(s);
+    }
+
+    return ret;
+}
+
+static u8
+pkcs1_tests(void)
+{
+    u8 ret = 6;
+
+    char *e[] = {
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000260445",
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000101957"};
+    char *d[] = {
+         "0997634c477c1a039d44c810b2aaa3c7862b0b88d3708272e1e15f66fc938970"
+         "9f8a11f3ea6a5af7effa2d01c189c50f0d5bcbe3fa272e56cfc4a4e1d388a9dc"
+         "d65df8628902556c8b6bb6a641709b5a35dd2622c73d4640bfa1359d0e76e1f2"
+         "19f8e33eb9bd0b59ec198eb2fccaae0346bd8b401e12e3c67cb629569c185a2e"
+         "0f35a2f741644c1cca5ebb139d77a89a2953fc5e30048c0e619f07c8d21d1e56"
+         "b8af07193d0fdf3f49cd49f2ef3138b5138862f1470bd2d16e34a2b9e7777a6c"
+         "8c8d4cb94b4e8b5d616cd5393753e7b0f31cc7da559ba8e98d888914e334773b"
+         "af498ad88d9631eb5fe32e53a4145bf0ba548bf2b0a50c63f67b14e398a34b0d",
+         "057076fbab758efba2945f16d3456c21df4b7cfe1a8a762af8389e42e0b648f4"
+         "d452d8bdffdf2097f75bc661efe939dd99c170c1672c9a0f21ad450347333fdc"
+         "52f350d02ca1e6516cdbee38d3eb56b15f3f062b0d4f0901ed9a05a566917c5c"
+         "108b20e0da091b8ca9da43b7b066d8c28d849068f6eb803d8e84ff243172c258"
+         "cd7bd18858d2648dd7a55a2cb4db3feaf3171846e3e2c883f50a192be5ab4c79"
+         "dd330584adcae17f1458bcb2ab43e3929cbef840e9999bf0eb5601e88ff8758d"
+         "b564a756346d65d8c55f1b11b9b092fca7f6b2394ebc3109b3d02ec5a0967ea6"
+         "45d127fe0fb9f9fa71637ac6f0b92671809f4aad1278a6cb5e8a7247fe53afdf"};
+    char *n[] = {
+         "cea80475324c1dc8347827818da58bac069d3419c614a6ea1ac6a3b510dcd72c"
+         "c516954905e9fef908d45e13006adf27d467a7d83c111d1a5df15ef293771aef"
+         "b920032a5bb989f8e4f5e1b05093d3f130f984c07a772a3683f4dc6fb28a9681"
+         "5b32123ccdd13954f19d5b8b24a103e771a34c328755c65ed64e1924ffd04d30"
+         "b2142cc262f6e0048fef6dbc652f21479ea1c4b1d66d28f4d46ef7185e390cbf"
+         "a2e02380582f3188bb94ebbf05d31487a09aff01fcbb4cd4bfd1f0a833b38c11"
+         "813c84360bb53c7d4481031c40bad8713bb6b835cb08098ed15ba31ee4ba728a"
+         "8c8e10f7294e1b4163b7aee57277bfd881a6f9d43e02c6925aa3a043fb7fb78d",
+         "d39a426f8b81cd954f3df5512d6fcdb796457c172b6d510247e45ebecd1e0f7e"
+         "8aa3253a61293a7b70094b70d65d73828719ef6aaabbb24e083b943be775b0bf"
+         "3b5a0dc8388433de78e0c113ef7763f767ddd1542bcbdd9845919886ce20e289"
+         "22754af2a733204bce9b5bd50140e18e5ba91e4800b50ef30ecd48b4ecded67a"
+         "2f7be8bf7d7f14378a8c9ba0e6103d02f1685a334e46713033c89908da2e9f8b"
+         "f72cb2a529281d4dc66799cc2a63c872b6bd5ffc1fa9ada236e7f8d5796dd972"
+         "4e5e4ccadaf160de7f2d69c84009d31e952ac808c89a784be70cf60f42811928"
+         "abdec6f896a0fa5fb164f9f4298a5a8831f6684dae31f2e76146d6be14c3ea7d"};
+
+    char *input[] =
+        {"c34b1a0d795dae5b88559191bb2c1cb75a5fd1d18b5002074560e6ad",
+         "077877895a428028f60998b985550820025a2a42c0beab27165c0802d3098150",
+         "8e5d03e53c9084db4e808148b55658d3a689ca4084dfc41bdf37bac5f8e11e83"
+         "ab7eb6053bcb26be9b51ba03cac2b945",
+         "68e7e5132d2d5985fc0c12f787ed3933fa96bfc4dd0e5fefd33336836d2eff85"
+         "a652275e1cfd10f276e1c2f51c6d9b13a06399407baf2b3d9bf468eef0d2c4d8",
+         "2c0a4d9ce74063da224a7955a045c05bdadf481125f5797fc2e03c59",
+         "1ca543685a5698ea6b4f91afeae507e895497e0037c8f074300c96a8af0640b2"};
+    char *output[] =
+        {"27da4104eace1991e08bd8e7cfccd97ec48b896a0e156ce7bdc23fd570aaa9a0"
+         "0ed015101f0c6261c7371ceca327a73c3cecfcf6b2d9ed920c9698046e25c89a"
+         "db2360887d99983bf632f9e6eb0e5df60715902b9aeaa74bf5027aa246510891"
+         "c74ae366a16f397e2c8ccdc8bd56aa10e0d01585e69f8c4856e76b53acfd3d78"
+         "2b8171529008fa5eff030f46956704a3f5d9167348f37021fc277c6c0a8f93b8"
+         "a23cfbf918990f982a56d0ed2aa08161560755adc0ce2c3e2ab2929f79bfc0b2"
+         "4ff3e0ff352e6445d8a617f1785d66c32295bb365d61cfb107e9993bbd93421f"
+         "2d344a86e4127827fa0d0b2535f9b1d547de12ba2868acdecf2cb5f92a6a159a",
+         "6b8be97d9e518a2ede746ff4a7d91a84a1fc665b52f154a927650db6e7348c69"
+         "f8c8881f7bcf9b1a6d3366eed30c3aed4e93c203c43f5528a45de791895747ad"
+         "e9c5fa5eee81427edee02082147aa311712a6ad5fb1732e93b3d6cd23ffd46a0"
+         "b3caf62a8b69957cc68ae39f9993c1a779599cdda949bdaababb77f248fcfeaa"
+         "44059be5459fb9b899278e929528ee130facd53372ecbc42f3e8de2998425860"
+         "406440f248d817432de687112e504d734028e6c5620fa282ca07647006cf0a2f"
+         "f83e19a916554cc61810c2e855305db4e5cf893a6a96767365794556ff033359"
+         "084d7e38a8456e68e21155b76151314a29875feee09557161cbc654541e89e42",
+         "3974900bec3fcb081f0e5a299adf30d087aabaa633911410e87a4979bbe3fa80"
+         "c3abcf221686399a49bc2f1e5ac40c35df1700e4b9cb7c805a896646573f4a57"
+         "0a9704d2a2e6baee4b43d916906884ad3cf283529ea265e8fcb5cc1bdf7b7dee"
+         "85941e4b4fb25c1fc7b951fb129ab393cb069be271c1d954da3c43674309f1d2"
+         "12826fabb8e812de2d53d12597de040d32cb28c9f813159cb18c1b51f7a874cb"
+         "f229cc222caeb98e35ec5e4bf5c5e22cc8528631f15117e8c2be6eac91f4070e"
+         "ecdd07ecc6db6c46eaa65f472f2006988efef0b51c538c6e04d7519c8e3da4b1"
+         "72b1e2761089ed3ad1197992ef37c168dc881c8b5f8bbfee919f7c7afd25b8fc",
+         "148af61ed5ea8a87a08b3f403929bf8031db4fd3999b64409ba489f97a3ee520"
+         "8ea4202d2ec18734f615003a51f77441085be6ac0f11810ffa2dad58f0e186d5"
+         "520ac2b8a5d3966e8d2abb8074e13b50a4e7de83be10a66fdc7ca18118c5774f"
+         "781212de9efebc6376fcdddc65a3b1b8f1ab31492fe478259ce719b3db587498"
+         "d879a01dec96e8eabeb07ff7073f3f3eb446084955ca26329a791315a2c259d2"
+         "25e26b2154b2047b21faba68115bfd962e5e24ec52d7c5d231e3044cbcd8c880"
+         "4855703cbaa622b15b6ef78c7421a367166f1b02576c87360593da75b7189efa"
+         "fd1082bd59f6857f1701f646c24d70c95273c49d5b11e6afe258821b55c1680c",
+         "bb2969df7eac0f17e07992c00c8b561d1c21482f042a4fc95b739aace629a12f"
+         "6086e399bff9aa71268203c1656ddfc890570bf49dc75d8a7bc510413135ef93"
+         "1473b0ba77af4e5691970466bc2a5ef811b4eb94269173bb365ed28688c0078a"
+         "11e0776ed7f539717209536079dc7af515386698c1e539dcf0b3c08e584e3bef"
+         "987702aa02e5ab329725026dcf3fe64193a4e27451e5e77713908f07c742af0a"
+         "2583a04c1f1a0ac4e9af5878a9c8e53ac1eba469ceef836f3f6eb9ee2625feaf"
+         "933905c308c21aa75a76cde1d8bc41cf77beeed6919dd75d3834b3135a781cce"
+         "01a04b468f339bbd21c74a323793c8f439e6df0f3dd4226e5ba8c712b29f7acc",
+         "802fed875ef06dd2fad2ef123f14b360c0ed51eada42b4db56d8e62627a85a18"
+         "fc15eacd2467d76e84efd1245e4e62ff9dd7c5dbcfb3c83d9cad6e0be064a3cb"
+         "0100f3ffcd4c4025d654174a91a0b13767f5f8352305e61d54cfc61b9b801c57"
+         "e1287e759ea1599b68bfcbba043d776e3f1e75887a1cc5d1ab878418bc15a356"
+         "b479e6b4d12b7d49de850b2976b8113135c0df094ee476a5d6ba3b2a3a03ecf1"
+         "f6e97f1e0c3ad17245221449a1e0b69b9441d97f596cffdbd93041b11757d19d"
+         "6a3a07c7d204eb0f53ac94a5e3bc69d8c49cf1bfa4ee9c1e4c077c5a18296bef"
+         "3a0db41524feee3cc83c2c2642c633436e635f11b43056c8c590f02ba3d2dfae"};
+
+    u8 e8[256] = {0};
+    u8 d8[256] = {0};
+    u8 n8[256] = {0};
+
+    hex_read(e8, e[0]);
+    hex_read(d8, d[0]);
+    hex_read(n8, n[0]);
+
+    size_t words = maid_mp_words(2048);
+    maid_mp_word ee[words];
+    maid_mp_word dd[words];
+    maid_mp_word nn[words];
+
+    maid_mp_read(words, ee, e8, true);
+    maid_mp_read(words, dd, d8, true);
+    maid_mp_read(words, nn, n8, true);
+
+    struct maid_rsa_key pub_key = {.exponent = ee, .modulo = nn};
+    struct maid_rsa_key prv_key = {.exponent = dd, .modulo = nn};
+
+    maid_pub *pub = maid_pub_new(maid_rsa_public,  &pub_key, 2048);
+    maid_pub *prv = maid_pub_new(maid_rsa_private, &prv_key, 2048);
+
+    struct maid_sign_def defs[] =
+        {maid_pkcs1_v1_5_sha224,     maid_pkcs1_v1_5_sha256,
+         maid_pkcs1_v1_5_sha384,     maid_pkcs1_v1_5_sha512,
+         maid_pkcs1_v1_5_sha512_224, maid_pkcs1_v1_5_sha512_256};
+
+    for (u8 i = 0; i < 4; i++)
+        ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
+
+    hex_read(e8, e[1]);
+    hex_read(d8, d[1]);
+    hex_read(n8, n[1]);
+
+    maid_mp_read(words, ee, e8, true);
+    maid_mp_read(words, dd, d8, true);
+    maid_mp_read(words, nn, n8, true);
+
+    maid_pub_renew(pub, &pub_key);
+    maid_pub_renew(prv, &prv_key);
+    for (u8 i = 4; i < 6; i++)
+        ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
+
+    maid_pub_del(pub);
+    maid_pub_del(prv);
+
+    return ret;
+}
+
 extern int
 main(void)
 {
@@ -1309,6 +1512,7 @@ main(void)
     ret += sha2_tests();
 
     ret += rsa_tests();
+    ret += pkcs1_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
