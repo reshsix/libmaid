@@ -156,10 +156,8 @@ pkcs1_renew(void *pkcs1, maid_pub *public, maid_pub *private)
 }
 
 extern void
-pkcs1_generate(void *pkcs1, u8 *buffer, const u8 *nonce)
+pkcs1_generate(void *pkcs1, u8 *buffer)
 {
-    (void)nonce;
-
     struct pkcs1 *p = pkcs1;
 
     if (p && buffer && p->private)
@@ -181,9 +179,8 @@ pkcs1_generate(void *pkcs1, u8 *buffer, const u8 *nonce)
 }
 
 extern bool
-pkcs1_verify(void *pkcs1, u8 *buffer, const u8 *nonce)
+pkcs1_verify(void *pkcs1, u8 *buffer)
 {
-    (void)nonce;
     struct pkcs1 *p = pkcs1;
 
     volatile bool ret = (p && buffer && p->public);

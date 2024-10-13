@@ -1308,11 +1308,11 @@ pkcs1_test(struct maid_sign_def def, maid_pub *pub, maid_pub *prv,
 
         u8 tmp[256] = {0};
         memcpy(tmp, input, sizeof(input));
-        maid_sign_generate(s, tmp, NULL);
+        maid_sign_generate(s, tmp);
 
         if (memcmp(tmp, output, sizeof(output)) == 0)
         {
-            if (maid_sign_verify(s, tmp, NULL))
+            if (maid_sign_verify(s, tmp))
                 ret = memcmp(tmp, input, sizeof(input)) == 0;
         }
 

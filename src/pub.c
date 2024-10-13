@@ -37,6 +37,8 @@ maid_pub_new(struct maid_pub_def def, const void *key, size_t bits)
     {
         memcpy(&(ret->def), &def, sizeof(struct maid_pub_def));
         ret->context = def.new(def.version, key, bits);
+        if (!(ret->context))
+            ret = maid_pub_del(ret);
     }
 
     return ret;

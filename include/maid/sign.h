@@ -29,8 +29,8 @@ struct maid_sign_def
     void * (*new)(u8, maid_pub *, maid_pub *, size_t);
     void * (*del)(void *);
     void (*renew)(void *, maid_pub *, maid_pub *);
-    void (*generate)(void *, u8 *, const u8 *);
-    bool (*verify)(void *, u8 *, const u8 *);
+    void (*generate)(void *, u8 *);
+    bool (*verify)(void *, u8 *);
     u8 version;
 };
 
@@ -41,8 +41,8 @@ maid_sign *maid_sign_new(struct maid_sign_def def, maid_pub *public,
                          maid_pub *private, size_t bits);
 void maid_sign_renew(maid_sign *s, maid_pub *public, maid_pub *private);
 maid_sign *maid_sign_del(maid_sign *s);
-void maid_sign_generate(maid_sign *s, u8 *buffer, const u8 *nonce);
-bool maid_sign_verify(maid_sign *s, u8 *buffer, const u8 *nonce);
+void maid_sign_generate(maid_sign *s, u8 *buffer);
+bool maid_sign_verify(maid_sign *s, u8 *buffer);
 
 /* External algorithms */
 

@@ -37,7 +37,7 @@ typedef struct maid_pub maid_pub;
 maid_pub *maid_pub_new(struct maid_pub_def def, const void *key, size_t bits);
 void maid_pub_renew(maid_pub *p, const void *key);
 maid_pub *maid_pub_del(maid_pub *p);
-void maid_pub_apply(maid_pub *pub, u8 *buffer);
+void maid_pub_apply(maid_pub *p, u8 *buffer);
 
 /* External algorithms */
 

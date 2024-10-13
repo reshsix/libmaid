@@ -44,6 +44,8 @@ maid_sign_new(struct maid_sign_def def, maid_pub *public,
 
         memcpy(&(ret->def), &def, sizeof(struct maid_sign_def));
         ret->context = def.new(def.version, public, private, bits);
+        if (!(ret->context))
+            ret = maid_sign_del(ret);
     }
 
     return ret;
@@ -67,19 +69,19 @@ maid_sign_del(struct maid_sign *s)
 }
 
 extern void
-maid_sign_generate(struct maid_sign *s, u8 *buffer, const u8 *nonce)
+maid_sign_generate(struct maid_sign *s, u8 *buffer)
 {
     if (s && buffer && s->generate)
-        s->def.generate(s->context, buffer, nonce);
+        s->def.generate(s->context, buffer);
 }
 
 extern bool
-maid_sign_verify(struct maid_sign *s, u8 *buffer, const u8 *nonce)
+maid_sign_verify(struct maid_sign *s, u8 *buffer)
 {
     bool ret = false;
 
     if (s && buffer && s->verify)
-        ret = s->def.verify(s->context, buffer, nonce);
+        ret = s->def.verify(s->context, buffer);
 
     return ret;
 }
