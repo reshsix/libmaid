@@ -27,12 +27,12 @@
 Reads integer from memory
 
 ### Parameters
-| name    | description          |
-|---------|----------------------|
-| addr    | Memory to be read    |
-| index   | Index of the item    |
-| length  | Length of every item |
-| big     | Little/Big endianess |
+| name   | description          |
+|--------|----------------------|
+| addr   | Memory to be read    |
+| index  | Index of the item    |
+| length | Length of every item |
+| big    | Little/Big endianess |
 
 ### Return value
 | case   | description   |
@@ -47,13 +47,13 @@ Reads integer from memory
 Writes integer to memory
 
 ### Parameters
-| name    | description             |
-|---------|-------------------------|
-| addr    | Memory to be written on |
-| index   | Index of the item       |
-| length  | Length of every item    |
-| big     | Little/Big endianess    |
-| data    | Integer value           |
+| name   | description             |
+|--------|-------------------------|
+| addr   | Memory to be written on |
+| index  | Index of the item       |
+| length | Length of every item    |
+| big    | Little/Big endianess    |
+| data   | Integer value           |
 
 </details>
 
@@ -62,10 +62,23 @@ Writes integer to memory
 Clears memory
 
 ### Parameters
-| name    | description          |
-|---------|----------------------|
-| addr    | Memory to be cleared |
-| length  | Length to clear      |
+| name   | description          |
+|--------|----------------------|
+| addr   | Memory to be cleared |
+| length | Length to clear      |
+
+</details>
+
+<details>
+<summary>bool maid_mem_cmp(void *addr, void *addr2, size_t length); </summary>
+Compares two blocks of memory
+
+### Parameters
+| name   | description       |
+|--------|-------------------|
+| addr   | Memory block 1    |
+| addr2  | Memory block 2    |
+| length | Length to compare |
 
 </details>
 

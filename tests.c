@@ -79,7 +79,7 @@ hex_read(u8 *data, char *hex)
 static u8
 mem_tests(void)
 {
-    u8 ret = 4;
+    u8 ret = 8;
 
     u8 mem[24] = {0x00, 0x00, 0x00, 0x00, 0xb0, 0x0b, 0x00, 0x00};
 
@@ -102,7 +102,14 @@ mem_tests(void)
         }
     }
 
-   return ret;
+    u8 zeros[24] = {0};
+    ret -= maid_mem_cmp(mem, zeros, sizeof(mem));
+    zeros[23] = 1;
+    ret -= !maid_mem_cmp(mem, zeros, sizeof(mem));
+    ret -= maid_mem_cmp(mem, zeros, 0);
+    ret -= maid_mem_cmp(NULL, NULL, sizeof(mem));
+
+    return ret;
 }
 
 /* Multiprecision utilities */

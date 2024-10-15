@@ -75,3 +75,22 @@ maid_mem_clear(void *addr, size_t length)
             dest[i] = 0x0;
     }
 }
+
+extern bool
+maid_mem_cmp(void *addr, void *addr2, size_t length)
+{
+    volatile bool ret = true;
+
+    if (addr && addr2)
+    {
+        volatile u8 *a = addr;
+        volatile u8 *b = addr2;
+        for (size_t i = 0; i < length; i++)
+            if (a[i] != b[i])
+                ret = false;
+    }
+    else
+        ret = (addr == addr2);
+
+    return ret;
+}
