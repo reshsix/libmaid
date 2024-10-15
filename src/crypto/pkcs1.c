@@ -199,15 +199,11 @@ pkcs1_verify(void *pkcs1, u8 *buffer)
         for (size_t i = 0; i < p->der_s; i++)
             ret &= (p->buffer[outl - p->hash_s - p->der_s + i] == p->der[i]);
         ret &= (p->buffer[outl - p->hash_s - p->der_s - 1] == 0x0);
-        for (size_t i = 0; i < p->hash_s; i++)
-            ret &= (p->buffer[outl - p->hash_s + i] == p->hash[i]);
 
         if (ret)
         {
-            memcpy(p->hash, &(p->buffer[outl - p->hash_s]), p->hash_s);
-
             maid_mem_clear(buffer, outl);
-            memcpy(buffer, p->hash, p->hash_s);
+            memcpy(buffer, &(p->buffer[outl - p->hash_s]), p->hash_s);
         }
     }
 
