@@ -307,7 +307,7 @@ Divides a biginteger by another, and returns the remainder
 | a     | Dividend -> Quotient         |
 | rem   | Remainder                    |
 | b     | Divisor (NULL = 1)           |
-| tmp   | Temporary buffer (words * 2) |
+| tmp   | Temporary buffer (words * 3) |
 
 </details>
 
