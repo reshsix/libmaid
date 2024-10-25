@@ -79,8 +79,10 @@ gcm_del(void *ctx)
 }
 
 static void *
-gcm_new(const u8 *key)
+gcm_new(u8 version, const u8 *key)
 {
+    (void)version;
+
     struct gcm *ret = calloc(1, sizeof(struct gcm));
 
     if (ret)

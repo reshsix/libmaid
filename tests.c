@@ -1231,6 +1231,80 @@ sha2_tests(void)
     return ret;
 }
 
+/* HMAC RFC4231 test vectors + comparison with other implementations */
+
+static u8
+hmac_test(maid_mac *m, char *key_h, char *input_h, char *tag_h)
+{
+    u8 ret = 0;
+
+    if (m)
+    {
+        u8    key[128] = {0};
+        u8 input[1024] = {0};
+        u8     tag[64] = {0};
+
+        hex_read(key, key_h);
+        hex_read(tag, tag_h);
+
+        size_t length  = hex_read(input, input_h);
+        size_t length2 = hex_read(tag,   tag_h);
+
+        maid_mac_renew(m, key);
+        maid_mac_update(m, input, length);
+
+        u8 tag2[64] = {0};
+        maid_mac_digest(m, tag2);
+
+        if (memcmp(tag2, tag, length2) == 0)
+            ret = 1;
+    }
+
+    return ret;
+}
+
+static u8
+hmac_tests(void)
+{
+    u8 ret = 6;
+
+    char *key = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+    char *data = "4869205468657265";
+
+    char *tags[] = {"896fb1128abbdf196832107cd49df33f"
+                    "47b4b1169912ba4f53684b22",
+                    "b0344c61d8db38535ca8afceaf0bf12b"
+                    "881dc200c9833da726e9376c2e32cff7",
+                    "afd03944d84895626b0825f4ab46907f"
+                    "15f9dadbe4101ec682aa034c7cebc59c"
+                    "faea9ea9076ede7f4af152e8b2fa9cb6",
+                    "87aa7cdea5ef619d4ff0b4241a1d6cb0"
+                    "2379f4e2ce4ec2787ad0b30545e17cde"
+                    "daa833b7d6b8a702038b274eaea3f4e4"
+                    "be9d914eeb61f1702e696c203a126854",
+                    "b244ba01307c0e7a8ccaad13b1067a4c"
+                    "f6b961fe0c6a20bda3d92039",
+                    "9f9126c3d9c3c330d760425ca8a217e3"
+                    "1feae31bfe70196ff81642b868402eab"};
+
+    u8 zeros[128] = {0};
+    maid_mac *macs[] = {maid_mac_new(maid_hmac_sha224,     zeros),
+                        maid_mac_new(maid_hmac_sha256,     zeros),
+                        maid_mac_new(maid_hmac_sha384,     zeros),
+                        maid_mac_new(maid_hmac_sha512,     zeros),
+                        maid_mac_new(maid_hmac_sha512_224, zeros),
+                        maid_mac_new(maid_hmac_sha512_256, zeros)};
+
+    for (u8 i = 0; i < 6; i++)
+        ret -= hmac_test(macs[i], key, data, tags[i]);
+
+    for (u8 i = 0; i < 6; i++)
+        maid_mac_del(macs[i]);
+
+    return ret;
+}
+
+
 /* RSA Primitives NIST test vectors */
 
 static u8
@@ -1674,6 +1748,8 @@ main(void)
 
     ret += ctr_drbg_tests();
     ret += sha2_tests();
+
+    ret += hmac_tests();
 
     /* Asymmetric cryptography */
 

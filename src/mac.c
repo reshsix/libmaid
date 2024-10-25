@@ -55,7 +55,7 @@ maid_mac_new(struct maid_mac_def def, const u8 *key)
     {
         memcpy(&(ret->def), &def, sizeof(struct maid_mac_def));
 
-        ret->ctx = def.new(key);
+        ret->ctx = def.new(def.version, key);
         ret->buffer = calloc(1, def.state_s);
         if (!(ret->ctx && ret->buffer))
             ret = maid_mac_del(ret);

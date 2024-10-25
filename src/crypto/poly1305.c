@@ -84,8 +84,10 @@ poly1305_del(void *ctx)
 }
 
 static void *
-poly1305_new(const u8 *key)
+poly1305_new(u8 version, const u8 *key)
 {
+    (void)version;
+
     struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
 
     if (ret)

@@ -129,6 +129,66 @@ Poly1305 128-bit MAC (IETF)
 | key  | 256-bit key |
 </details>
 
+<details>
+<summary>const struct maid_mac_def maid_hmac_sha224</summary>
+HMAC-SHA224 224-bit MAC (NIST)
+
+### Parameters
+| name | description |
+|------|-------------|
+| key  | 512-bit key |
+</details>
+
+<details>
+<summary>const struct maid_mac_def maid_hmac_sha256</summary>
+HMAC-SHA256 256-bit MAC (NIST)
+
+### Parameters
+| name | description |
+|------|-------------|
+| key  | 512-bit key |
+</details>
+
+<details>
+<summary>const struct maid_mac_def maid_hmac_sha384</summary>
+HMAC-SHA384 384-bit MAC (NIST)
+
+### Parameters
+| name | description  |
+|------|--------------|
+| key  | 1024-bit key |
+</details>
+
+<details>
+<summary>const struct maid_mac_def maid_hmac_sha512</summary>
+HMAC-SHA512 512-bit MAC (NIST)
+
+### Parameters
+| name | description  |
+|------|--------------|
+| key  | 1024-bit key |
+</details>
+
+<details>
+<summary>const struct maid_mac_def maid_hmac_sha512_224</summary>
+HMAC-SHA512/224 224-bit MAC (NIST)
+
+### Parameters
+| name | description  |
+|------|--------------|
+| key  | 1024-bit key |
+</details>
+
+<details>
+<summary>const struct maid_mac_def maid_hmac_sha512_256</summary>
+HMAC-SHA512/256 256-bit MAC (NIST)
+
+### Parameters
+| name | description  |
+|------|--------------|
+| key  | 1024-bit key |
+</details>
+
 ## Example Code
 
 ```c

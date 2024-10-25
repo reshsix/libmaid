@@ -36,7 +36,7 @@ sudo ldconfig
 |                                      |                           |
 | [Block ciphers](docs/block.md)       | AES-ECB, AES-CTR          |
 | [Stream ciphers](docs/stream.md)     | Chacha20                  |
-| [MACs](docs/mac.md)                  | Poly1305                  |
+| [MACs](docs/mac.md)                  | Poly1305, HMAC-SHA2       |
 | [AEADs](docs/aead.md)                | AES-GCM, Chacha20Poly1305 |
 | [CSPRNGs](docs/rng.md)               | CTR-DRBG-AES              |
 | [Hash functions](docs/hash.md)       | SHA-2                     |

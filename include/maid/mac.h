@@ -24,12 +24,13 @@
 
 struct maid_mac_def
 {
-    void * (*new)(const u8 *);
+    void * (*new)(u8, const u8 *);
     void * (*del)(void *);
     void (*renew)(void *, const u8 *);
     void (*update)(void *, u8 *, size_t);
     void (*digest)(void *, u8 *);
     size_t state_s;
+    u8 version;
 };
 
 /* Internal algorithms */
@@ -48,5 +49,12 @@ void maid_mac_digest(maid_mac *m, u8 *output);
 /* External algorithms */
 
 extern const struct maid_mac_def maid_poly1305;
+
+extern const struct maid_mac_def maid_hmac_sha224;
+extern const struct maid_mac_def maid_hmac_sha256;
+extern const struct maid_mac_def maid_hmac_sha384;
+extern const struct maid_mac_def maid_hmac_sha512;
+extern const struct maid_mac_def maid_hmac_sha512_224;
+extern const struct maid_mac_def maid_hmac_sha512_256;
 
 #endif
