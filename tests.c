@@ -21,14 +21,17 @@
 
 #include <maid/mem.h>
 #include <maid/mp.h>
+
 #include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
 #include <maid/aead.h>
 #include <maid/rng.h>
 #include <maid/hash.h>
+
 #include <maid/pub.h>
 #include <maid/sign.h>
+#include <maid/kex.h>
 
 /* Helper functions */
 
@@ -1524,17 +1527,142 @@ pkcs1_tests(void)
     return ret;
 }
 
+/* KAS FFC NIST test vectors */
+
+static u8
+dh_test(maid_kex *x, struct maid_dh_group *g, char *prv_h,
+        char *pub_h, char *pub2_h, char *secret_h)
+{
+    u8 ret = 0;
+
+    if (x && g)
+    {
+        u8 prv   [256] = {0};
+        u8 pub   [256] = {0};
+        u8 pub2  [256] = {0};
+        u8 secret[256] = {0};
+
+        hex_read(prv,    prv_h);
+        hex_read(pub,    pub_h);
+        hex_read(pub2,   pub2_h);
+        hex_read(secret, secret_h);
+
+        maid_kex_renew(x, g);
+
+        u8 tmp[256] = {0};
+        maid_kex_gpub(x, prv, tmp);
+        if (memcmp(tmp, pub, sizeof(tmp)) == 0)
+        {
+            maid_kex_gsec(x, prv, pub2, tmp);
+            ret = memcmp(tmp, secret, sizeof(tmp)) == 0;
+        }
+    }
+
+    return ret;
+}
+
+static u8
+dh_tests(void)
+{
+    u8 ret = 1;
+
+    u8 zeros[256] = {0};
+    struct maid_dh_group zgroup = {.generator = (void *)zeros,
+                                   .modulo    = (void *)zeros};
+
+    maid_kex *x = maid_kex_new(maid_dh, &zgroup, 2048);
+
+    char *g[] =
+        {"4a1af3a492e9ee746e57d58c2c5b41415ed45519dcd93291f7fdc257ff0314db"
+         "f1b7600c43593fffacf1809a156fd86eb78518c8ec4e594ae291434ceb95b62e"
+         "9aea536880646940f9ecbd8589269767afb0ad001bd4fd94d3e992b1b4bc5aaa"
+         "9280893b39056c2226fe5a286c37505a3899cff3c19645dc01cb2087a5008cf5"
+         "4dc2efb89bd187beedd50a291534594c3a052205444f9fc84712248ea879e467"
+         "ba4d5b755695ebe88afa8e018c1b7463d92ff7d3448fa8f5af6c4fdbe7c96c71"
+         "22a31df140b2e09ab672c9c01316a24ae192c75423ab9da1a1e50bedbae88437"
+         "b2e7fe328dfa1c537797c7f348c9db2d75529d4251786268054515f8a24ef30b"};
+    char *p[] =
+        {"c57ca24f4bd68c3cdac7baaaea2e5c1e18b27b8c55659feae0a136532b36e04e"
+         "3e64a9e4fc8f326297e4bef7c1de075a8928f3fe4ffe68bcfb0a7ca4b3144889"
+         "9fafb843e2a0625cb4883f065011fe658d49d2f54b7479db06629289eddacb87"
+         "3716d2a17ae8de92ee3e414a915eedf36c6b7efd159218fca7ac428557e9dcda"
+         "55c98b289ec1c4464d88ed628edb3fb9d7c8e3cfb8342cd26f280641e3668cfc"
+         "72ff263b6b6c6f73def29029e06132c412740952ecf31ba64598acf91c658e3a"
+         "91844b238ab23cc9faeaf138ced805e0fa44681febd957b84a975b88c5f1bbb0"
+         "49c3917cd313b947bb918fe52607aba9c5d03d954126929d1367f27e1188dc2d"};
+
+    u8 g8[256] = {0};
+    u8 p8[256] = {0};
+
+    hex_read(g8, g[0]);
+    hex_read(p8, p[0]);
+
+    size_t words = maid_mp_words(2048);
+    maid_mp_word gg[words];
+    maid_mp_word pp[words];
+
+    maid_mp_read(words, gg, g8, true);
+    maid_mp_read(words, pp, p8, true);
+
+    struct maid_dh_group group = {.generator = gg, .modulo = pp};
+
+    char *prv[] =
+        {"0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "00000000d00ec7e80d5cc3405f9b40e0b52503c888273cef46a98d289a602a1a"};
+    char *pub[] =
+        {"7d0660bfce9e7263f6bfc79bca58feca7131077d31a964dd3a2a9a493420fb49"
+         "62be61aefa37635354563671f66186e8096e6e888160ce1ddcf1b5fe4bf5c9f6"
+         "c99a63015d1723adcd8a2aebd4847ab022896f8107114cbcf34ea32435d5a268"
+         "9f7356d3894aeafd9ad80baab0fdd2671540a59b2fc789fd0be4154357df8d7f"
+         "996f2076e963fa59d5ffd9fe8a006ce09c052ebebcc6db71b7778fb0d3030f18"
+         "ad2604d3152a207f6625a63121bd0217a4424856d2167af8fea3e77d20ebe161"
+         "24d0e74f95fb8b5ed619447152e4883d00fc2e3d14f26a724fde7e870f196ec5"
+         "a040bbbaf4da12034e5cbf94624e2dc280b1d44457c8820d3c485a8023d6bb44"};
+    char *pub2[] =
+        {"78045869392d56f3520712a68f29466d8a89cf419192504c453c224dbc9a0ffd"
+         "297d6cc1a370eee93981399da4c70897aab48f334f05a5562733e4e731c37f17"
+         "3880760088edb1e9986a5d430806d5146424d93a7fa4a391659ff9666755e75a"
+         "1438816113e1448e6e14b46ce8ad7908fec3b8e502257263eabafefc9a3b9c64"
+         "522150fbc211f45eef4335fbc6dc01a9156943abae05c3b177ac9d7e3bd3c57e"
+         "f58df9523bcfc5532d67ac61174f6c9c09a93892dfbf490d150b02f224385619"
+         "cf6db90a6f79042ef9efdbbcdbf2a38b0112ec40dc6bff2bc7f596417840e3ac"
+         "4aa5a5d044e71a876a10a204df713447f2920d92180e144318ce0e18b87eef6e"};
+    char *secret[] =
+        {"0df1d1b0faae8b8afb7c47884849f23a2d8f01ee47141e91d54949ff7fd0d110"
+         "ac4cccc67f428a04ee6441f81d1a04263b99b5eef61794fd3d584bd7e1f4f610"
+         "b8dcb78d045f721319f6a8333e828c56b1975c4fa3d31eeb61a4c2042cc9226c"
+         "6eeea75b668bfbb50d1b7ca188c79585a44ce538041e941b03e6cca4365802be"
+         "79895ad2601e47e62635153a91ef92a90f8958d3f7d2c503613778511e394d92"
+         "8fddb07dc7adf434854e948519f1bfb7ca023bb0464596b6010e380da5d7135c"
+         "5a0d41c56d3792f6dc5e09a42f7e2a9486d8590b01542ae69fa14fa582ca7344"
+         "434705649d687885cc2477aa4c088d47339548926b9f7a17138267f3e45589db"};
+
+    for (u8 i = 0; i < 1; i++)
+        ret -= dh_test(x, &group, prv[i], pub[i], pub2[i], secret[i]);
+
+    maid_kex_del(x);
+
+    return ret;
+}
+
+
 extern int
 main(void)
 {
-    u8 ret = 0;
+    u16 ret = 0;
 
     /* Utilities */
 
     ret += mem_tests();
     ret += mp_tests();
 
-    /* Algorithms */
+    /* Symmetric cryptography */
 
     ret += aes_tests();
     ret += aes_ctr_tests();
@@ -1547,8 +1675,11 @@ main(void)
     ret += ctr_drbg_tests();
     ret += sha2_tests();
 
+    /* Asymmetric cryptography */
+
     ret += rsa_tests();
     ret += pkcs1_tests();
+    ret += dh_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

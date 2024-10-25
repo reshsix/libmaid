@@ -74,7 +74,7 @@ Deletes a public-key primitive instance
 </details>
 
 <details>
-<summary>void maid_pub_renew(maid_pub *p, const *void key)</summary>
+<summary>void maid_pub_renew(maid_pub *p, const void *key)</summary>
 Recreates a public-key primitive instance
 
 ### Parameters
@@ -108,7 +108,7 @@ Used for both RSA public and private keys
 | name     | description          |
 |----------|----------------------|
 | exponent | public e / private d |
-| modulo   | modulo N             |
+| modulo   | modulo N (p * q)     |
 
 </details>
 

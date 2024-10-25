@@ -43,3 +43,4 @@ sudo ldconfig
 |                                      |                           |
 | [Public-key primitives](docs/pub.md) | RSA                       |
 | [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |
+| [Key Exchange](docs/kex.md)          | Diffie-Hellman            |

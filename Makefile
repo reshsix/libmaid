@@ -49,8 +49,8 @@ $(FOLDERS):
 	mkdir -p $@
 
 OBJS = crypto/aes.o crypto/chacha.o crypto/poly1305.o crypto/gcm.o \
-       crypto/drbg.o crypto/sha2.o crypto/rsa.o crypto/pkcs1.o \
-       mem.o mp.o block.o stream.o mac.o aead.o rng.o hash.o pub.o sign.o
+       crypto/drbg.o crypto/sha2.o crypto/rsa.o crypto/pkcs1.o crypto/dh.o \
+       mem.o mp.o block.o stream.o mac.o aead.o rng.o hash.o pub.o sign.o kex.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
