@@ -80,6 +80,53 @@ Compares two blocks of memory
 | addr2  | Memory block 2    |
 | length | Length to compare |
 
+### Return value
+| case       | description |
+|------------|-------------|
+| Equal      | True        |
+| Not Equal  | False       |
+
+</details>
+
+<details>
+<summary>size_t maid_mem_import(void *addr, size_t limit,
+                                const char *input, size_t length); </summary>
+Imports base64 as memory
+
+### Parameters
+| name   | description            |
+|--------|------------------------|
+| addr   | Memory buffer          |
+| limit  | Memory buffer limit    |
+| input  | Base64 to be imported  |
+| length | Length to be imported  |
+
+### Return value
+| case    | description |
+|---------|-------------|
+| Success | Bytes read  |
+| Error   | 0           |
+
+</details>
+
+<details>
+<summary>size_t maid_mem_export(const void *addr, size_t length,
+                                char *output, size_t limit); </summary>
+Exports memory as base64
+
+### Parameters
+| name   | description            |
+|--------|------------------------|
+| addr   | Memory to be exported  |
+| length | Length to be exported  |
+| output | Base64 buffer          |
+| limit  | Base64 buffer limit    |
+
+### Return value
+| case   | description   |
+|--------|---------------|
+| Always | Bytes written |
+
 </details>
 
 ## Example Code

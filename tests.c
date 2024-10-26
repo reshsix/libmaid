@@ -82,7 +82,7 @@ hex_read(u8 *data, char *hex)
 static u8
 mem_tests(void)
 {
-    u8 ret = 8;
+    u8 ret = 58;
 
     u8 mem[24] = {0x00, 0x00, 0x00, 0x00, 0xb0, 0x0b, 0x00, 0x00};
 
@@ -111,6 +111,44 @@ mem_tests(void)
     ret -= !maid_mem_cmp(mem, zeros, sizeof(mem));
     ret -= maid_mem_cmp(mem, zeros, 0);
     ret -= maid_mem_cmp(NULL, NULL, sizeof(mem));
+
+    /* From RFC 4648 */
+    char *base64[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==",
+                      "Zm9vYmE=", "Zm9vYmFy"};
+    char  *ascii[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
+
+    memset(zeros, '\0', sizeof(zeros));
+    for (size_t i = 0; i < 7; i++)
+    {
+        char buf[16] = {0};
+        size_t l  = strlen(base64[i]);
+        size_t l2 = strlen(ascii[i]);
+
+        ret -= maid_mem_import(buf, sizeof(buf), base64[i], l) == l;
+        ret -= memcmp(buf, ascii[i], l2) == 0;
+        ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
+    }
+
+    for (size_t i = 0; i < 7; i++)
+    {
+        char buf[16] = {0};
+        size_t l  = strlen(ascii[i]);
+        size_t l2 = strlen(base64[i]);
+
+        ret -= maid_mem_export(ascii[i], l, buf, sizeof(buf)) == l2;
+        ret -= memcmp(buf, base64[i], l2) == 0;
+        ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
+    }
+
+    char *bad64[] = {"Zm9vYg", "Zm9vY%", "Zm9vY=Fy", "Zm9vYm=y"};
+    for (size_t i = 0; i < 4; i++)
+    {
+        char buf[16] = {0};
+        size_t l  = strlen(bad64[i]);
+
+        ret -= maid_mem_import(buf, sizeof(buf), bad64[i], l) == 0;
+        ret -= memcmp(buf, zeros, sizeof(buf)) == 0;
+    }
 
     return ret;
 }

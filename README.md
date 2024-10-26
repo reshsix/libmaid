@@ -31,7 +31,7 @@ sudo ldconfig
 | Category                             | Algorithms                |
 | ------------------------------------:|---------------------------|
 | [Type aliases](docs/types.md)        | ------------------------- |
-| [Memory utils](docs/mem.md)          | ------------------------- |
+| [Memory utils](docs/mem.md)          | Base64                    |
 | [Multiprecision](docs/mp.md)         | ------------------------- |
 |                                      |                           |
 | [Block ciphers](docs/block.md)       | AES-ECB, AES-CTR          |
