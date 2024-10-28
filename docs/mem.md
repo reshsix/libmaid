@@ -134,18 +134,30 @@ Exports memory as base64
 ```c
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <maid/mem.h>
 
 int main(void)
 {
-    u8 memory[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-    u32 integer = maid_mem_read(memory, 0, sizeof(u32), true);
-    maid_mem_write(memory, 1, sizeof(u32), false, integer ^ 0xed0cee0e);
+    char *b64 = "AAECAwQFBgc=";
 
-    for (size_t i = 0; i < sizeof(memory); i++)
-        printf("%02x", memory[i]);
-    printf("\n");
+    u8 memory[8] = {0};
+    if (maid_mem_import(memory, sizeof(memory), b64, strlen(b64)))
+    {
+        u32 integer = maid_mem_read(memory, 0, sizeof(u32), true);
+        maid_mem_write(memory, 1, sizeof(u32), false, integer ^ 0xed0cee0e);
+
+        for (size_t i = 0; i < sizeof(memory); i++)
+            printf("%02x", memory[i]);
+        printf("\n");
+
+        char buf[16] = {0};
+        maid_mem_export(memory, sizeof(memory), buf, sizeof(buf));
+        printf("%s\n", buf);
+    }
+    else
+        fprintf(stderr, "Base64 error\n");
 
     return EXIT_SUCCESS;
 }

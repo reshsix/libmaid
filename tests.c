@@ -82,7 +82,7 @@ hex_read(u8 *data, char *hex)
 static u8
 mem_tests(void)
 {
-    u8 ret = 58;
+    u8 ret = 64;
 
     u8 mem[24] = {0x00, 0x00, 0x00, 0x00, 0xb0, 0x0b, 0x00, 0x00};
 
@@ -129,6 +129,17 @@ mem_tests(void)
         ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
     }
 
+    for (size_t i = 0; i < 1; i++)
+    {
+        char buf[16] = {0};
+        size_t l = strlen(base64[3]);
+        size_t l2 = strlen(ascii[3]);
+
+        ret -= maid_mem_import(buf, sizeof(buf), base64[6], l) == l;
+        ret -= memcmp(buf, ascii[3], l) == 0;
+        ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
+    }
+
     for (size_t i = 0; i < 7; i++)
     {
         char buf[16] = {0};
@@ -138,6 +149,18 @@ mem_tests(void)
         ret -= maid_mem_export(ascii[i], l, buf, sizeof(buf)) == l2;
         ret -= memcmp(buf, base64[i], l2) == 0;
         ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
+    }
+
+    for (size_t i = 0; i < 1; i++)
+    {
+        char buf[16] = {0};
+        size_t l  = strlen(ascii[6]);
+        size_t l2 = 5;
+        size_t l2m4 = l2 % 4;
+
+        ret -= maid_mem_export(ascii[6], l, buf, l2) == l2 - l2m4;
+        ret -= memcmp(buf, base64[3], l2m4) == 0;
+        ret -= memcmp(&(buf[l2 - l2m4]), zeros, sizeof(buf) - l2 + l2m4) == 0;
     }
 
     char *bad64[] = {"Zm9vYg", "Zm9vY%", "Zm9vY=Fy", "Zm9vYm=y"};

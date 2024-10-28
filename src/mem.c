@@ -77,14 +77,14 @@ maid_mem_clear(void *addr, size_t length)
 }
 
 extern bool
-maid_mem_cmp(void *addr, void *addr2, size_t length)
+maid_mem_cmp(const void *addr, const void *addr2, size_t length)
 {
     volatile bool ret = true;
 
     if (addr && addr2)
     {
-        volatile u8 *a = addr;
-        volatile u8 *b = addr2;
+        const volatile u8 *a = addr;
+        const volatile u8 *b = addr2;
         for (size_t i = 0; i < length; i++)
             if (a[i] != b[i])
                 ret = false;
@@ -100,10 +100,9 @@ maid_mem_import(void *addr, size_t limit, const char *input, size_t length)
 {
     size_t ret = 0;
 
-    char table[256] = {0};
-    memset(table, 0xFF, sizeof(table));
+    volatile u8 table[256] = {0};
+    memset((u8*)table, 0xFF, sizeof(table));
 
-    table['='] = 0;
     for (int i = 0; i < 26; i++)
         table['A' + i] = i;
     for (int i = 0; i < 26; i++)
@@ -114,6 +113,7 @@ maid_mem_import(void *addr, size_t limit, const char *input, size_t length)
     table['/'] = 63;
 
     /* Won't read if there's any error */
+    table['='] = 0xFE;
     volatile bool error = (length % 4 != 0);
     for (size_t i = 0; i < length; i++)
     {
@@ -124,14 +124,15 @@ maid_mem_import(void *addr, size_t limit, const char *input, size_t length)
         if (t == 0xFF)
            error = true;
         /* Padding not at the end */
-        if (t == 0x00 && !(i == length - 1 || i == length - 2))
+        if (t == 0xFE && !(i == length - 1 || i == length - 2))
            error = true;
         /* Padding on last but one, but not on last */
-        if (t == 0x00 && i == length - 2 && table[(int)input[i + 1]] != 0x00)
+        if (t == 0xFE && i == length - 2 && table[(int)input[i + 1]] != 0xFE)
            error = true;
     }
 
     /* But will pretend to, avoiding timing attacks */
+    table['='] = 0x00;
     volatile u8 *a = addr;
     volatile u8 zero = 0;
     while (length && limit)
@@ -169,6 +170,9 @@ maid_mem_export(const void *addr, size_t length, char *output, size_t limit)
 
     const char table[64] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    if (limit % 4 != 0)
+        limit -= limit % 4;
 
     const u8 *a = addr;
     while (length && limit)

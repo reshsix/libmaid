@@ -25,7 +25,7 @@ void maid_mem_write(void *addr, size_t index,
                     size_t length, bool big, u64 data);
 void maid_mem_clear(void *addr, size_t length);
 
-bool maid_mem_cmp(void *addr, void *addr2, size_t length);
+bool maid_mem_cmp(const void *addr, const void *addr2, size_t length);
 
 size_t maid_mem_import(void *addr, size_t limit,
                        const char *input, size_t length);
