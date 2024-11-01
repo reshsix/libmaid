@@ -114,7 +114,7 @@ Used for both RSA public and private keys
 
 <details>
 <summary>const struct maid_pub_def maid_rsa_public</summary>
-RSA public key, used in encryption and signature verification
+RSA public key (RSA Security)
 
 ### Parameters
 
@@ -133,7 +133,7 @@ RSA public key, used in encryption and signature verification
 
 <details>
 <summary>const struct maid_pub_def maid_rsa_private</summary>
-RSA private key, used in decryption and signature generation
+RSA private key (RSA Security)
 
 ### Parameters
 

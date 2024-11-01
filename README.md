@@ -1,12 +1,12 @@
 <div align="center">
     <h3 align="center">A Cryptography Library for Maids</h3>
     <a href="https://github.com/reshsix/libmaid">
-        <img src="logo.png" width="100" height="100">
+        <img src="logo.png" width="96" height="96">
     </a>
 </div>
 
 ## ☕ About
-Version: **1.1 beta**
+Version: **1.1 pre-release**
 
 ## 🎬 Getting Started
 

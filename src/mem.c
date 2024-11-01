@@ -183,10 +183,10 @@ maid_mem_export(const void *addr, size_t length, char *output, size_t limit)
         u8 sext[4] = {0};
         sext[0] = a[0] >> 2;
         sext[1] = a[0] << 4 & 0x3F;
-        sext[1] |= (l > 1) ? (a[1] >> 4) : 0;
+        sext[1] |= (l > 1) ? (a[1] >> 4 & 0xFF) : 0;
         sext[2] =  (l > 1) ? (a[1] << 2 & 0x3F) : 0;
-        sext[2] |= (l > 2) ? (a[2] >> 6) : 0;
-        sext[3] =  (l > 2) ? (a[2] & 0x3F) : 0;
+        sext[2] |= (l > 2) ? (a[2] >> 6 & 0xFF) : 0;
+        sext[3] =  (l > 2) ? (a[2] << 0 & 0x3F) : 0;
 
         output[0] = table[sext[0]];
         if (l2 > 1) output[1] = table[sext[1]];

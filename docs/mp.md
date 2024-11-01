@@ -71,7 +71,7 @@ Writes a biginteger to memory
 | name  | description          |
 |-------|----------------------|
 | words | Amount of words      |
-| a     | Source               |
+| a     | Source (NULL = 0)    |
 | addr  | Memory to be written |
 | big   | Little/Big endian    |
 
@@ -83,11 +83,11 @@ Writes a biginteger to memory
 Prints a biginteger
 
 ### Parameters
-| name  | description         |
-|-------|---------------------|
-| words | Amount of words     |
-| name  | Name to print       |
-| a     | Number to print     |
+| name  | description                |
+|-------|----------------------------|
+| words | Amount of words            |
+| name  | Name to print              |
+| a     | Number to print (NULL = 0) |
 
 </details>
 
@@ -154,7 +154,7 @@ Compares two bigintegers
 | name  | description         |
 |-------|---------------------|
 | words | Amount of words     |
-| a     | Number 1            |
+| a     | Number 1 (NULL = 0) |
 | b     | Number 2 (NULL = 0) |
 
 ### Return value

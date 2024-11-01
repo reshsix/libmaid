@@ -121,7 +121,7 @@ Verifies a digital signature
 
 <details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha224</summary>
-PKCS#1 v1.5 signature with SHA-224
+PKCS#1 v1.5 signature with SHA-224 (RSA Security)
 
 ### Parameters
 
@@ -139,7 +139,7 @@ PKCS#1 v1.5 signature with SHA-224
 
 <details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha256</summary>
-PKCS#1 v1.5 signature with SHA-256
+PKCS#1 v1.5 signature with SHA-256 (RSA Security)
 
 ### Parameters
 
@@ -157,7 +157,7 @@ PKCS#1 v1.5 signature with SHA-256
 
 <details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha384</summary>
-PKCS#1 v1.5 signature with SHA-384
+PKCS#1 v1.5 signature with SHA-384 (RSA Security)
 
 ### Parameters
 
@@ -175,7 +175,7 @@ PKCS#1 v1.5 signature with SHA-384
 
 <details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha512</summary>
-PKCS#1 v1.5 signature with SHA-512
+PKCS#1 v1.5 signature with SHA-512 (RSA Security)
 
 ### Parameters
 
@@ -193,7 +193,7 @@ PKCS#1 v1.5 signature with SHA-512
 
 <details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha512_224</summary>
-PKCS#1 v1.5 signature with SHA-512/224
+PKCS#1 v1.5 signature with SHA-512/224 (RSA Security)
 
 ### Parameters
 
@@ -211,7 +211,7 @@ PKCS#1 v1.5 signature with SHA-512/224
 
 <details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha512_256</summary>
-PKCS#1 v1.5 signature with SHA-512/256
+PKCS#1 v1.5 signature with SHA-512/256 (RSA Security)
 
 ### Parameters
 

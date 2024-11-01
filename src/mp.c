@@ -65,12 +65,12 @@ maid_mp_read(size_t words, maid_mp_word *a, const u8 *addr, bool big)
 extern void
 maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big)
 {
-    if (words && a && addr)
+    if (words && addr)
     {
         for (size_t i = 0; i < words; i++)
         {
             maid_mem_write(addr, (!big) ? i : words - i - 1,
-                           maid_mp_bytes, big, a[i]);
+                           maid_mp_bytes, big, (a) ? a[i] : 0x0);
         }
     }
 }
@@ -78,7 +78,7 @@ maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big)
 extern void
 maid_mp_debug(size_t words, const char *name, const maid_mp_word *a)
 {
-    if (words && name && a)
+    if (words && name)
     {
         fprintf(stderr, "%s:\n", name);
         for (size_t i = 0; i < words; i++)
@@ -138,7 +138,7 @@ maid_mp_cmp(size_t words, const maid_mp_word *a, const maid_mp_word *b)
 {
     s8 ret = 0;
 
-    if (words && a)
+    if (words)
     {
         volatile maid_mp_word x, y;
         volatile s8 none = 0;
@@ -369,10 +369,10 @@ maid_mp_div(size_t words, maid_mp_word *a,
             {
                 /* Does the same stuff, except with b = 1 */
                 volatile bool none = false;
-                for (size_t i = 0; i < words; i++)
+                for (size_t j = 0; j < words; j++)
                 {
-                    size_t ii = words - i - 1;
-                    if (tmp2[ii] < ((ii == 0) ? 0x01 : 0x00))
+                    size_t jj = words - j - 1;
+                    if (tmp2[jj] < ((jj == 0) ? 0x01 : 0x00))
                     {
                         if (sub)
                             sub = false;
@@ -382,8 +382,8 @@ maid_mp_div(size_t words, maid_mp_word *a,
                 }
                 (void)none;
 
-                for (size_t i = 0; i < words; i++)
-                    tmp2[i] = (i == 0) ? 0x01 : 0x00;
+                for (size_t j = 0; j < words; j++)
+                    tmp2[j] = (j == 0) ? 0x01 : 0x00;
             }
 
             maid_mp_shl(words, tmp2, ii);

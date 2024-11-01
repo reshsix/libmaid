@@ -561,19 +561,16 @@ aes_gcm_test(maid_aead *ae, char *key_h, char *nonce_h, char *ad_h,
         size_t length  = hex_read(output, output_h);
         size_t length2 = hex_read(ad,     ad_h);
 
-        if (ae)
-        {
-            maid_aead_renew(ae, key, nonce);
-            maid_aead_update(ae, ad, length2);
-            maid_aead_crypt(ae, input, length, false);
+        maid_aead_renew(ae, key, nonce);
+        maid_aead_update(ae, ad, length2);
+        maid_aead_crypt(ae, input, length, false);
 
-            u8 tag2[16] = {0};
-            maid_aead_digest(ae, tag2);
+        u8 tag2[16] = {0};
+        maid_aead_digest(ae, tag2);
 
-            if (memcmp(input, output, length)  == 0 &&
-                memcmp(tag2, tag, sizeof(tag)) == 0 )
-                ret = 1;
-        }
+        if (memcmp(input, output, length)  == 0 &&
+            memcmp(tag2, tag, sizeof(tag)) == 0 )
+            ret = 1;
     }
 
     return ret;

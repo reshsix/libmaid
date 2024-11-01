@@ -131,7 +131,7 @@ Diffie-Hellman group
 
 <details>
 <summary>const struct maid_kex_def maid_dh</summary>
-Diffie-Hellman key exchange (Finite field)
+Diffie-Hellman key exchange (IETF)
 
 ### Parameters
 
