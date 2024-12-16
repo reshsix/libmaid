@@ -6,7 +6,7 @@
 </div>
 
 ## ☕ About
-Version: **1.1**
+Version: **1.2 alpha**
 
 ## 🎬 Getting Started
 
@@ -44,3 +44,5 @@ sudo ldconfig
 | [Public-key primitives](docs/pub.md) | RSA                       |
 | [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |
 | [Key exchange](docs/kex.md)          | Diffie-Hellman            |
+|                                      |                           |
+| [Object import](docs/import.md)      | PEM, PKCS#1, PKCS#8       |
