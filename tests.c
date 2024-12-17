@@ -1415,7 +1415,7 @@ rsa_test(maid_pub *pub, maid_pub *prv, char *e_h, char *d_h, char *N_h,
 static u8
 rsa_tests(void)
 {
-    u8 ret = 1;
+    u8 ret = 2;
 
     u8 zeros[128] = {0};
     struct maid_rsa_key zkey = {.exponent = (void *)zeros,
@@ -1423,6 +1423,11 @@ rsa_tests(void)
 
     maid_pub *pub = maid_pub_new(maid_rsa_public,  &zkey, 1024);
     maid_pub *prv = maid_pub_new(maid_rsa_private, &zkey, 1024);
+
+    size_t bits = 0;
+    if (maid_pub_info(pub, &bits) == &maid_rsa_public  && bits == 1024 &&
+        maid_pub_info(prv, &bits) == &maid_rsa_private && bits == 1024)
+        ret -= 1;
 
     char *e[] =
         {"0000000000000000000000000000000000000000859e499b8a186c8ee6196954"
@@ -1475,8 +1480,7 @@ pkcs1_test(struct maid_sign_def def, maid_pub *pub, maid_pub *prv,
         hex_read(input,  input_h);
         hex_read(output, output_h);
 
-        maid_sign *s = maid_sign_new(def, (maid_pub *)0x1,
-                                          (maid_pub *)0x1, 2048);
+        maid_sign *s = maid_sign_new(def, pub, prv, 2048);
         maid_sign_renew(s, pub, prv);
 
         u8 tmp[256] = {0};

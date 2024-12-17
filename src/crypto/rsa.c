@@ -65,7 +65,7 @@ rsa_del(void *rsa)
 }
 
 extern void *
-rsa_new(u8 version, const void *key, size_t bits)
+rsa_new(const struct maid_pub_def *self, const void *key, size_t bits)
 {
     struct rsa *ret = NULL;
     if (bits && bits % (sizeof(maid_mp_word) * 8) == 0)
@@ -75,7 +75,7 @@ rsa_new(u8 version, const void *key, size_t bits)
     if (ret)
     {
         ret->bits = bits;
-        ret->private = (version != RSA_PUBLIC);
+        ret->private = (self != &maid_rsa_public);
 
         ret->words = maid_mp_words(ret->bits);
         size_t size = ret->words * sizeof(maid_mp_word);
@@ -131,12 +131,12 @@ const struct maid_pub_def maid_rsa_public =
 {
     .new   = rsa_new,   .del   = rsa_del,
     .renew = rsa_renew, .apply = rsa_apply,
-    .version = RSA_PUBLIC
+    .self = &maid_rsa_public
 };
 
 const struct maid_pub_def maid_rsa_private =
 {
     .new   = rsa_new,   .del   = rsa_del,
     .renew = rsa_renew, .apply = rsa_apply,
-    .version = RSA_PRIVATE
+    .self = &maid_rsa_private
 };

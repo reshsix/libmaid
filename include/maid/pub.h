@@ -24,11 +24,11 @@
 
 struct maid_pub_def
 {
-    void * (*new)(u8, const void *, size_t);
+    void * (*new)(const struct maid_pub_def *, const void *, size_t);
     void * (*del)(void *);
     void (*renew)(void *, const void *);
     void (*apply)(void *, u8 *);
-    u8 version;
+    const struct maid_pub_def *self;
 };
 
 /* External interface */
@@ -37,6 +37,7 @@ typedef struct maid_pub maid_pub;
 maid_pub *maid_pub_new(struct maid_pub_def def, const void *key, size_t bits);
 void maid_pub_renew(maid_pub *p, const void *key);
 maid_pub *maid_pub_del(maid_pub *p);
+const struct maid_pub_def *maid_pub_info(struct maid_pub *p, size_t *bits);
 void maid_pub_apply(maid_pub *p, u8 *buffer);
 
 /* External algorithms */

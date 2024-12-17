@@ -131,7 +131,10 @@ pkcs1_new(u8 version, maid_pub *public, maid_pub *private, size_t bits)
         size_t outl = ret->words * sizeof(maid_mp_word);
         ret->hash   = calloc(1, ret->hash_s);
         ret->buffer = calloc(1, outl);
-        if (ret->hash && ret->buffer)
+        size_t bt = 0;
+        if (ret->hash && ret->buffer &&
+            maid_pub_info(public,  &bt) == &maid_rsa_public  && bt == bits &&
+            maid_pub_info(private, &bt) == &maid_rsa_private && bt == bits)
         {
             ret->version = version;
             ret->public  = public;
