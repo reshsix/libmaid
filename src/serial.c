@@ -140,6 +140,80 @@ maid_pem_import(const char *input, const char **endptr)
     return ret;
 }
 
+extern char *
+maid_pem_export(struct maid_pem *p)
+{
+    char *ret = NULL;
+
+    const char *label = "UNKNOWN";
+    if (p && p->data && p->size)
+    {
+        switch (p->type)
+        {
+            case MAID_PEM_PUBLIC_RSA:
+                label = "RSA PUBLIC KEY";
+                break;
+            case MAID_PEM_PRIVATE_RSA:
+                label = "RSA PRIVATE KEY";
+                break;
+            case MAID_PEM_PUBLIC:
+                label = "PUBLIC KEY";
+                break;
+            case MAID_PEM_PRIVATE:
+                label = "PRIVATE KEY";
+                break;
+
+            default:
+                break;
+        }
+
+        size_t label_s = strlen(label);
+        if (label_s && label_s < 49)
+        {
+            size_t usage = 32 + (label_s * 2) + ((p->size * 4) / 3) +
+                           (p->size / 48) + 1 + 1;
+            ret = calloc(1, usage);
+        }
+    }
+
+    if (ret)
+    {
+        strcpy(ret, "-----BEGIN ");
+        strcat(ret, label);
+        strcat(ret, "-----\n");
+
+        u8 *in  = p->data;
+        char *out = &(ret[strlen(ret)]);
+        size_t size = p->size;
+        while (size)
+        {
+            size_t limit = (size > 48) ? 48 : size;
+            size_t written = maid_mem_export(in, limit, out, 64);
+
+            if (written == 0)
+            {
+                free(ret);
+                ret = NULL;
+                break;
+            }
+
+            out[written] = '\n';
+            in  = &(in[limit]);
+            out = &(out[written + 1]);
+            size -= limit;
+        }
+
+        if (ret)
+        {
+            strcat(ret, "-----END ");
+            strcat(ret, label);
+            strcat(ret, "-----\n");
+        }
+    }
+
+    return ret;
+}
+
 /* ASN.1 parsing */
 
 static u64
