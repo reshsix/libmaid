@@ -21,31 +21,31 @@
 #include <maid/mem.h>
 #include <maid/pub.h>
 
-#include <maid/import.h>
+#include <maid/serial.h>
 
-/* PEM to struct maid_import */
+/* PEM to struct maid_pem */
 
-extern struct maid_import *
-maid_import_free(struct maid_import *im)
+extern struct maid_pem *
+maid_pem_free(struct maid_pem *p)
 {
-    if (im)
+    if (p)
     {
-        maid_mem_clear(im->data, im->size);
-        free(im->data);
+        maid_mem_clear(p->data, p->size);
+        free(p->data);
     }
-    free(im);
+    free(p);
     return NULL;
 }
 
-extern struct maid_import *
-maid_import_pem(const char *input, const char **endptr)
+extern struct maid_pem *
+maid_pem_import(const char *input, const char **endptr)
 {
-    struct maid_import *ret = NULL;
+    struct maid_pem *ret = NULL;
 
     size_t limit = (input) ? (strlen(input) * 3) / 4 : 0;
     if (limit > 32)
     {
-        ret = calloc(1, sizeof(struct maid_import));
+        ret = calloc(1, sizeof(struct maid_pem));
         limit -= 32;
     }
 
@@ -119,18 +119,18 @@ maid_import_pem(const char *input, const char **endptr)
         if (ret->size)
         {
             if      (strcmp(label, "RSA PUBLIC KEY") == 0)
-                ret->type = MAID_IMPORT_PUBLIC_RSA;
+                ret->type = MAID_PEM_PUBLIC_RSA;
             else if (strcmp(label, "RSA PRIVATE KEY") == 0)
-                ret->type = MAID_IMPORT_PRIVATE_RSA;
+                ret->type = MAID_PEM_PRIVATE_RSA;
             else if (strcmp(label, "PUBLIC KEY") == 0)
-                ret->type = MAID_IMPORT_PUBLIC;
+                ret->type = MAID_PEM_PUBLIC;
             else if (strcmp(label, "PRIVATE KEY") == 0)
-                ret->type = MAID_IMPORT_PRIVATE;
+                ret->type = MAID_PEM_PRIVATE;
             else
-                ret->type = MAID_IMPORT_UNKNOWN;
+                ret->type = MAID_PEM_UNKNOWN;
         }
         else
-            ret = maid_import_free(ret);
+            ret = maid_pem_free(ret);
     }
 
     if (label)
@@ -341,62 +341,53 @@ maid_asn1_octet_string(u8 **output, const u8 *buffer, size_t size)
 
 /* PKCS parsing */
 
-static maid_pub *
-maid_pkcs1_public(struct maid_import *im)
+static enum maid_serial
+maid_pkcs1_public(struct maid_pem *p, size_t *bits, maid_mp_word **output)
 {
-    maid_pub *ret = NULL;
+    enum maid_serial ret = MAID_SERIAL_UNKNOWN;
 
-    size_t bits = 0;
-    struct maid_rsa_key key = {};
-
-    if (maid_asn1_check(0x30, im->data, im->size))
+    if (maid_asn1_check(0x30, p->data, p->size))
     {
-        size_t remain = im->size;
-        u8 *current = maid_asn1_enter(im->data, &remain);
+        size_t remain = p->size;
+        u8 *current = maid_asn1_enter(p->data, &remain);
 
         size_t words = 0;
-
-        key.modulo = maid_asn1_integer(&words, words, current, remain);
-        if (key.modulo)
+        output[0] = maid_asn1_integer(&words, words, current, remain);
+        if (output[0])
         {
             current = maid_asn1_advance(current, &remain);
-            key.exponent = maid_asn1_integer(NULL, words, current, remain);
-            if (key.exponent)
+            output[1] = maid_asn1_integer(NULL, words, current, remain);
+            if (output[1])
                 current = maid_asn1_advance(current, &remain);
         }
 
         if (remain == 0)
         {
-            bits = words * sizeof(maid_mp_word) * 8;
-            ret = maid_pub_new(maid_rsa_public, &key, bits);
+            ret = MAID_SERIAL_RSA_PUBLIC;
+            *bits = words * sizeof(maid_mp_word) * 8;
         }
-    }
-
-    if (bits)
-    {
-        maid_mem_clear(key.modulo,   bits / 8);
-        maid_mem_clear(key.exponent, bits / 8);
-
-        free(key.modulo);
-        free(key.exponent);
+        else
+        {
+            for (u8 i = 0; i < 2; i++)
+            {
+                free(output[i]);
+                output[i] = NULL;
+            }
+        }
     }
 
     return ret;
 }
 
-static maid_pub *
-maid_pkcs1_private(struct maid_import *im)
+static enum maid_serial
+maid_pkcs1_private(struct maid_pem *p, size_t *bits, maid_mp_word **output)
 {
-    maid_pub *ret = NULL;
+    enum maid_serial ret = MAID_SERIAL_UNKNOWN;
 
-    size_t bits = 0;
-    struct maid_rsa_key key = {};
-    maid_mp_word *params[7] = {NULL};
-
-    if (maid_asn1_check(0x30, im->data, im->size))
+    if (maid_asn1_check(0x30, p->data, p->size))
     {
-        size_t remain = im->size;
-        u8 *current = maid_asn1_enter(im->data, &remain);
+        size_t remain = p->size;
+        u8 *current = maid_asn1_enter(p->data, &remain);
 
         size_t words = 0;
 
@@ -405,47 +396,36 @@ maid_pkcs1_private(struct maid_import *im)
             current[1] == 0x01 && current[2] == 0x00)
         {
             current = maid_asn1_advance(current, &remain);
-            key.modulo = maid_asn1_integer(&words, words, current, remain);
+            output[0] = maid_asn1_integer(&words, words, current, remain);
         }
 
-        if (key.modulo)
+        if (output[0])
         {
             current = maid_asn1_advance(current, &remain);
-
-            for (size_t i = 0; i < sizeof(params)/sizeof(maid_mp_word *); i++)
+            for (u8 i = 1; i < 8; i++)
             {
-                if (i == 1)
-                {
-                    params[i] = maid_asn1_integer(NULL, words,
-                                                  current, remain);
-                    if (params[i])
-                        current = maid_asn1_advance(current, &remain);
-                    else
-                        break;
-                }
+                output[i] = maid_asn1_integer(NULL, words,
+                                              current, remain);
+                if (output[i])
+                    current = maid_asn1_advance(current, &remain);
                 else
-                    if (maid_asn1_check(0x02, current, remain))
-                        current = maid_asn1_advance(current, &remain);
-                    else
-                        break;
+                    break;
             }
         }
 
         if (remain == 0)
         {
-            key.exponent = params[1];
-            bits = words * sizeof(maid_mp_word) * 8;
-            ret = maid_pub_new(maid_rsa_private, &key, bits);
+            ret = MAID_SERIAL_RSA_PRIVATE;
+            *bits = words * sizeof(maid_mp_word) * 8;
         }
-    }
-
-    if (bits)
-    {
-        maid_mem_clear(key.modulo,   bits / 8);
-        maid_mem_clear(key.exponent, bits / 8);
-
-        free(key.modulo);
-        free(key.exponent);
+        else
+        {
+            for (u8 i = 0; i < 8; i++)
+            {
+                free(output[i]);
+                output[i] = NULL;
+            }
+        }
     }
 
     return ret;
@@ -453,15 +433,16 @@ maid_pkcs1_private(struct maid_import *im)
 
 /* "Public key PKCS8" is actually X.509 SPKI,
  * but it's easier to call it that */
-static maid_pub *
-maid_pkcs8(struct maid_import *im, bool private)
+static enum maid_serial
+maid_pkcs8(struct maid_pem *p, size_t *bits,
+           maid_mp_word **output, bool private)
 {
-    maid_pub *ret = NULL;
+    enum maid_serial ret = MAID_SERIAL_UNKNOWN;
 
-    if (maid_asn1_check(0x30, im->data, im->size))
+    if (maid_asn1_check(0x30, p->data, p->size))
     {
-        size_t remain = im->size;
-        u8 *current = maid_asn1_enter(im->data, &remain);
+        size_t remain = p->size;
+        u8 *current = maid_asn1_enter(p->data, &remain);
 
         /* Only version 0 supported (on private key) */
         if (!private || (maid_asn1_check(0x02, current, remain) &&
@@ -480,7 +461,7 @@ maid_pkcs8(struct maid_import *im, bool private)
                 {
                     current = maid_asn1_advance(current, &remain);
 
-                    struct maid_import im2 = {.type = MAID_IMPORT_UNKNOWN};
+                    struct maid_pem p2 = {.type = MAID_PEM_UNKNOWN};
 
                     const u8 rsa_oid[] = {0x2A, 0x86, 0x48, 0x86,
                                           0xF7, 0x0D, 0x01, 0x01, 0x01};
@@ -492,33 +473,33 @@ maid_pkcs8(struct maid_import *im, bool private)
 
                             if (!private)
                             {
-                                im2.size = maid_asn1_bit_string
-                                               (&(im2.data), current, remain);
-                                if (im2.size)
+                                p2.size = maid_asn1_bit_string
+                                              (&(p2.data), current, remain);
+                                if (p2.size)
                                 {
                                     current = maid_asn1_enter(current,
                                                               &remain);
-                                    if (im2.size + 1 == remain)
-                                        im2.type = MAID_IMPORT_PUBLIC_RSA;
+                                    if (p2.size + 1 == remain)
+                                        p2.type = MAID_PEM_PUBLIC_RSA;
                                 }
                             }
                             else
                             {
-                                im2.size = maid_asn1_octet_string
-                                               (&(im2.data), current, remain);
-                                if (im2.size)
+                                p2.size = maid_asn1_octet_string
+                                               (&(p2.data), current, remain);
+                                if (p2.size)
                                 {
                                     current = maid_asn1_enter(current,
                                                               &remain);
-                                    if (im2.size == remain)
-                                        im2.type = MAID_IMPORT_PRIVATE_RSA;
+                                    if (p2.size == remain)
+                                        p2.type = MAID_PEM_PRIVATE_RSA;
                                 }
                             }
                         }
                     }
 
-                    if (im2.type != MAID_IMPORT_UNKNOWN)
-                        ret = maid_import_pub(&im2);
+                    if (p2.type != MAID_PEM_UNKNOWN)
+                        ret = maid_serial_import(&p2, bits, output);
                 }
             }
         }
@@ -527,31 +508,31 @@ maid_pkcs8(struct maid_import *im, bool private)
     return ret;
 }
 
-/* Struct maid_import to Primitives */
+/* Struct maid_pem to maid_serials */
 
-extern maid_pub *
-maid_import_pub(struct maid_import *im)
+extern enum maid_serial
+maid_serial_import(struct maid_pem *p, size_t *bits, maid_mp_word **output)
 {
-    maid_pub *ret = NULL;
+    enum maid_serial ret = MAID_SERIAL_UNKNOWN;
 
-    if (im)
+    if (p)
     {
-        switch (im->type)
+        switch (p->type)
         {
-            case MAID_IMPORT_PUBLIC_RSA:
-                ret = maid_pkcs1_public(im);
+            case MAID_PEM_PUBLIC_RSA:
+                ret = maid_pkcs1_public(p, bits, output);
                 break;
 
-            case MAID_IMPORT_PRIVATE_RSA:
-                ret = maid_pkcs1_private(im);
+            case MAID_PEM_PRIVATE_RSA:
+                ret = maid_pkcs1_private(p, bits, output);
                 break;
 
-            case MAID_IMPORT_PUBLIC:
-                ret = maid_pkcs8(im, false);
+            case MAID_PEM_PUBLIC:
+                ret = maid_pkcs8(p, bits, output, false);
                 break;
 
-            case MAID_IMPORT_PRIVATE:
-                ret = maid_pkcs8(im, true);
+            case MAID_PEM_PRIVATE:
+                ret = maid_pkcs8(p, bits, output, true);
                 break;
 
             default:

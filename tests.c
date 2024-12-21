@@ -33,7 +33,7 @@
 #include <maid/sign.h>
 #include <maid/kex.h>
 
-#include <maid/import.h>
+#include <maid/serial.h>
 
 /* Helper functions */
 
@@ -1792,7 +1792,7 @@ dh_tests(void)
 /* PEM encoding RFC 7468 examples, and OpenSSL generated keys */
 
 static u8
-import_tests(void)
+serial_tests(void)
 {
     u8 ret = 8;
 
@@ -1818,7 +1818,7 @@ import_tests(void)
         "Nkn3Eos8EiZByi9DVsyfy9eejh+8AXgp\n"
         "-----END RSA PRIVATE KEY-----\n";
 
-    u8 cert_type = MAID_IMPORT_PUBLIC_RSA;
+    u8 cert_type = MAID_PEM_PUBLIC_RSA;
     u8 cert_data[] =
         {0x30, 0x82, 0x01, 0x99, 0x30, 0x82, 0x01, 0x47, 0xa0, 0x03, 0x02,
          0x01, 0x02, 0x02, 0x01, 0x2a, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e,
@@ -1859,7 +1859,7 @@ import_tests(void)
          0x09, 0x21, 0xe1, 0x55, 0x00, 0x47, 0x12, 0x9d, 0xae, 0x41, 0xd5,
          0xc9, 0x07, 0xe7, 0x79, 0x07, 0x28};
 
-    u8 key_type = MAID_IMPORT_PRIVATE_RSA;
+    u8 key_type = MAID_PEM_PRIVATE_RSA;
     u8 key_data[] =
         {0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d,
          0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22, 0x03, 0x62,
@@ -1879,11 +1879,11 @@ import_tests(void)
     int i = 0;
     do
     {
-        struct maid_import *im = maid_import_pem(current, &endptr);
+        struct maid_pem *p = maid_pem_import(current, &endptr);
 
-        if (im)
+        if (p)
         {
-            u8 type = MAID_IMPORT_UNKNOWN;
+            u8 type = MAID_PEM_UNKNOWN;
             u8 *data = NULL;
             size_t size = 0;
 
@@ -1903,15 +1903,15 @@ import_tests(void)
 
             if (i < 2)
             {
-                ret -= im->type == type;
-                ret -= memcmp(im->data, data, size) == 0;
-                ret -= im->size == size;
+                ret -= p->type == type;
+                ret -= memcmp(p->data, data, size) == 0;
+                ret -= p->size == size;
             }
         }
         else
             break;
 
-        maid_import_free(im);
+        maid_pem_free(p);
         current = endptr;
         i++;
     } while (endptr && *endptr != '\0');
@@ -1972,16 +1972,38 @@ import_tests(void)
     for (u8 i = 0; i < 2; i++)
     {
         const char *endptr = NULL;
-        struct maid_import *im  = maid_import_pem(pubs[i], &endptr);
-        struct maid_import *im2 = maid_import_pem(prvs[i], &endptr);
+        struct maid_pem *p  = maid_pem_import(pubs[i], &endptr);
+        struct maid_pem *p2 = maid_pem_import(prvs[i], &endptr);
 
         u8 buffer[64] = {0};
         maid_pub *pub = NULL, *prv = NULL;
         maid_sign *s = NULL;
-        if (im && im2)
+        if (p && p2)
         {
-            pub = maid_import_pub(im);
-            prv = maid_import_pub(im2);
+            size_t bits = 0;
+            maid_mp_word *data[7] = {NULL};
+
+            enum maid_serial type = maid_serial_import(p, &bits, data);
+            if (type == MAID_SERIAL_RSA_PUBLIC)
+            {
+                struct maid_rsa_key k = {.modulo   = data[0],
+                                         .exponent = data[1]};
+                pub = maid_pub_new(maid_rsa_public, &k, bits);
+            }
+
+            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word); i++)
+                free(data[i]);
+
+            type = maid_serial_import(p2, &bits, data);
+            if (type == MAID_SERIAL_RSA_PRIVATE)
+            {
+                struct maid_rsa_key k = {.modulo   = data[0],
+                                         .exponent = data[2]};
+                prv = maid_pub_new(maid_rsa_private, &k, bits);
+            }
+
+            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word); i++)
+                free(data[i]);
         }
         if (pub && prv)
             s = maid_sign_new(maid_pkcs1_v1_5_sha256, pub, prv, 512);
@@ -1994,8 +2016,8 @@ import_tests(void)
                 ret -= memcmp(buffer, hash, sizeof(hash)) == 0;
         }
 
-        maid_import_free(im);
-        maid_import_free(im2);
+        maid_pem_free(p);
+        maid_pem_free(p2);
         maid_pub_del(pub);
         maid_pub_del(prv);
         maid_sign_del(s);
@@ -2037,7 +2059,7 @@ main(void)
 
     /* Interfaces */
 
-    ret += import_tests();
+    ret += serial_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
