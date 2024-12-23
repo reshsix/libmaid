@@ -224,7 +224,7 @@ mp_tests(void)
     u8 ret = 64;
 
     size_t words = maid_mp_words(128);
-    ret -= (sizeof(maid_mp_word) == 4) ? (words == 4) : (words == 2);
+    ret -= (words == 2);
 
     u8 val[] = {
     /* a */            0xc0, 0xd1, 0xf1, 0xed, 0x00, 0x11, 0xb1, 0xd0,
@@ -1976,7 +1976,7 @@ serial_tests(void)
                 pub = maid_pub_new(maid_rsa_public, &k, bits);
             }
 
-            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word); i++)
+            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
                 free(data[i]);
 
             type = maid_serial_import(p2, &bits, data);
@@ -1987,7 +1987,7 @@ serial_tests(void)
                 prv = maid_pub_new(maid_rsa_private, &k, bits);
             }
 
-            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word); i++)
+            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
                 free(data[i]);
         }
         if (pub && prv)

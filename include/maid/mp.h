@@ -20,11 +20,7 @@
 
 #include <maid/types.h>
 
-#ifdef __SIZEOF_INT128__
 typedef u64 maid_mp_word;
-#else
-typedef u32 maid_mp_word;
-#endif
 
 size_t maid_mp_words(size_t bits);
 

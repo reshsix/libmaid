@@ -22,20 +22,10 @@
 
 #include <maid/mp.h>
 
-#ifdef __SIZEOF_INT128__
-typedef unsigned __int128 maid_mp_word2;
-typedef signed   __int128 maid_mp_word2s;
 const char *maid_mp_fmt = "%016lx";
-#else
-typedef u64 maid_mp_word2;
-typedef s64 maid_mp_word2s;
-const char *maid_mp_fmt = "%08x";
-#endif
-
 static const size_t maid_mp_bits  = sizeof(maid_mp_word) * 8;
 static const size_t maid_mp_bytes = sizeof(maid_mp_word) * 1;
-static const maid_mp_word maid_mp_max =
-    (((maid_mp_word2)1ULL) << maid_mp_bits) - 1;
+static const maid_mp_word maid_mp_max = -1;
 
 extern size_t
 maid_mp_words(size_t bits)
@@ -188,15 +178,17 @@ maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        volatile maid_mp_word2 carry = 0;
+        volatile u8 carry = 0;
 
         for (size_t i = 0; i < words; i++)
         {
-            carry += a[i];
-            carry += (b) ? b[i] : 0x0;
+            volatile maid_mp_word val = (b ? b[i] : 0);
 
-            a[i] = carry & maid_mp_max;
-            carry >>= maid_mp_bits;
+            a[i] += val;
+            a[i] += carry;
+            carry = (carry) ? (a[i] <= val) : (a[i] < val);
+
+            val = 0;
         }
 
         carry = 0;
@@ -208,15 +200,19 @@ maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        volatile maid_mp_word2s carry = 0;
+        volatile u8 carry = 0;
 
         for (size_t i = 0; i < words; i++)
         {
-            carry += a[i];
-            carry -= (b) ? b[i] : 0x0;
+            volatile maid_mp_word org = a[i];
+            volatile maid_mp_word val = (b ? b[i] : 0);
 
-            a[i] = carry & maid_mp_max;
-            carry >>= maid_mp_bits;
+            a[i] -= val;
+            a[i] -= carry;
+            carry = (carry) ? (a[i] >= org) : (a[i] > org);
+
+            org = 0;
+            val = 0;
         }
 
         carry = 0;
@@ -302,44 +298,82 @@ maid_mp_sar(size_t words, maid_mp_word *a, size_t shift)
     }
 }
 
-extern void
-maid_mp_mul(size_t words, maid_mp_word *a,
-            const maid_mp_word *b, maid_mp_word *tmp)
+static void
+maid_mp_mul_long(size_t words, maid_mp_word *a,
+                 const maid_mp_word *b, maid_mp_word *tmp, bool halve)
 {
     if (words && a && tmp)
     {
+        /* Halving optimizes mulmod, no need to consider odd words */
+        size_t words2 = words;
+        if (halve)
+            words /= 2;
+
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
 
-        volatile maid_mp_word2 mul = 0;
         for (size_t i = 0; i < words; i++)
         {
             for (size_t j = 0; j < words; j++)
             {
                 size_t idx = (i + j);
-                mul  = tmp[i];
-                mul *= (b) ? b[j] : (j == 0);
+                volatile maid_mp_word val = (b) ? b[j] : (j == 0);
 
-                if (idx < words)
+                size_t half    = maid_mp_bits / 2;
+                maid_mp_word mask = maid_mp_max >> half;
+
+                volatile maid_mp_word x = tmp[i] >> half;
+                volatile maid_mp_word y = tmp[i] &  mask;
+                volatile maid_mp_word z = val    >> half;
+                volatile maid_mp_word w = val    &  mask;
+
+                volatile maid_mp_word xz = x * z;
+                volatile maid_mp_word xw = x * w;
+                volatile maid_mp_word yz = y * z;
+                volatile maid_mp_word yw = y * w;
+
+                volatile u8 carry = 0;
+                volatile maid_mp_word low = yw;
+                volatile maid_mp_word org = low;
+                low   += xw << half;
+                carry += (low < org);
+                org   = low;
+                low   += yz << half;
+                carry += (low < org);
+                volatile maid_mp_word high = xz + (xw >> half) +
+                                             (yz >> half) + carry;
+
+                if (idx < words2)
                 {
-                    volatile maid_mp_word2 carry = 0;
-                    for (size_t k = idx; k < words; k++)
-                    {
-                        carry += a[k];
-                        if (k == idx)
-                            carry += mul & maid_mp_max;
-                        else if (k == (idx + 1))
-                            carry += mul >> maid_mp_bits;
+                    volatile u8 carry = 0;
 
-                        a[k] = carry & maid_mp_max;
-                        carry >>= maid_mp_bits;
+                    for (size_t k = idx; k < words2; k++)
+                    {
+                        volatile maid_mp_word val = 0;
+                        if (k == idx)
+                            val = low;
+                        else if (k == (idx + 1))
+                            val = high;
+
+                        a[k] += val;
+                        a[k] += carry;
+                        carry = (carry) ? (a[k] <= val) : (a[k] < val);
+
+                        val = 0;
                     }
+
                     carry = 0;
                 }
             }
         }
-        mul = 0;
     }
+}
+
+extern void
+maid_mp_mul(size_t words, maid_mp_word *a,
+            const maid_mp_word *b, maid_mp_word *tmp)
+{
+    maid_mp_mul_long(words, a, b, tmp, false);
 }
 
 extern void
@@ -507,9 +541,9 @@ maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         maid_mp_mov(words, &(mod2[words]), NULL);
 
         if (b)
-            maid_mp_mul(words * 2, a2, b2, tmp2);
+            maid_mp_mul_long(words * 2, a2, b2, tmp2, true);
         else
-            maid_mp_mul(words * 2, a2, NULL, tmp2);
+            maid_mp_mul_long(words * 2, a2, NULL, tmp2, true);
 
         maid_mp_mod(words * 2, a2, mod2, tmp2);
         maid_mp_mov(words, a, a2);
@@ -753,7 +787,7 @@ maid_mp_mont_mulmod(size_t words, maid_mp_word *ma, const maid_mp_word *mb,
         maid_mp_mov(words,     &(b2[words]),   NULL);
         maid_mp_mov(words,     &(mod2[words]), NULL);
 
-        maid_mp_mul(words * 2, a2, (mb) ? b2 : NULL, tmp2);
+        maid_mp_mul_long(words * 2, a2, (mb) ? b2 : NULL, tmp2, true);
 
         maid_mp_mov(words, &(imod2[words]), NULL);
         maid_mp_mov(words, imod2, imod);
@@ -763,7 +797,7 @@ maid_mp_mont_mulmod(size_t words, maid_mp_word *ma, const maid_mp_word *mb,
 
         maid_mp_mul(words * 1, acc, a2, tmp2);
         maid_mp_mov(words + 1, &(acc[words]), NULL);
-        maid_mp_mul(words * 2, acc, mod2, tmp2);
+        maid_mp_mul_long(words * 2, acc, mod2, tmp2, true);
         maid_mp_add((words * 2) + 1, acc, a2);
         maid_mp_shr((words * 2) + 1, acc, words * maid_mp_bits);
 
