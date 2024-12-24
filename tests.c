@@ -221,7 +221,7 @@ tmp_check(size_t words, maid_mp_word *tmp, size_t used, size_t total)
 static u8
 mp_tests(void)
 {
-    u8 ret = 64;
+    u8 ret = 65;
 
     size_t words = maid_mp_words(128);
     ret -= (words == 2);
@@ -379,6 +379,88 @@ mp_tests(void)
 
     MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, 49, false);
     MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, 49, true);
+
+    /* Generators */
+    u8 entropy[32] = {0};
+    maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
+
+    /* Checks if the amount of set bits is a normal distribution,
+     * and if the constraints (range or primality) are fulfilled */
+    size_t fails = 0;
+    for (u8 y = 0; y < 3; y++)
+    {
+        u8 low = 0, high = 0;
+        size_t set = 0;
+        for (u16 x = 0; x < 100; x++)
+        {
+            switch (y)
+            {
+                case 0:
+                    maid_mp_random(words, a, g, 128);
+                    low = 50;
+                    high = 80;
+                    break;
+                case 1:
+                    maid_mp_mov(words, b, NULL);
+                    b[0] = 1ULL << 16;
+                    maid_mp_mov(words, c, NULL);
+                    c[1] = 1ULL << 32;
+
+                    maid_mp_random2(words, a, g, b, c, tmp);
+                    if (maid_mp_cmp(words, a, b) > 0 ||
+                        maid_mp_cmp(words, a, c) < 0)
+                        fails++;
+
+                    low = 35;
+                    high = 60;
+                    break;
+                case 2:
+                    maid_mp_prime(words, a, g, 64, 16, tmp);
+                    maid_mp_prime(words, b, g, 64, 16, tmp);
+
+                    /* c = ab */
+                    maid_mp_mov(words, c, a);
+                    maid_mp_mul(words, c, b, tmp);
+
+                    /* b = tot(ab) */
+                    maid_mp_mov(words, d, a);
+                    maid_mp_mov(words, z, NULL);
+                    z[0] = 1;
+                    maid_mp_sub(words, b, z);
+                    maid_mp_sub(words, d, z);
+                    maid_mp_mul(words, b, d, tmp);
+
+                    /* 2^tot(ab) % ab = 1 */
+                    z[0] = 2;
+                    maid_mp_expmod(words, z, b, c, tmp, false);
+                    maid_mp_mov(words, c, NULL);
+                    c[0] = 1;
+                    if (maid_mp_cmp(words, z, c) != 0)
+                        fails++;
+
+                    low = 20;
+                    high = 45;
+                    break;
+            }
+
+            size_t iset = 0;
+            for (size_t i = 0; i < words; i++)
+                for (u8 j = 0; j < sizeof(maid_mp_word) * 8; j++)
+                    if (a[i] & (1ULL << j))
+                        iset++;
+
+            if (iset <= low && iset >= high)
+                fails++;
+            set += iset;
+        }
+
+        set /= 100;
+        size_t mid = low + ((high - low) / 2);
+        if (set < mid - 1 && set > mid + 1)
+            fails++;
+    }
+    if (!fails)
+        ret -= 1;
 
     return ret;
 }

@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include <maid/mem.h>
+#include <maid/rng.h>
 
 #include <maid/mp.h>
 
@@ -914,5 +915,299 @@ maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
         bit = false;
 
         maid_mp_mont_out(words, a, mod, imod, tmp2);
+    }
+}
+
+extern void
+maid_mp_random(size_t words, maid_mp_word *a, maid_rng *g, size_t bits)
+{
+    if (words && a && g && bits)
+    {
+        maid_mp_word mask = -1;
+        size_t bits2 = maid_mp_bits * words;
+        if (bits2 < bits)
+            bits = bits2;
+        else
+            mask >>= bits2 - bits;
+        size_t bytes = (bits / 8)            + ((bits %            8) ? 1 : 0);
+        size_t last  = (bits / maid_mp_bits) - ((bits % maid_mp_bits) ? 0 : 1);
+
+        maid_mp_mov(words, a, NULL);
+        maid_rng_generate(g, (u8*)a, bytes);
+
+        a[last] &= mask;
+    }
+}
+
+extern void
+maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
+                const maid_mp_word *low, const maid_mp_word *high,
+                maid_mp_word *tmp)
+{
+    if (words && a && g && tmp)
+    {
+        maid_mp_random(words, a, g, words * maid_mp_bits);
+
+        maid_mp_word *a2   = &(tmp[words * 0]);
+        maid_mp_word *b2   = &(tmp[words * 2]);
+        maid_mp_word *tmp2 = &(tmp[words * 4]);
+
+        maid_mp_mov(words * 2, a2, NULL);
+        maid_mp_mov(words * 2, b2, NULL);
+
+        maid_mp_mov(words, a2, a);
+        maid_mp_mov(words, b2, high);
+        maid_mp_sub(words, b2, low);
+        maid_mp_mul(words * 2, a2, b2, tmp2);
+
+        /* Same as division by 0x10000... */
+        maid_mp_mov(words, a, &(a2[words]));
+        maid_mp_add(words, a, low);
+    }
+}
+
+static bool
+maid_mp_fastgcd1(size_t words, const maid_mp_word *a,
+                 const maid_mp_word *b, maid_mp_word *tmp)
+{
+    /* Returns GCD(a, b) == 1 in non-constant time */
+
+    bool ret = false;
+
+    if (words && a && b)
+    {
+        maid_mp_word *a2   = &(tmp[words * 0]);
+        maid_mp_word *b2   = &(tmp[words * 1]);
+        maid_mp_word *zero = &(tmp[words * 2]);
+        maid_mp_word *or   = &(tmp[words * 3]);
+
+        maid_mp_mov(words, a2, a);
+        maid_mp_mov(words, b2, b);
+        maid_mp_mov(words, zero, NULL);
+
+        if (maid_mp_cmp(words, a, zero) != 0 &&
+            maid_mp_cmp(words, b, zero) != 0)
+        {
+            volatile size_t k = 0;
+
+            while (true)
+            {
+                maid_mp_mov(words, or, a2);
+                maid_mp_orr(words, or, b2);
+                if (!(or[0] & 0x1))
+                {
+                    maid_mp_shr(words, a2, 1);
+                    maid_mp_shr(words, b2, 1);
+                    k++;
+                }
+                else
+                    break;
+            }
+
+            while (!(a2[0] & 0x1))
+                maid_mp_shr(words, a2, 1);
+
+            while (maid_mp_cmp(words, b2, zero) != 0)
+            {
+                while (!(b2[0] & 0x1))
+                    maid_mp_shr(words, b2, 1);
+
+                if (maid_mp_cmp(words, a2, b2) < 0)
+                {
+                    maid_mp_mov(words, or, a2);
+                    maid_mp_mov(words, a2, b2);
+                    maid_mp_mov(words, b2, or);
+                }
+
+                maid_mp_sub(words, b2, a2);
+            }
+
+            zero[0] = 1;
+            if (k == 0 && maid_mp_cmp(words, a2, zero) == 0)
+                ret = true;
+
+            k = 0;
+        }
+    }
+
+    return ret;
+}
+
+
+static bool
+maid_mp_sprp(size_t words, const maid_mp_word *a, maid_rng *g,
+             size_t rounds, maid_mp_word *tmp)
+{
+    bool ret = false;
+
+    /* Not constant time, as it's very slow and unnecessary here */
+    if (words && a && g && rounds && tmp)
+    {
+        volatile bool finished = false;
+
+        /* Tests if odd or even */
+        ret = a[0] & 0x1;
+        if (!ret)
+            finished = true;
+
+        /* Checks if it's 1 (non-prime) or 2 (prime) */
+        maid_mp_word *check = &(tmp[words * 0]);
+        maid_mp_mov(words, check, NULL);
+        check[0] = (ret) ? 0x01 : 0x02;
+        if (maid_mp_cmp(words, a, check) == 0)
+        {
+            ret = !ret;
+            finished = true;
+        }
+
+        /* Does a trial division test with small primes */
+        if (!finished)
+        {
+            /* Product of primes from 3 to 751 (from SP800-89) */
+            const u8 sp[] =
+                {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
+                 0x13, 0x8e, 0x8a, 0x0f, 0xcf, 0x3a, 0x4e, 0x84,
+                 0xa7, 0x71, 0xd4, 0x0f, 0xd3, 0x05, 0xd7, 0xf4,
+                 0xaa, 0x59, 0x30, 0x6d, 0x72, 0x51, 0xde, 0x54,
+                 0xd9, 0x8a, 0xf8, 0xfe, 0x95, 0x72, 0x9a, 0x1f,
+                 0x73, 0xd8, 0x93, 0xfa, 0x42, 0x4c, 0xd2, 0xed,
+                 0xc8, 0x63, 0x6a, 0x6c, 0x32, 0x85, 0xe0, 0x22,
+                 0xb0, 0xe3, 0x86, 0x6a, 0x56, 0x5a, 0xe8, 0x10,
+                 0x8e, 0xed, 0x85, 0x91, 0xcd, 0x4f, 0xe8, 0xd2,
+                 0xce, 0x86, 0x16, 0x5a, 0x97, 0x8d, 0x71, 0x9e,
+                 0xbf, 0x64, 0x7f, 0x36, 0x2d, 0x33, 0xfc, 0xa2,
+                 0x9c, 0xd1, 0x79, 0xfb, 0x42, 0x40, 0x1c, 0xba,
+                 0xf3, 0xdf, 0x0c, 0x61, 0x40, 0x56, 0xf9, 0xc8,
+                 0xf3, 0xcf, 0xd5, 0x1e, 0x47, 0x4a, 0xfb, 0x6b,
+                 0xc6, 0x97, 0x4f, 0x78, 0xdb, 0x8a, 0xba, 0x8e,
+                 0x9e, 0x51, 0x7f, 0xde, 0xd6, 0x58, 0x59, 0x1a,
+                 0xb7, 0x50, 0x2b, 0xd4, 0x18, 0x49, 0x46, 0x2f};
+            u8 sp_words = maid_mp_words(sizeof(sp) * 8);
+            if (words > sp_words)
+                sp_words = words;
+
+            maid_mp_word *p    = &(tmp[words * 0]);
+            maid_mp_mov(sp_words, p, NULL);
+            p[0] = 741;
+
+            if (maid_mp_cmp(words, a, p) < 0)
+            {
+                maid_mp_word *p2   = &(tmp[sp_words * 0]);
+                maid_mp_word *a2   = &(tmp[sp_words * 1]);
+                maid_mp_word *one  = &(tmp[sp_words * 2]);
+                maid_mp_word *tmp2 = &(tmp[sp_words * 3]);
+
+                maid_mp_read(sp_words, p2, sp, true);
+                maid_mp_mov(sp_words, a2, NULL);
+                maid_mp_mov(words, a2, a);
+                maid_mp_mov(sp_words, one, NULL);
+                one[0] = 1;
+
+                if (!maid_mp_fastgcd1(words, a2, p2, tmp2))
+                {
+                    ret = false;
+                    finished = true;
+                }
+            }
+        }
+
+        /* Does a probabilistic Miller-Rabin test */
+        if (!finished)
+        {
+            maid_mp_word *m    = &(tmp[words * 0]);
+            maid_mp_word *one  = &(tmp[words * 1]);
+            maid_mp_word *low  = &(tmp[words * 2]);
+            maid_mp_word *high = &(tmp[words * 3]);
+            maid_mp_word *b    = &(tmp[words * 4]);
+            maid_mp_word *b2   = &(tmp[words * 5]);
+            maid_mp_word *tmp2 = &(tmp[words * 6]);
+
+            maid_mp_mov(words, m, a);
+            maid_mp_mov(words, one, NULL);
+            one[0] = 0x1;
+            maid_mp_sub(words, m, one);
+
+            maid_mp_mov(words, low, NULL);
+            low[0] = 0x2;
+            maid_mp_mov(words, high, m);
+
+            volatile size_t r = 0, c = 0;
+            for (size_t i = 0; i < words; i++)
+            {
+                r  = m[i] & -m[i];
+                c  = i;
+
+                if (a[i] != 0)
+                    break;
+            }
+
+            volatile size_t k = 0;
+            for (size_t i = 0; i < maid_mp_bits; i++)
+            {
+                if (r <= 1)
+                    break;
+
+                r >>= 1;
+                k++;
+            }
+            k += c * maid_mp_bits;
+            r = 0, c = 0;
+            maid_mp_shr(words, m, k);
+
+            for (size_t i = 0; ret && i < rounds; i++)
+            {
+                maid_mp_random2(words, b, g, low, high, tmp2);
+                maid_mp_expmod2(words, b, m, a, tmp2, false);
+
+                if (maid_mp_cmp(words, b, one)  == 0 ||
+                    maid_mp_cmp(words, b, high) == 0)
+                    continue;
+
+                for (size_t j = 0; j < (k - 1); j++)
+                {
+                    maid_mp_mov(words, b2, b);
+                    maid_mp_mulmod(words, b, b2, a, tmp2);
+
+                    if (maid_mp_cmp(words, b, high) == 0)
+                    {
+                        finished = true;
+                        break;
+                    }
+                }
+
+                if (!finished)
+                {
+                    ret = false;
+                    break;
+                }
+                finished = false;
+            }
+            k = 0;
+        }
+
+        finished = false;
+    }
+
+    return ret;
+}
+
+extern void
+maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
+              size_t bits, size_t safety, maid_mp_word *tmp)
+{
+    if (words && a && g && safety && tmp)
+    {
+        maid_mp_mov(words, a, NULL);
+
+        size_t words2 = maid_mp_words(bits);
+        if (words2 < words)
+            words = words2;
+
+        do
+        {
+            maid_mp_random(words, a, g, bits);
+            a[0] |= 1;
+        }
+        while (!maid_mp_sprp(words, a, g, safety / 2, tmp));
     }
 }

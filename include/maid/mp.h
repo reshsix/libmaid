@@ -70,4 +70,12 @@ void maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
                      const maid_mp_word *mod, maid_mp_word *tmp,
                      bool constant);
 
+#include <maid/rng.h>
+void maid_mp_random(size_t words, maid_mp_word *a, maid_rng *g, size_t bits);
+void maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
+                     const maid_mp_word *low, const maid_mp_word *high,
+                     maid_mp_word *tmp);
+void maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
+                   size_t bits, size_t safety, maid_mp_word *tmp);
+
 #endif
