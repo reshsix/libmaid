@@ -34,8 +34,7 @@ maid_sign_new(struct maid_sign_def def, maid_pub *public,
               maid_pub *private, size_t bits)
 {
     struct maid_sign *ret = NULL;
-    if (public || private)
-        ret = calloc(1, sizeof(struct maid_sign));
+    ret = calloc(1, sizeof(struct maid_sign));
 
     if (ret)
     {
@@ -54,8 +53,13 @@ maid_sign_new(struct maid_sign_def def, maid_pub *public,
 extern void
 maid_sign_renew(struct maid_sign *s, maid_pub *public, maid_pub *private)
 {
-    if (s && (public || private))
+    if (s)
+    {
+        s->generate = (bool)private;
+        s->verify   = (bool)public;
+
         s->def.renew(s->context, public, private);
+    }
 }
 
 extern struct maid_sign *

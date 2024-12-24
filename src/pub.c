@@ -24,7 +24,6 @@ struct maid_pub
 {
     struct maid_pub_def def;
     void *context;
-    size_t bits;
 };
 
 extern struct maid_pub *
@@ -37,10 +36,8 @@ maid_pub_new(struct maid_pub_def def, const void *key, size_t bits)
     if (ret)
     {
         memcpy(&(ret->def), &def, sizeof(struct maid_pub_def));
-        ret->context = def.new(def.self, key, bits);
-        if (ret->context)
-            ret->bits = bits;
-        else
+        ret->context = def.new(def.version, key, bits);
+        if (!(ret->context))
             ret = maid_pub_del(ret);
     }
 
@@ -62,22 +59,6 @@ maid_pub_del(struct maid_pub *p)
     free(p);
 
     return NULL;
-}
-
-extern const struct maid_pub_def *
-maid_pub_info(struct maid_pub *p, size_t *bits)
-{
-    const struct maid_pub_def *ret = NULL;
-
-    if (p)
-    {
-        if (bits)
-            *bits = p->bits;
-
-        ret = p->def.self;
-    }
-
-    return ret;
 }
 
 extern void
