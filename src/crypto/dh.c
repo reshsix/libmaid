@@ -25,9 +25,7 @@
 struct dh
 {
     size_t bits, words;
-
     struct maid_dh_group group;
-    maid_mp_word *buf, *buf2, *tmp;
 };
 
 extern void *
@@ -40,15 +38,9 @@ dh_del(void *dh)
 
         maid_mem_clear(d->group.generator, size);
         maid_mem_clear(d->group.modulo,    size);
-        maid_mem_clear(d->buf,  size);
-        maid_mem_clear(d->buf2, size);
-        maid_mem_clear(d->tmp,  size * 49);
 
         free(d->group.generator);
         free(d->group.modulo);
-        free(d->buf);
-        free(d->buf2);
-        free(d->tmp);
 
         maid_mem_clear(d, sizeof(struct dh));
     }
@@ -75,12 +67,7 @@ dh_new(const void *cfg, size_t bits)
         ret->group.generator = calloc(1, size);
         ret->group.modulo    = calloc(1, size);
 
-        ret->buf  = calloc(1,  size);
-        ret->buf2 = calloc(1,  size);
-        ret->tmp  = calloc(49, size);
-
-        if (ret->buf && ret->buf2 && ret->tmp &&
-            ret->group.generator && ret->group.modulo)
+        if (ret->group.generator && ret->group.modulo)
         {
             maid_mp_mov(ret->words, ret->group.generator, g->generator);
             maid_mp_mov(ret->words, ret->group.modulo,    g->modulo);
@@ -112,13 +99,17 @@ dh_gpub(void *dh, const void *private, void *public)
     {
         struct dh *d = dh;
 
-        maid_mp_mov(d->words, d->buf, d->group.generator);
-        maid_mp_read(d->words, d->buf2, private, true);
+        maid_mp_word buf[d->words];
+        maid_mp_word buf2[d->words];
 
-        maid_mp_expmod2(d->words, d->buf, d->buf2,
-                        d->group.modulo, d->tmp, true);
+        maid_mp_mov(d->words, buf, d->group.generator);
+        maid_mp_read(d->words, buf2, private, true);
 
-        maid_mp_write(d->words, d->buf, public, true);
+        maid_mp_expmod2(d->words, buf, buf2, d->group.modulo, true);
+        maid_mp_write(d->words, buf, public, true);
+
+        maid_mem_clear(buf,  sizeof(buf));
+        maid_mem_clear(buf2, sizeof(buf2));
     }
 }
 
@@ -129,13 +120,17 @@ dh_gsec(void *dh, const void *private, const void *public, u8 *buffer)
     {
         struct dh *d = dh;
 
-        maid_mp_read(d->words, d->buf,  public,  true);
-        maid_mp_read(d->words, d->buf2, private, true);
+        maid_mp_word buf[d->words];
+        maid_mp_word buf2[d->words];
 
-        maid_mp_expmod2(d->words, d->buf, d->buf2,
-                        d->group.modulo, d->tmp, true);
+        maid_mp_read(d->words, buf,  public,  true);
+        maid_mp_read(d->words, buf2, private, true);
 
-        maid_mp_write(d->words, d->buf, buffer, true);
+        maid_mp_expmod2(d->words, buf, buf2, d->group.modulo, true);
+        maid_mp_write(d->words, buf, buffer, true);
+
+        maid_mem_clear(buf,  sizeof(buf));
+        maid_mem_clear(buf2, sizeof(buf2));
     }
 }
 

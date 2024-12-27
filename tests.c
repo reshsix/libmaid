@@ -196,32 +196,10 @@ mp_test(size_t words, u8 *val, maid_mp_word *a, maid_mp_word *b,
     }
 }
 
-static void
-tmp_clean(size_t words, maid_mp_word *tmp, size_t total)
-{
-    for (size_t i = 0; i < words * total; i++)
-        tmp[i] = i;
-}
-
-static bool
-tmp_check(size_t words, maid_mp_word *tmp, size_t used, size_t total)
-{
-    bool ret = true;
-
-    for (size_t i = words * used; i < words * total; i++)
-    {
-        if (tmp[i] != i)
-            ret = false;
-    }
-    tmp_clean(words, tmp, total);
-
-    return ret;
-}
-
 static u8
 mp_tests(void)
 {
-    u8 ret = 65;
+    u8 ret = 54;
 
     size_t words = maid_mp_words(128);
     ret -= (words == 2);
@@ -282,10 +260,6 @@ mp_tests(void)
     maid_mp_word c[words];
     maid_mp_word d[words];
 
-    size_t tmp_l = 64;
-    maid_mp_word tmp[words * tmp_l];
-    tmp_clean(words, tmp, tmp_l);
-
     /* read/write */
     mp_test(words, val, a, b, c, d, 0, 1, 2, 0);
     maid_mp_write(words, a, &(val[2 * 16]), false);
@@ -332,11 +306,10 @@ mp_tests(void)
 
     #define MAID_MP_TEST_T(id, r, zn, mem) \
     mp_test(words, val, a, b, c, d, 0, 1, r, 0); \
-    maid_mp_##id(words, a, b, tmp); \
+    maid_mp_##id(words, a, b); \
     ret -= memcmp(a, c, size) == 0; \
-    maid_mp_##id(words, a, NULL, tmp); \
+    maid_mp_##id(words, a, NULL); \
     ret -= memcmp(a, (zn) ? z : c, size) == 0; \
-    ret -= tmp_check(words, tmp, mem, tmp_l);
 
     MAID_MP_TEST_T(mul, 13, false, 1);
     MAID_MP_TEST_T(div, 14, false, 2);
@@ -345,24 +318,22 @@ mp_tests(void)
 
     /* div2 */
     mp_test(words, val, a, b, c, d, 0, 1, 14, 0);
-    maid_mp_div2(words, a, d, b, tmp);
+    maid_mp_div2(words, a, d, b);
     ret -= memcmp(a, c, size) == 0;
-    maid_mp_div2(words, a, d, NULL, tmp);
+    maid_mp_div2(words, a, d, NULL);
     ret -= memcmp(a, c, size) == 0;
     mp_test(words, val, a, b, c, d, 0, 1, 15, 0);
-    maid_mp_div2(words, a, d, b, tmp);
+    maid_mp_div2(words, a, d, b);
     ret -= memcmp(d, c, size) == 0;
-    maid_mp_div2(words, a, d, NULL, tmp);
+    maid_mp_div2(words, a, d, NULL);
     ret -= memcmp(d, z, size) == 0;
-    ret -= tmp_check(words, tmp, 3, tmp_l);
 
     #define MAID_MP_TEST_M(id, aa, bb, cc, r, mem, ...) \
     mp_test(words, val, a, b, c, d, aa, bb, cc, r); \
-    maid_mp_##id(words, a, b, c, tmp,##__VA_ARGS__); \
+    maid_mp_##id(words, a, b, c,##__VA_ARGS__); \
     ret -= memcmp(a, d, size) == 0; \
-    maid_mp_##id(words, a, NULL, c, tmp,##__VA_ARGS__); \
+    maid_mp_##id(words, a, NULL, c,##__VA_ARGS__); \
     ret -= memcmp(a, d, size) == 0; \
-    ret -= tmp_check(words, tmp, mem, tmp_l);
 
     MAID_MP_TEST_M(mulmod, 0, 1, 2, 17, 12);
     MAID_MP_TEST_M(expmod, 0, 1, 2, 18, 14, false);
@@ -370,12 +341,11 @@ mp_tests(void)
 
     /* invmod */
     mp_test(words, val, a, b, c, d, 0, 2, 0, 0);
-    ret -= !maid_mp_invmod(words, a, b, tmp);
+    ret -= !maid_mp_invmod(words, a, b);
     ret -= memcmp(a, d, size) == 0;
     mp_test(words, val, a, b, c, d, 0, 1, 0, 19);
-    ret -= maid_mp_invmod(words, a, b, tmp);
+    ret -= maid_mp_invmod(words, a, b);
     ret -= memcmp(a, d, size) == 0;
-    ret -= tmp_check(words, tmp, 21, tmp_l);
 
     MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, 49, false);
     MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, 49, true);
@@ -406,7 +376,7 @@ mp_tests(void)
                     maid_mp_mov(words, c, NULL);
                     c[1] = 1ULL << 32;
 
-                    maid_mp_random2(words, a, g, b, c, tmp);
+                    maid_mp_random2(words, a, g, b, c);
                     if (maid_mp_cmp(words, a, b) > 0 ||
                         maid_mp_cmp(words, a, c) < 0)
                         fails++;
@@ -415,12 +385,12 @@ mp_tests(void)
                     high = 60;
                     break;
                 case 2:
-                    maid_mp_prime(words, a, g, 64, 16, tmp);
-                    maid_mp_prime(words, b, g, 64, 16, tmp);
+                    maid_mp_prime(words, a, g, 64, 16);
+                    maid_mp_prime(words, b, g, 64, 16);
 
                     /* c = ab */
                     maid_mp_mov(words, c, a);
-                    maid_mp_mul(words, c, b, tmp);
+                    maid_mp_mul(words, c, b);
 
                     /* b = tot(ab) */
                     maid_mp_mov(words, d, a);
@@ -428,11 +398,11 @@ mp_tests(void)
                     z[0] = 1;
                     maid_mp_sub(words, b, z);
                     maid_mp_sub(words, d, z);
-                    maid_mp_mul(words, b, d, tmp);
+                    maid_mp_mul(words, b, d);
 
                     /* 2^tot(ab) % ab = 1 */
                     z[0] = 2;
-                    maid_mp_expmod(words, z, b, c, tmp, false);
+                    maid_mp_expmod(words, z, b, c, false);
                     maid_mp_mov(words, c, NULL);
                     c[0] = 1;
                     if (maid_mp_cmp(words, z, c) != 0)

@@ -23,8 +23,6 @@
 
 Words are used in a little-endian way
 
-Temporary values are not cleared by the end of functions
-
 <details>
 <summary>maid_mp_word</summary>
 Type that contains a word: u64 on systems with 128-bits integer support,
@@ -236,7 +234,7 @@ Shifts a biginteger right
 
 <details>
 <summary>void maid_mp_mul(size_t words, maid_mp_word *a,
-                          const maid_mp_word *b, maid_mp_word *tmp);</summary>
+                          const maid_mp_word *b);</summary>
 Multiplies a biginteger by another
 
 ### Parameters
@@ -245,13 +243,12 @@ Multiplies a biginteger by another
 | words | Amount of words          |
 | a     | Multiplicand -> Product  |
 | b     | Multiplier (NULL = 1)    |
-| tmp   | Temporary buffer (words) |
 
 </details>
 
 <details>
 <summary>void maid_mp_div(size_t words, maid_mp_word *a,
-                          const maid_mp_word *b, maid_mp_word *tmp);</summary>
+                          const maid_mp_word *b);</summary>
 Divides a biginteger by another
 
 ### Parameters
@@ -260,13 +257,12 @@ Divides a biginteger by another
 | words | Amount of words              |
 | a     | Dividend -> Quotient         |
 | b     | Divisor (NULL = 1)           |
-| tmp   | Temporary buffer (words * 2) |
 
 </details>
 
 <details>
 <summary>void maid_mp_mod(size_t words, maid_mp_word *a,
-                          const maid_mp_word *b, maid_mp_word *tmp);</summary>
+                          const maid_mp_word *b);</summary>
 Gets the remainder of a biginteger divided by another
 
 ### Parameters
@@ -275,13 +271,12 @@ Gets the remainder of a biginteger divided by another
 | words | Amount of words              |
 | a     | Dividend -> Remainder        |
 | b     | Divisor (NULL = 1)           |
-| tmp   | Temporary buffer (words * 3) |
 
 </details>
 
 <details>
 <summary>void maid_mp_exp(size_t words, maid_mp_word *a,
-                          const maid_mp_word *b, maid_mp_word *tmp);</summary>
+                          const maid_mp_word *b);</summary>
 Raises a big integer to the power of another
 
 ### Parameters
@@ -290,14 +285,12 @@ Raises a big integer to the power of another
 | words | Amount of words              |
 | a     | Base -> Power                |
 | b     | Exponent (NULL = 1)          |
-| tmp   | Temporary buffer (words * 3) |
 
 </details>
 
 <details>
 <summary>void maid_mp_div2(size_t words, maid_mp_word *a,
-                           maid_mp_word *rem, const maid_mp_word *b,
-                           maid_mp_word *tmp);</summary>
+                           maid_mp_word *rem, const maid_mp_word *b);</summary>
 Divides a biginteger by another, and returns the remainder
 
 ### Parameters
@@ -307,14 +300,13 @@ Divides a biginteger by another, and returns the remainder
 | a     | Dividend -> Quotient         |
 | rem   | Remainder                    |
 | b     | Divisor (NULL = 1)           |
-| tmp   | Temporary buffer (words * 3) |
 
 </details>
 
 <details>
 <summary>void maid_mp_mulmod(size_t words, maid_mp_word *a,
-                             const maid_mp_word *b, const maid_mp_word *mod,
-                             maid_mp_word *tmp);</summary>
+                             const maid_mp_word *b, const maid_mp_word *mod
+                            );</summary>
 Modular multiplies a biginteger by another
 
 ### Parameters
@@ -324,14 +316,13 @@ Modular multiplies a biginteger by another
 | a     | Multiplicand -> Product       |
 | b     | Multiplier (NULL = 1)         |
 | mod   | Modulo divisor                |
-| tmp   | Temporary buffer (words * 12) |
 
 </details>
 
 <details>
 <summary>void maid_mp_expmod(size_t words, maid_mp_word *a,
                              const maid_mp_word *b, const maid_mp_word *mod,
-                             maid_mp_word *tmp, bool constant);</summary>
+                             bool constant);</summary>
 Raises a big integer to the modular power of another
 
 ### Parameters
@@ -341,15 +332,13 @@ Raises a big integer to the modular power of another
 | a        | Base -> Power                   |
 | b        | Exponent (NULL = 1)             |
 | mod      | Modulo divisor                  |
-| tmp      | Temporary buffer (words * 14)   |
 | constant | Constant time for all exponents |
 
 </details>
 
 <details>
 <summary>bool maid_mp_invmod(size_t words, maid_mp_word *a,
-                             const maid_mp_word *mod,
-                             maid_mp_word *tmp);</summary>
+                             const maid_mp_word *mod);</summary>
 Modular multiplicative inverse of a biginteger
 
 ### Parameters
@@ -358,7 +347,6 @@ Modular multiplicative inverse of a biginteger
 | words | Amount of words               |
 | a     | Number                        |
 | mod   | Modulo divisor                |
-| tmp   | Temporary buffer (words * 21) |
 
 ### Return value
 | case           | description |
@@ -371,7 +359,7 @@ Modular multiplicative inverse of a biginteger
 <details>
 <summary>void maid_mp_expmod2(size_t words, maid_mp_word *a,
                               const maid_mp_word *b, const maid_mp_word *mod,
-                              maid_mp_word *tmp, bool constant);</summary>
+                              bool constant);</summary>
 Raises a big integer to the modular power of another (using Montgomery method)
 
 ### Parameters
@@ -381,7 +369,6 @@ Raises a big integer to the modular power of another (using Montgomery method)
 | a        | Base -> Power                   |
 | b        | Exponent (NULL = 1)             |
 | mod      | Odd modulo divisor              |
-| tmp      | Temporary buffer (words * 49)   |
 | constant | Constant time for all exponents |
 
 </details>
@@ -406,14 +393,12 @@ int main(void)
 
     maid_mp_word b[words];
     maid_mp_word e[words];
-    maid_mp_word tmp[words * 14];
 
     maid_mp_read(words, b, base,     false);
     maid_mp_read(words, e, exponent, false);
 
     u8 power[128 / 8] = {0};
-    maid_mp_exp(words, b, e, tmp);
-    maid_mem_clear(tmp, sizeof(tmp));
+    maid_mp_exp(words, b, e);
 
     /* Big endian */
     maid_mp_write(words, b, power, true);

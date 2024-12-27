@@ -47,35 +47,27 @@ void maid_mp_shr(size_t words, maid_mp_word *a, u64 shift);
 void maid_mp_sal(size_t words, maid_mp_word *a, u64 shift);
 void maid_mp_sar(size_t words, maid_mp_word *a, u64 shift);
 
-void maid_mp_mul(size_t words, maid_mp_word *a,
-                 const maid_mp_word *b, maid_mp_word *tmp);
-void maid_mp_div(size_t words, maid_mp_word *a,
-                 const maid_mp_word *b, maid_mp_word *tmp);
-void maid_mp_mod(size_t words, maid_mp_word *a,
-                 const maid_mp_word *b, maid_mp_word *tmp);
-void maid_mp_exp(size_t words, maid_mp_word *a,
-                 const maid_mp_word *b, maid_mp_word *tmp);
+void maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_div(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_mod(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b);
 
 void maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
-                  const maid_mp_word *b, maid_mp_word *tmp);
+                  const maid_mp_word *b);
 
 void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod, maid_mp_word *tmp);
+                    const maid_mp_word *mod);
 void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod, maid_mp_word *tmp,
-                    bool constant);
-bool maid_mp_invmod(size_t words, maid_mp_word *a,
-                    const maid_mp_word *mod, maid_mp_word *tmp);
+                    const maid_mp_word *mod, bool constant);
+bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod);
 void maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                     const maid_mp_word *mod, maid_mp_word *tmp,
-                     bool constant);
+                     const maid_mp_word *mod, bool constant);
 
 #include <maid/rng.h>
 void maid_mp_random(size_t words, maid_mp_word *a, maid_rng *g, size_t bits);
 void maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
-                     const maid_mp_word *low, const maid_mp_word *high,
-                     maid_mp_word *tmp);
+                     const maid_mp_word *low, const maid_mp_word *high);
 void maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
-                   size_t bits, size_t safety, maid_mp_word *tmp);
+                   size_t bits, size_t safety);
 
 #endif

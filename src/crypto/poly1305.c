@@ -32,8 +32,6 @@ struct poly1305
     maid_mp_word *acc;
     /* R and S key parts */
     maid_mp_word *r, *s;
-    /* Temporary buffer */
-    maid_mp_word *tmp;
 };
 
 static void
@@ -69,12 +67,10 @@ poly1305_del(void *ctx)
         maid_mem_clear(p->acc,     p->words * sizeof(maid_mp_word));
         maid_mem_clear(p->r,       p->words * sizeof(maid_mp_word));
         maid_mem_clear(p->s,       p->words * sizeof(maid_mp_word));
-        maid_mem_clear(p->tmp, 3 * p->words * sizeof(maid_mp_word));
 
         free(p->acc);
         free(p->r);
         free(p->s);
-        free(p->tmp);
 
         maid_mem_clear(ctx, sizeof(struct poly1305));
     }
@@ -98,14 +94,12 @@ poly1305_new(u8 version, const u8 *key)
         ret->acc = calloc(ret->words,     sizeof(maid_mp_word));
         ret->r   = calloc(ret->words,     sizeof(maid_mp_word));
         ret->s   = calloc(ret->words,     sizeof(maid_mp_word));
-        ret->tmp = calloc(ret->words * 3, sizeof(maid_mp_word));
 
         maid_mp_mov(ret->words, ret->acc, NULL);
         maid_mp_mov(ret->words, ret->r,   NULL);
         maid_mp_mov(ret->words, ret->s,   NULL);
-        maid_mp_mov(ret->words, ret->tmp, NULL);
 
-        if (key && ret->acc && ret->r && ret->s && ret->tmp)
+        if (key && ret->acc && ret->r && ret->s)
             poly1305_init(ret, key);
         else
             ret = poly1305_del(ret);
@@ -124,7 +118,6 @@ poly1305_renew(void *ctx, const u8 *key)
             poly1305_init(p, key);
 
         maid_mem_clear(p->acc,     p->words * sizeof(maid_mp_word));
-        maid_mem_clear(p->tmp, 3 * p->words * sizeof(maid_mp_word));
     }
 }
 
@@ -153,15 +146,17 @@ poly1305_update(void *ctx, u8 *block, size_t size)
         buf[size] |= 1;
 
         /* Read buffer as number */
-        maid_mp_read(p->words, p->tmp, buf, false);
+        maid_mp_word tmp[p->words];
+        maid_mp_read(p->words, tmp, buf, false);
         maid_mem_clear(buf, sizeof(buf));
 
         /* Adds block to the accumulator */
-        maid_mp_add(p->words, p->acc, p->tmp);
+        maid_mp_add(p->words, p->acc, tmp);
+        maid_mem_clear(tmp, sizeof(tmp));
         /* Multiplies accumulator by r */
-        maid_mp_mul(p->words, p->acc, p->r, p->tmp);
+        maid_mp_mul(p->words, p->acc, p->r);
         /* Reduction by prime */
-        maid_mp_mod(p->words, p->acc, pr, p->tmp);
+        maid_mp_mod(p->words, p->acc, pr);
     }
 }
 

@@ -35,8 +35,6 @@ struct rsa
     size_t words;
 
     struct maid_rsa_key key;
-    maid_mp_word *buf;
-    maid_mp_word *tmp;
 };
 
 extern void *
@@ -49,13 +47,9 @@ rsa_del(void *rsa)
 
         maid_mem_clear(r->key.exponent, size);
         maid_mem_clear(r->key.modulo,   size);
-        maid_mem_clear(r->buf, size);
-        maid_mem_clear(r->tmp, size * 49);
 
         free(r->key.exponent);
         free(r->key.modulo);
-        free(r->buf);
-        free(r->tmp);
 
         maid_mem_clear(r, sizeof(struct rsa));
     }
@@ -83,10 +77,7 @@ rsa_new(u8 version, const void *key, size_t bits)
         ret->key.exponent = calloc(1, size);
         ret->key.modulo   = calloc(1, size);
 
-        ret->buf = calloc(1,  size);
-        ret->tmp = calloc(49, size);
-
-        if (ret->buf && ret->tmp && ret->key.exponent && ret->key.modulo)
+        if (ret->key.exponent && ret->key.modulo)
         {
             maid_mp_mov(ret->words, ret->key.exponent, k->exponent);
             maid_mp_mov(ret->words, ret->key.modulo,   k->modulo);
@@ -118,10 +109,14 @@ rsa_apply(void *rsa, u8 *buffer)
     {
         struct rsa *r = rsa;
 
-        maid_mp_read(r->words, r->buf, buffer, true);
-        maid_mp_expmod2(r->words, r->buf, r->key.exponent,
-                        r->key.modulo, r->tmp, r->private);
-        maid_mp_write(r->words, r->buf, buffer, true);
+        maid_mp_word buf[r->words];
+        maid_mp_read(r->words, buf, buffer, true);
+
+        maid_mp_expmod2(r->words, buf, r->key.exponent,
+                        r->key.modulo, r->private);
+        maid_mp_write(r->words, buf, buffer, true);
+
+        maid_mem_clear(buf, sizeof(buf));
     }
 }
 
