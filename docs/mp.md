@@ -373,6 +373,54 @@ Raises a big integer to the modular power of another (using Montgomery method)
 
 </details>
 
+<details>
+<summary>void maid_mp_random(size_t words, maid_mp_word *a,
+                             maid_rng *g, size_t bits);</summary>
+Generates a random number with a certain amount of bits
+
+### Parameters
+| name     | description             |
+|----------|-------------------------|
+| words    | Amount of words         |
+| a        | Output                  |
+| g        | Random number generator |
+| bits     | Amount of bits          |
+
+</details>
+
+<details>
+<summary>void maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
+                              const maid_mp_word *low,
+                              const maid_mp_word *high);</summary>
+Generates a random number within a certain range
+
+### Parameters
+| name     | description                  |
+|----------|------------------------------|
+| words    | Amount of words              |
+| a        | Output                       |
+| g        | Random number generator      |
+| low      | Range low limit (including)  |
+| high     | Range high limit (excluding) |
+
+</details>
+
+<details>
+<summary>void maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
+                            size_t bits, size_t safety); </summary>
+Generates a strong probable prime with a certain amount of bits
+
+### Parameters
+| name     | description                      |
+|----------|----------------------------------|
+| words    | Amount of words                  |
+| a        | Output                           |
+| g        | Random number generator          |
+| bits     | Amount of bits                   |
+| safety   | 1 / 2^safety chance of non-prime |
+
+</details>
+
 ## Example Code
 
 ```c

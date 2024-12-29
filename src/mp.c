@@ -331,8 +331,8 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
                 size_t idx = (i + j);
                 volatile maid_mp_word val = (b) ? b[j] : (j == 0);
 
-                size_t half    = maid_mp_bits / 2;
-                maid_mp_word mask = maid_mp_max >> half;
+                const size_t       half = maid_mp_bits / 2;
+                const maid_mp_word mask = maid_mp_max >> half;
 
                 volatile maid_mp_word x = tmp[i] >> half;
                 volatile maid_mp_word y = tmp[i] &  mask;
@@ -376,6 +376,10 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
 
                     carry = 0;
                 }
+
+                x = 0, y = 0, z = 0, w = 0;
+                xz = 0, xw = 0, yz = 0, yw = 0;
+                val = 0, carry = 0, low = 0, org = 0, high = 0;
             }
         }
 
@@ -1339,7 +1343,7 @@ extern void
 maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
               size_t bits, size_t safety)
 {
-    if (words && a && g && safety)
+    if (words && a && g && bits && safety)
     {
         maid_mp_mov(words, a, NULL);
 
@@ -1352,6 +1356,6 @@ maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
             maid_mp_random(words, a, g, bits);
             a[0] |= 1;
         }
-        while (!maid_mp_sprp(words, a, g, safety / 2));
+        while (!maid_mp_sprp(words, a, g, (safety > 1) ? safety / 2 : 1));
     }
 }
