@@ -383,6 +383,95 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
     }
 }
 
+static void
+maid_mp_mul_karat_halve(size_t words, maid_mp_word *a, const maid_mp_word *b)
+{
+    /* Does karatsuba to optimize mulmod,
+     * which always have half the higher words empty
+     *
+     * Depends on words being divisible by four
+     * Empirically, starts to be faster above 1024 bits */
+
+    if (words <= 16 || words % 4 != 0)
+        maid_mp_mul_long(words, a, b, true);
+    else
+    {
+        /* Trick to allow NULL = 1 */
+        volatile maid_mp_word one[words];
+        maid_mp_mov(words, (maid_mp_word *)one, NULL);
+        one[0] = 1;
+        b = (b) ? b : (const maid_mp_word *) one;
+
+        ALLOC_MP(ac,    1)
+        ALLOC_MP(bd,    1)
+        ALLOC_MP(ab,    1)
+        ALLOC_MP(cd,    1)
+        ALLOC_MP(abcd0, 1)
+        ALLOC_MP(abcd1, 1)
+        ALLOC_MP(abcd2, 1)
+        ALLOC_MP(abcd3, 1)
+        ALLOC_MP(tmp,   1)
+
+        size_t half    = words / 2;
+        size_t quarter = words / 4;
+
+        maid_mp_mov(quarter, ac,  &(a[quarter]));
+        maid_mp_mov(quarter, tmp, &(b[quarter]));
+        maid_mp_mul_karat_halve(half, ac, tmp);
+
+        maid_mp_mov(quarter, bd,  a);
+        maid_mp_mov(quarter, tmp, b);
+        maid_mp_mul_karat_halve(half, bd, tmp);
+
+        maid_mp_mov(quarter, ab,  &(a[quarter]));
+        maid_mp_mov(quarter, tmp, a);
+        maid_mp_add(half, ab, tmp);
+
+        maid_mp_mov(quarter, cd,  &(b[quarter]));
+        maid_mp_mov(quarter, tmp, b);
+        maid_mp_add(half, cd, tmp);
+
+        maid_mp_mov(quarter, abcd0, ab);
+        maid_mp_mov(quarter, tmp,   cd);
+        maid_mp_mul_karat_halve(half, abcd0, tmp);
+
+        maid_mp_mov(quarter, abcd1, cd[quarter] ? ab : NULL);
+        maid_mp_shl(half,    abcd1, maid_mp_bits * quarter);
+
+        maid_mp_mov(quarter, abcd2, ab[quarter] ? cd : NULL);
+        maid_mp_shl(half,    abcd2, maid_mp_bits * quarter);
+
+        abcd3[0] = (ab[quarter] && cd[quarter]) ? 1 : 0;
+        maid_mp_shl(words, abcd3, maid_mp_bits * half);
+
+        maid_mp_mov(words, tmp, ab);
+        maid_mp_mov(words, ab, abcd0);
+        maid_mp_add(words, ab, abcd1);
+        maid_mp_add(words, ab, abcd2);
+        maid_mp_add(words, ab, abcd3);
+        maid_mp_sub(words, ab, bd);
+        maid_mp_sub(words, ab, ac);
+
+        maid_mp_mov(words, a, bd);
+        maid_mp_shl(words, ab, sizeof(words) * quarter * 8);
+        maid_mp_add(words, a, ab);
+        maid_mp_shl(words, ac, sizeof(words) * half * 8);
+        maid_mp_add(words, a, ac);
+
+        CLEAR_MP(ac)
+        CLEAR_MP(bd)
+        CLEAR_MP(ab)
+        CLEAR_MP(cd)
+        CLEAR_MP(abcd0)
+        CLEAR_MP(abcd1)
+        CLEAR_MP(abcd2)
+        CLEAR_MP(abcd3)
+        CLEAR_MP(tmp)
+
+        one[0] = 0;
+    }
+}
+
 extern void
 maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
@@ -561,9 +650,9 @@ maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         maid_mp_mov(words, &(mod2[words]), NULL);
 
         if (b)
-            maid_mp_mul_long(words * 2, a2, b2, true);
+            maid_mp_mul_karat_halve(words * 2, a2, b2);
         else
-            maid_mp_mul_long(words * 2, a2, NULL, true);
+            maid_mp_mul_karat_halve(words * 2, a2, NULL);
 
         maid_mp_mod(words * 2, a2, mod2);
         maid_mp_mov(words, a, a2);
@@ -819,7 +908,7 @@ maid_mp_mont_mulmod(size_t words, maid_mp_word *ma, const maid_mp_word *mb,
         maid_mp_mov(words,     &(b2[words]),   NULL);
         maid_mp_mov(words,     &(mod2[words]), NULL);
 
-        maid_mp_mul_long(words * 2, a2, (mb) ? b2 : NULL, true);
+        maid_mp_mul_karat_halve(words * 2, a2, (mb) ? b2 : NULL);
 
         maid_mp_mov(words, &(imod2[words]), NULL);
         maid_mp_mov(words, imod2, imod);
@@ -829,7 +918,7 @@ maid_mp_mont_mulmod(size_t words, maid_mp_word *ma, const maid_mp_word *mb,
 
         maid_mp_mul(words * 1, acc, a2);
         maid_mp_mov(words + 1, &(acc[words]), NULL);
-        maid_mp_mul_long(words * 2, acc, mod2, true);
+        maid_mp_mul_karat_halve(words * 2, acc, mod2);
         maid_mp_add((words * 2) + 1, acc, a2);
         maid_mp_shr((words * 2) + 1, acc, words * maid_mp_bits);
 
