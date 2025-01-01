@@ -56,7 +56,7 @@ OBJS = crypto/aes.o crypto/chacha.o \
 	   block.o stream.o mac.o aead.o \
 	   rng.o hash.o \
 	   pub.o sign.o kex.o \
-	   serial.o
+	   serial.o keygen.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@

@@ -34,6 +34,7 @@
 #include <maid/kex.h>
 
 #include <maid/serial.h>
+#include <maid/keygen.h>
 
 /* Helper functions */
 
@@ -2058,6 +2059,61 @@ serial_tests(void)
     return ret;
 }
 
+/* Testing generated keys with signatures */
+
+static u8
+keygen_tests(void)
+{
+    u8 ret = 1;
+
+    u8 entropy[32] = {0};
+    maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
+    if (g)
+    {
+        maid_mp_word *params[7];
+        size_t words = maid_keygen_rsa(512, params, g);
+        if (words)
+        {
+            struct maid_rsa_key k1 = {.exponent = params[1],
+                                      .modulo   = params[0]};
+            struct maid_rsa_key k2 = {.exponent = params[2],
+                                      .modulo   = params[0]};
+
+            maid_pub  *pub = maid_pub_new(maid_rsa_public,  &k1, 512);
+            maid_pub  *prv = maid_pub_new(maid_rsa_private, &k2, 512);
+            maid_sign *s   = maid_sign_new(maid_pkcs1_v1_5_sha256,
+                                           pub, prv, 512);
+
+            if (pub && prv && s)
+            {
+                u8 hash[512 / 8] = {0};
+                for (size_t i = 0; i < 256 / 8; i++)
+                    hash[i] = 0xFF;
+
+                maid_sign_generate(s, hash);
+                if (maid_sign_verify(s, hash))
+                {
+                    ret = 0;
+                    for (size_t i = 0; i < 256 / 8; i++)
+                    {
+                        if (hash[i] != 0xFF)
+                        {
+                            ret = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            maid_sign_del(s);
+            maid_pub_del(pub);
+            maid_pub_del(prv);
+        }
+    }
+
+    return ret;
+}
+
 extern int
 main(void)
 {
@@ -2092,6 +2148,7 @@ main(void)
     /* Interfaces */
 
     ret += serial_tests();
+    ret += keygen_tests();
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

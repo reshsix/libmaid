@@ -46,3 +46,4 @@ sudo ldconfig
 | [Key exchange](docs/kex.md)          | Diffie-Hellman            |
 |                                      |                           |
 | [Serialization](docs/serial.md)      | PEM, PKCS#1, PKCS#8       |
+| [Key generation](docs/keygen.md)     | RSA                       |
