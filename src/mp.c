@@ -67,20 +67,31 @@ maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big)
 }
 
 extern void
-maid_mp_debug(size_t words, const char *name, const maid_mp_word *a)
+maid_mp_debug(size_t words, const char *name,
+              const maid_mp_word *a, bool format)
 {
     if (words && name)
     {
-        fprintf(stderr, "%s:\n", name);
-        for (size_t i = 0; i < words; i++)
+        if (!format)
         {
-            if (i && i % 4 == 0)
-                fprintf(stderr, "\n");
-
-            fprintf(stderr, maid_mp_fmt, (a) ? a[words - 1 - i] : 0x0);
-            fprintf(stderr, " ");
+            fprintf(stderr, "%s: 0x", name);
+            for (size_t i = 0; i < words; i++)
+                fprintf(stderr, maid_mp_fmt, (a) ? a[words - 1 - i] : 0x0);
+            fprintf(stderr, "\n");
         }
-        fprintf(stderr, "\n\n");
+        else
+        {
+            fprintf(stderr, "%s: \n", name);
+            for (size_t i = 0; i < words; i++)
+            {
+                if (i && i % 4 == 0)
+                    fprintf(stderr, "\n");
+
+                fprintf(stderr, maid_mp_fmt, (a) ? a[words - 1 - i] : 0x0);
+                fprintf(stderr, " ");
+            }
+            fprintf(stderr, "\n\n");
+        }
     }
 }
 

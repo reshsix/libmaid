@@ -2093,12 +2093,12 @@ keygen_tests(void)
                 maid_sign_generate(s, hash);
                 if (maid_sign_verify(s, hash))
                 {
-                    ret = 0;
+                    ret--;
                     for (size_t i = 0; i < 256 / 8; i++)
                     {
                         if (hash[i] != 0xFF)
                         {
-                            ret = 1;
+                            ret++;
                             break;
                         }
                     }
@@ -2119,36 +2119,43 @@ main(void)
 {
     u16 ret = 0;
 
+    #define TEST(name) \
+        u16 name##_fails = name(); \
+        if (name##_fails) \
+            printf("%s() failed %d %s\n", #name, name##_fails, \
+                   (name##_fails == 1) ? "test" : "tests"); \
+        ret += name##_fails;
+
     /* Utilities */
 
-    ret += mem_tests();
-    ret += mp_tests();
+    TEST(mem_tests)
+    TEST(mp_tests)
 
     /* Symmetric cryptography */
 
-    ret += aes_tests();
-    ret += aes_ctr_tests();
-    ret += aes_gcm_tests();
+    TEST(aes_tests)
+    TEST(aes_ctr_tests)
+    TEST(aes_gcm_tests)
 
-    ret += chacha_tests();
-    ret += poly1305_tests();
-    ret += chacha20poly1305_tests();
+    TEST(chacha_tests)
+    TEST(poly1305_tests)
+    TEST(chacha20poly1305_tests)
 
-    ret += ctr_drbg_tests();
-    ret += sha2_tests();
+    TEST(ctr_drbg_tests)
+    TEST(sha2_tests)
 
-    ret += hmac_tests();
+    TEST(hmac_tests)
 
     /* Asymmetric cryptography */
 
-    ret += rsa_tests();
-    ret += pkcs1_tests();
-    ret += dh_tests();
+    TEST(rsa_tests)
+    TEST(pkcs1_tests)
+    TEST(dh_tests)
 
     /* Interfaces */
 
-    ret += serial_tests();
-    ret += keygen_tests();
+    TEST(serial_tests)
+    TEST(keygen_tests)
 
     return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
