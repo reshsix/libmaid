@@ -47,5 +47,7 @@ enum maid_serial
 
 enum maid_serial maid_serial_import(struct maid_pem *p, size_t *bits,
                                     maid_mp_word **output);
+struct maid_pem *maid_serial_export(enum maid_serial s, size_t bits,
+                                    maid_mp_word **input);
 
 #endif

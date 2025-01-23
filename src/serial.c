@@ -582,7 +582,166 @@ maid_pkcs8(struct maid_pem *p, size_t *bits,
     return ret;
 }
 
-/* Struct maid_pem to maid_serials */
+/* ASN.1 writing */
+
+static size_t
+maid_measure_tag(size_t size)
+{
+    size_t ret = size;
+
+    if (ret > 0x7F)
+    {
+        if      (ret < 0xFF)             ret += 1;
+        else if (ret < 0xFFFF)           ret += 2;
+        else if (ret < 0xFFFFFF)         ret += 3;
+        else if (ret < 0xFFFFFFFF)       ret += 4;
+        else if (ret < 0xFFFFFFFFFF)     ret += 5;
+        else if (ret < 0xFFFFFFFFFFFF)   ret += 6;
+        else if (ret < 0xFFFFFFFFFFFFFF) ret += 7;
+        else                             ret += 8;
+    }
+
+    return ret + 2;
+}
+
+static size_t
+maid_measure_integer(size_t words, maid_mp_word *input)
+{
+    /* Returns the number of bytes that will be used (except in tag part) */
+    size_t ret = 0;
+
+    volatile u8 buf = 0;
+    for (size_t i = 0; i < words * sizeof(maid_mp_word); i++)
+    {
+        /* Inverts order, from highest byte to lowest */
+        size_t j = (words * sizeof(maid_mp_word)) - i - 1;
+        size_t w = j / sizeof(maid_mp_word);
+        size_t z = j % sizeof(maid_mp_word);
+
+        buf = (input[w] >> (z * 8)) & 0xFF;
+        if (buf != 0)
+        {
+            ret = j + 1;
+            if (buf & 0x80)
+                ret++;
+            break;
+        }
+    }
+    buf = 0;
+
+    return ret;
+}
+
+static u8 *
+maid_to_tag(u8 *output, u8 id, size_t size)
+{
+    u8 *ret = &(output[2]);
+
+    output[0] = id;
+    if (size > 0x7F)
+    {
+        u8 bytes = 0;
+        if      (size < 0xFF)             bytes = 1;
+        else if (size < 0xFFFF)           bytes = 2;
+        else if (size < 0xFFFFFF)         bytes = 3;
+        else if (size < 0xFFFFFFFF)       bytes = 4;
+        else if (size < 0xFFFFFFFFFF)     bytes = 5;
+        else if (size < 0xFFFFFFFFFFFF)   bytes = 6;
+        else if (size < 0xFFFFFFFFFFFFFF) bytes = 7;
+        else                              bytes = 8;
+        output[1] = 0x80 | bytes;
+
+        for (u8 i = 0; i < bytes; i++)
+        {
+            size_t j = bytes - i - 1;
+            output[2 + i] = (size >> (j * 8)) & 0xFF;
+        }
+
+        ret = &(ret[bytes]);
+    }
+    else
+        output[1] = size;
+
+    return ret;
+}
+
+static u8 *
+maid_to_asn1_integer(u8 *output, size_t words,
+                     maid_mp_word *input, size_t size)
+{
+    if (size > sizeof(maid_mp_word) * words)
+    {
+        output[0] = 0x0;
+        output = &(output[1]);
+    }
+
+    for (size_t i = 0; i < size; i++)
+    {
+        size_t j = size - i - 1;
+        size_t w = j / sizeof(maid_mp_word);
+        size_t z = j % sizeof(maid_mp_word);
+
+        output[i] = (input[w] >> (z * 8)) & 0xFF;
+    }
+
+    return &(output[size]);
+}
+
+/* PKCS writing */
+
+static struct maid_pem *
+maid_rsa_export(struct maid_pem *ret, size_t bits, maid_mp_word **input,
+                bool private)
+{
+    u8 items = (private) ? 8 : 2;
+
+    size_t words = maid_mp_words(bits);
+    size_t sizes[items];
+
+    ret->size = (private) ? 3 : 0;
+    for (size_t i = 0; i < items; i++)
+    {
+        sizes[i] = maid_measure_integer(words, input[i]);
+        ret->size += maid_measure_tag(sizes[i]);
+    }
+
+    size_t seq_s = ret->size;
+    if (ret->size)
+    {
+        ret->type = (private) ? MAID_PEM_PRIVATE_RSA : MAID_PEM_PUBLIC_RSA;
+        ret->size = maid_measure_tag(ret->size);
+        ret->data = calloc(1, ret->size);
+    }
+
+    if (ret->data)
+    {
+        u8 *output = maid_to_tag(ret->data, 0x30, seq_s);
+
+        if (private)
+        {
+            maid_mp_word zero = 0;
+            output = maid_to_tag(output, 0x02, 1);
+            output = maid_to_asn1_integer(output, 1, &zero, 1);
+        }
+
+        for (size_t i = 0; i < items; i++)
+        {
+            output = maid_to_tag(output, 0x02, sizes[i]);
+            output = maid_to_asn1_integer(output, words, input[i], sizes[i]);
+        }
+    }
+    else
+    {
+        free(ret);
+        ret = NULL;
+    }
+
+    maid_mem_clear(sizes, sizeof(sizes));
+
+    return ret;
+}
+
+/* Struct maid_pem <-> maid_serials */
 
 extern enum maid_serial
 maid_serial_import(struct maid_pem *p, size_t *bits, maid_mp_word **output)
@@ -610,6 +769,33 @@ maid_serial_import(struct maid_pem *p, size_t *bits, maid_mp_word **output)
                 break;
 
             default:
+                break;
+        }
+    }
+
+    return ret;
+}
+
+extern struct maid_pem *
+maid_serial_export(enum maid_serial s, size_t bits, maid_mp_word **input)
+{
+    struct maid_pem *ret = calloc(1, sizeof(struct maid_pem));
+
+    if (ret)
+    {
+        switch (s)
+        {
+            case MAID_SERIAL_RSA_PUBLIC:
+                ret = maid_rsa_export(ret, bits, input, false);
+                break;
+
+            case MAID_SERIAL_RSA_PRIVATE:
+                ret = maid_rsa_export(ret, bits, input, true);
+                break;
+
+            default:
+                free(ret);
+                ret = NULL;
                 break;
         }
     }
