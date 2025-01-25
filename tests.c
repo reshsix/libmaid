@@ -2002,6 +2002,11 @@ serial_tests(void)
     const char *pubs[] = {public,  public2};
     const char *prvs[] = {private, private2};
 
+    enum maid_serial pub_t[] = {MAID_SERIAL_RSA_PUBLIC,
+                                MAID_SERIAL_PKCS8_RSA_PUBLIC};
+    enum maid_serial prv_t[] = {MAID_SERIAL_RSA_PRIVATE,
+                                MAID_SERIAL_PKCS8_RSA_PRIVATE};
+
     for (u8 i = 0; i < 2; i++)
     {
         const char *endptr = NULL;
@@ -2017,24 +2022,40 @@ serial_tests(void)
             maid_mp_word *data[7] = {NULL};
 
             enum maid_serial type = maid_serial_import(p, &bits, data);
-            if (type == MAID_SERIAL_RSA_PUBLIC ||
-                type == MAID_SERIAL_PKCS8_RSA_PUBLIC)
+            if (type == pub_t[i])
             {
                 struct maid_rsa_key k = {.modulo   = data[0],
                                          .exponent = data[1]};
                 pub = maid_pub_new(maid_rsa_public, &k, bits);
+
+                if (pub)
+                {
+                    struct maid_pem *p3 = maid_serial_export(pub_t[i],
+                                                             bits, data);
+                    char *public3 = (p3) ? maid_pem_export(p3) : NULL;
+                    if (!public3 || strcmp(pubs[i], public3) != 0)
+                        pub = maid_pub_del(pub);
+                }
             }
 
             for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
                 free(data[i]);
 
             type = maid_serial_import(p2, &bits, data);
-            if (type == MAID_SERIAL_RSA_PRIVATE ||
-                type == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+            if (type == prv_t[i])
             {
                 struct maid_rsa_key k = {.modulo   = data[0],
                                          .exponent = data[2]};
                 prv = maid_pub_new(maid_rsa_private, &k, bits);
+
+                if (prv)
+                {
+                    struct maid_pem *p3 = maid_serial_export(prv_t[i],
+                                                             bits, data);
+                    char *private3 = (p3) ? maid_pem_export(p3) : NULL;
+                    if (!private3 || strcmp(prvs[i], private3) != 0)
+                        prv = maid_pub_del(prv);
+                }
             }
 
             for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)

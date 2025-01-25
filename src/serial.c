@@ -677,6 +677,7 @@ maid_to_asn1_integer(u8 *output, size_t words,
     {
         output[0] = 0x00;
         output = &(output[1]);
+        size -= 1;
     }
 
     for (size_t i = 0; i < size; i++)
