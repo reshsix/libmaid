@@ -574,6 +574,10 @@ maid_pkcs8(struct maid_pem *p, size_t *bits,
 
                     if (p2.type != MAID_PEM_UNKNOWN)
                         ret = maid_serial_import(&p2, bits, output);
+
+                    if (ret != MAID_SERIAL_UNKNOWN)
+                        ret = (!private) ? MAID_SERIAL_PKCS8_RSA_PUBLIC  :
+                                           MAID_SERIAL_PKCS8_RSA_PRIVATE ;
                 }
             }
         }
@@ -671,7 +675,7 @@ maid_to_asn1_integer(u8 *output, size_t words,
 {
     if (size > sizeof(maid_mp_word) * words)
     {
-        output[0] = 0x0;
+        output[0] = 0x00;
         output = &(output[1]);
     }
 
@@ -691,13 +695,22 @@ maid_to_asn1_integer(u8 *output, size_t words,
 
 static struct maid_pem *
 maid_rsa_export(struct maid_pem *ret, size_t bits, maid_mp_word **input,
-                bool private)
+                bool private, bool pkcs8)
 {
     u8 items = (private) ? 8 : 2;
 
     size_t words = maid_mp_words(bits);
     size_t sizes[items];
 
+    const u8 pub_header[]  = {0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86,
+                              0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00};
+    const u8 priv_header[] = {0x02, 0x01, 0x00, 0x30, 0x0D, 0x06, 0x09, 0x2A,
+                              0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01,
+                              0x05, 0x00};
+
+    const size_t header_s = (pkcs8) ? ((private) ? sizeof(priv_header) :
+                                                   sizeof(pub_header)  )
+                                    : 0x00;
     ret->size = (private) ? 3 : 0;
     for (size_t i = 0; i < items; i++)
     {
@@ -706,16 +719,42 @@ maid_rsa_export(struct maid_pem *ret, size_t bits, maid_mp_word **input,
     }
 
     size_t seq_s = ret->size;
+    size_t diff  = maid_measure_tag(seq_s) - seq_s;
+    size_t diff2 = maid_measure_tag(seq_s + diff) - seq_s - diff;
+    size_t extra = (pkcs8) ? (header_s + diff + diff2 + !private) : 0x00;
+
     if (ret->size)
     {
-        ret->type = (private) ? MAID_PEM_PRIVATE_RSA : MAID_PEM_PUBLIC_RSA;
-        ret->size = maid_measure_tag(ret->size);
+        if (pkcs8)
+            ret->type = (private) ? MAID_PEM_PRIVATE : MAID_PEM_PUBLIC;
+        else
+            ret->type = (private) ? MAID_PEM_PRIVATE_RSA : MAID_PEM_PUBLIC_RSA;
+
+        ret->size = maid_measure_tag(ret->size + extra);
         ret->data = calloc(1, ret->size);
     }
 
     if (ret->data)
     {
-        u8 *output = maid_to_tag(ret->data, 0x30, seq_s);
+        u8 *output = maid_to_tag(ret->data, 0x30, seq_s + extra);
+
+        if (pkcs8)
+        {
+            const u8 *header = (private) ? priv_header : pub_header;
+            memcpy(output, header, header_s);
+            output = &(output[header_s]);
+
+            if (private)
+                output = maid_to_tag(output, 0x04, seq_s + diff);
+            else
+            {
+                output = maid_to_tag(output, 0x03, seq_s + diff + 1);
+                output[0] = 0x00;
+                output = &(output[1]);
+            }
+
+            output = maid_to_tag(output, 0x30, seq_s);
+        }
 
         if (private)
         {
@@ -786,11 +825,19 @@ maid_serial_export(enum maid_serial s, size_t bits, maid_mp_word **input)
         switch (s)
         {
             case MAID_SERIAL_RSA_PUBLIC:
-                ret = maid_rsa_export(ret, bits, input, false);
+                ret = maid_rsa_export(ret, bits, input, false, false);
                 break;
 
             case MAID_SERIAL_RSA_PRIVATE:
-                ret = maid_rsa_export(ret, bits, input, true);
+                ret = maid_rsa_export(ret, bits, input, true, false);
+                break;
+
+            case MAID_SERIAL_PKCS8_RSA_PUBLIC:
+                ret = maid_rsa_export(ret, bits, input, false, true);
+                break;
+
+            case MAID_SERIAL_PKCS8_RSA_PRIVATE:
+                ret = maid_rsa_export(ret, bits, input, true, true);
                 break;
 
             default:

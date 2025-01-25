@@ -42,7 +42,9 @@ enum maid_serial
 {
     MAID_SERIAL_UNKNOWN,
     MAID_SERIAL_RSA_PUBLIC,
-    MAID_SERIAL_RSA_PRIVATE
+    MAID_SERIAL_RSA_PRIVATE,
+    MAID_SERIAL_PKCS8_RSA_PUBLIC,
+    MAID_SERIAL_PKCS8_RSA_PRIVATE
 };
 
 enum maid_serial maid_serial_import(struct maid_pem *p, size_t *bits,

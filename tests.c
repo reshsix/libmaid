@@ -2017,7 +2017,8 @@ serial_tests(void)
             maid_mp_word *data[7] = {NULL};
 
             enum maid_serial type = maid_serial_import(p, &bits, data);
-            if (type == MAID_SERIAL_RSA_PUBLIC)
+            if (type == MAID_SERIAL_RSA_PUBLIC ||
+                type == MAID_SERIAL_PKCS8_RSA_PUBLIC)
             {
                 struct maid_rsa_key k = {.modulo   = data[0],
                                          .exponent = data[1]};
@@ -2028,7 +2029,8 @@ serial_tests(void)
                 free(data[i]);
 
             type = maid_serial_import(p2, &bits, data);
-            if (type == MAID_SERIAL_RSA_PRIVATE)
+            if (type == MAID_SERIAL_RSA_PRIVATE ||
+                type == MAID_SERIAL_PKCS8_RSA_PRIVATE)
             {
                 struct maid_rsa_key k = {.modulo   = data[0],
                                          .exponent = data[2]};
