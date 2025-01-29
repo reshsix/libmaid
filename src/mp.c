@@ -23,7 +23,8 @@
 
 #include <maid/mp.h>
 
-const char *maid_mp_fmt = "%016lx";
+const char *maid_mp_fmt    = "%016lx";
+const char *maid_mp_fmt_ns = "%lx";
 static const size_t maid_mp_bits  = sizeof(maid_mp_word) * 8;
 static const size_t maid_mp_bytes = sizeof(maid_mp_word) * 1;
 static const maid_mp_word maid_mp_max = -1;
@@ -74,9 +75,18 @@ maid_mp_debug(size_t words, const char *name,
     {
         if (!format)
         {
+            bool started = false;
             fprintf(stderr, "%s: 0x", name);
             for (size_t i = 0; i < words; i++)
-                fprintf(stderr, maid_mp_fmt, (a) ? a[words - 1 - i] : 0x0);
+            {
+                maid_mp_word w = a[words - 1 - i];
+                if (!started && w == 0)
+                    continue;
+
+                fprintf(stderr, (started) ? maid_mp_fmt : maid_mp_fmt_ns,
+                        (a) ? a[words - 1 - i] : 0x0);
+                started = true;
+            }
             fprintf(stderr, "\n");
         }
         else

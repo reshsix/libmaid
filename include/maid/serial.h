@@ -38,6 +38,8 @@ struct maid_pem *maid_pem_import(const char *input, const char **endptr);
 char *maid_pem_export(struct maid_pem *p);
 struct maid_pem *maid_pem_free(struct maid_pem *p);
 
+#include <maid/mp.h>
+
 enum maid_serial
 {
     MAID_SERIAL_UNKNOWN,
