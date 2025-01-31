@@ -15,7 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 --->
 
-# Digital signatures
+# Key generation
 
 ```c
 #include <maid/keygen.h>

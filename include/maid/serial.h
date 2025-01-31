@@ -20,16 +20,18 @@
 
 #include <maid/types.h>
 
+enum maid_pem_t
+{
+    MAID_PEM_UNKNOWN,
+    MAID_PEM_PUBLIC_RSA,
+    MAID_PEM_PRIVATE_RSA,
+    MAID_PEM_PUBLIC,
+    MAID_PEM_PRIVATE
+};
+
 struct maid_pem
 {
-    enum
-    {
-        MAID_PEM_UNKNOWN,
-        MAID_PEM_PUBLIC_RSA,
-        MAID_PEM_PRIVATE_RSA,
-        MAID_PEM_PUBLIC,
-        MAID_PEM_PRIVATE
-    } type;
+    enum maid_pem_t type;
     u8 *data;
     size_t size;
 };

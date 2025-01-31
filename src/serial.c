@@ -42,6 +42,10 @@ maid_pem_import(const char *input, const char **endptr)
 {
     struct maid_pem *ret = NULL;
 
+    const char *endptr2 = NULL;
+    if (!endptr)
+        endptr = &endptr2;
+
     size_t limit = (input) ? (strlen(input) * 3) / 4 : 0;
     if (limit > 32)
     {
