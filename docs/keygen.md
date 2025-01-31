@@ -25,7 +25,7 @@
 
 <details>
 <summary>size_t maid_keygen_rsa(size_t bits, maid_mp_word **output,
-                                maid_rng *g);</summary>
+                                maid_rng *g)</summary>
 Generates a RSA key
 
 ### Parameters

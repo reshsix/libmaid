@@ -21,10 +21,11 @@
 #include <maid/serial.h>
 ```
 
-## External Interface (PEM)
+## PEM Interface
 
 <details>
 <summary>enum maid_pem_t</summary>
+
 | name                 | translation     |
 |----------------------|-----------------|
 | MAID_PEM_UNKNOWN     | (Unrecognized)  |
@@ -36,6 +37,7 @@
 
 <details>
 <summary>struct maid_pem</summary>
+
 | field | description         |
 |-------|---------------------|
 | type  | Type of the header  |
@@ -45,7 +47,7 @@
 
 <details>
 <summary>struct maid_pem *maid_pem_import(const char *input,
-                                          const char **endptr);</summary>
+                                          const char **endptr)</summary>
 Imports data from a PEM string (Skips comments)
 
 ### Parameters
@@ -62,7 +64,7 @@ Imports data from a PEM string (Skips comments)
 </details>
 
 <details>
-<summary>char *maid_pem_export(struct maid_pem *p);</summary>
+<summary>char *maid_pem_export(struct maid_pem *p)</summary>
 Exports data to a PEM string
 
 ### Parameters
@@ -78,7 +80,7 @@ Exports data to a PEM string
 </details>
 
 <details>
-<summary>struct maid_pem *maid_pem_free(struct maid_pem *p);</summary>
+<summary>struct maid_pem *maid_pem_free(struct maid_pem *p)</summary>
 Frees a maid_pem struct alocated by the library
 
 ### Parameters
@@ -93,10 +95,11 @@ Frees a maid_pem struct alocated by the library
 
 </details>
 
-# External Interface (DER)
+## Serial Interface
 
 <details>
 <summary>enum maid_serial</summary>
+
 | name                          | description           | multiprecision integers                   |
 |-------------------------------|-----------------------|-------------------------------------------|
 | MAID_SERIAL_UNKNOWN           | (Unrecognized)        |                                           |
@@ -108,7 +111,7 @@ Frees a maid_pem struct alocated by the library
 
 <details>
 <summary>enum maid_serial maid_serial_import(struct maid_pem *p, size_t *bits,
-                                             maid_mp_word **output);</summary>
+                                             maid_mp_word **output)</summary>
 Imports a serialized object as ordered multiprecision integers
 
 ### Parameters
@@ -128,7 +131,7 @@ Imports a serialized object as ordered multiprecision integers
 
 <details>
 <summary>struct maid_pem *maid_serial_export(enum maid_serial s, size_t bits,
-                                             maid_mp_word **input);</summary>
+                                             maid_mp_word **input)</summary>
 Exports ordered multiprecision integers as a serialized object
 
 ### Parameters
