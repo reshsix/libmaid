@@ -174,8 +174,8 @@ maid_pem_export(struct maid_pem *p)
         size_t label_s = strlen(label);
         if (label_s && label_s < 49)
         {
-            size_t usage = 32 + (label_s * 2) + ((p->size * 4) / 3) +
-                           (p->size / 48) + 1 + 1;
+            size_t usage = 1 + 32 + (label_s * 2) + ((p->size / 48) + 2) +
+                           (((p->size * 4) / 3) + 4);
             ret = calloc(1, usage);
         }
     }

@@ -6,7 +6,7 @@
 </div>
 
 ## ☕ About
-Version: **1.2 beta**
+Version: **1.2 pre-release**
 
 ## 🎬 Getting Started
 
