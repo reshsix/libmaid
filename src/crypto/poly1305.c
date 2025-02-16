@@ -181,5 +181,6 @@ const struct maid_mac_def maid_poly1305 =
     .renew = poly1305_renew,
     .update = poly1305_update,
     .digest = poly1305_digest,
-    .state_s = 16
+    .state_s = 16,
+    .digest_s = 16,
 };

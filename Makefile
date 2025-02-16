@@ -19,7 +19,7 @@ CFLAGS += --std=c99 -Iinclude -Wall -Wextra
 
 .PHONY: all debug clean install uninstall
 
-TARGETS = build/libmaid.a build/libmaid.so
+TARGETS = build/libmaid.a build/libmaid.so build/maid
 all: CFLAGS += -O2 -DNDEBUG=1
 all: $(TARGETS)
 debug: CFLAGS += -Og -pg -ggdb3
@@ -35,10 +35,12 @@ install: build/libmaid.a build/libmaid.so
 	cp build/libmaid.a  "$(DESTDIR)/lib/"
 	cp build/libmaid.so "$(DESTDIR)/lib/"
 	cp -r include/maid "$(DESTDIR)/include/"
+	cp build/maid "$(DESTDIR)/bin/"
 uninstall:
 	rm -rf "$(DESTDIR)/include/maid/"
 	rm -rf "$(DESTDIR)/lib/libmaid.a"
 	rm -rf "$(DESTDIR)/lib/libmaid.so"
+	rm -rf "$(DESTDIR)/bin/maid"
 
 test:
 	$(CC) $(CFLAGS) -static tests.c -o build/tests -Lbuild -lmaid
@@ -66,3 +68,6 @@ build/libmaid.a: $(OBJS) | build
 	ranlib $@
 build/libmaid.so: $(OBJS) | build
 	$(CC) -shared -o $@ $^
+
+build/maid: | build
+	$(CC) cli.c -o $@ -lmaid

@@ -30,6 +30,7 @@ struct maid_hash_def
     void (*update)(void *, u8 *, size_t);
     void (*digest)(void *, u8 *);
     size_t state_s;
+    size_t digest_s;
     u8 version;
 };
 
@@ -40,7 +41,7 @@ maid_hash *maid_hash_new(struct maid_hash_def def);
 maid_hash *maid_hash_del(maid_hash *m);
 void maid_hash_renew(maid_hash *m);
 void maid_hash_update(maid_hash *m, const u8 *buffer, size_t size);
-void maid_hash_digest(maid_hash *m, u8 *output);
+size_t maid_hash_digest(maid_hash *m, u8 *output);
 
 /* External algorithms */
 

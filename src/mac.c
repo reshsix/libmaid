@@ -101,9 +101,11 @@ maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
     }
 }
 
-extern void
+extern size_t
 maid_mac_digest(struct maid_mac *m, u8 *output)
 {
+    size_t ret = 0;
+
     if (m && output && !(m->finished))
     {
         if (m->buffer_c)
@@ -113,5 +115,9 @@ maid_mac_digest(struct maid_mac *m, u8 *output)
         m->buffer_c = 0;
 
         m->finished = true;
+
+        ret = m->def.digest_s;
     }
+
+    return ret;
 }

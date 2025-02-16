@@ -6,7 +6,7 @@
 </div>
 
 ## ☕ About
-Version: **1.2**
+Version: **1.3 alpha**
 
 ## 🎬 Getting Started
 
@@ -27,7 +27,11 @@ sudo make install
 sudo ldconfig
 ```
 
-## 📖 Library Reference
+### Usage
+The library can be linked with -lmaid, and a command-line tool `maid` is
+available
+
+## 📖 Reference
 | Category                             | Algorithms                |
 | ------------------------------------:|---------------------------|
 | [Type aliases](docs/types.md)        | ------------------------- |

@@ -432,6 +432,7 @@ const struct maid_hash_def maid_sha224 =
     .update = sha2_update,
     .digest = sha2_digest,
     .state_s = 64,
+    .digest_s = 28,
     .version = SHA_224
 };
 
@@ -443,6 +444,7 @@ const struct maid_hash_def maid_sha256 =
     .update = sha2_update,
     .digest = sha2_digest,
     .state_s = 64,
+    .digest_s = 32,
     .version = SHA_256
 };
 
@@ -454,6 +456,7 @@ const struct maid_hash_def maid_sha384 =
     .update = sha2_update,
     .digest = sha2_digest,
     .state_s = 128,
+    .digest_s = 48,
     .version = SHA_384
 };
 
@@ -465,6 +468,7 @@ const struct maid_hash_def maid_sha512 =
     .update = sha2_update,
     .digest = sha2_digest,
     .state_s = 128,
+    .digest_s = 64,
     .version = SHA_512
 };
 
@@ -476,6 +480,7 @@ const struct maid_hash_def maid_sha512_224 =
     .update = sha2_update,
     .digest = sha2_digest,
     .state_s = 128,
+    .digest_s = 28,
     .version = SHA_512_224
 };
 
@@ -487,5 +492,6 @@ const struct maid_hash_def maid_sha512_256 =
     .update = sha2_update,
     .digest = sha2_digest,
     .state_s = 128,
+    .digest_s = 32,
     .version = SHA_512_256
 };

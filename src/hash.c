@@ -99,9 +99,11 @@ maid_hash_update(struct maid_hash *m, const u8 *buffer, size_t size)
     }
 }
 
-extern void
+extern size_t
 maid_hash_digest(struct maid_hash *m, u8 *output)
 {
+    size_t ret = 0;
+
     if (m && output && !(m->finished))
     {
         if (m->buffer_c)
@@ -111,5 +113,9 @@ maid_hash_digest(struct maid_hash *m, u8 *output)
         m->buffer_c = 0;
 
         m->finished = true;
+
+        ret = m->def.digest_s;
     }
+
+    return ret;
 }

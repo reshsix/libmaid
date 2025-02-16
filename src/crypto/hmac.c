@@ -186,6 +186,7 @@ const struct maid_mac_def maid_hmac_sha224 =
     .update = hmac_update,
     .digest = hmac_digest,
     .state_s = 64,
+    .digest_s = 28,
     .version = HMAC_SHA224
 };
 
@@ -197,6 +198,7 @@ const struct maid_mac_def maid_hmac_sha256 =
     .update = hmac_update,
     .digest = hmac_digest,
     .state_s = 64,
+    .digest_s = 32,
     .version = HMAC_SHA256
 };
 
@@ -208,6 +210,7 @@ const struct maid_mac_def maid_hmac_sha384 =
     .update = hmac_update,
     .digest = hmac_digest,
     .state_s = 128,
+    .digest_s = 48,
     .version = HMAC_SHA384
 };
 
@@ -219,6 +222,7 @@ const struct maid_mac_def maid_hmac_sha512 =
     .update = hmac_update,
     .digest = hmac_digest,
     .state_s = 128,
+    .digest_s = 64,
     .version = HMAC_SHA512
 };
 
@@ -230,6 +234,7 @@ const struct maid_mac_def maid_hmac_sha512_224 =
     .update = hmac_update,
     .digest = hmac_digest,
     .state_s = 128,
+    .digest_s = 28,
     .version = HMAC_SHA512_224
 };
 
@@ -241,5 +246,6 @@ const struct maid_mac_def maid_hmac_sha512_256 =
     .update = hmac_update,
     .digest = hmac_digest,
     .state_s = 128,
+    .digest_s = 32,
     .version = HMAC_SHA512_256
 };
