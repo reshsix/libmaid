@@ -535,7 +535,8 @@ sign_verify(int argc, char *argv[], bool verify)
 
                 if (!verify)
                 {
-                    if (read(in, buffer, hash_s) == (ssize_t)hash_s)
+                    if (read(in, buffer, hash_s) == (ssize_t)hash_s &&
+                        read(in, buffer, 1) == 0)
                     {
                         ctx = maid_sign_new(*sign_d, NULL, pub, bits);
 
@@ -550,12 +551,12 @@ sign_verify(int argc, char *argv[], bool verify)
                             fprintf(stderr, "Out of memory\n");
                     }
                     else
-                        fprintf(stderr, "Hash is too short");
+                        fprintf(stderr, "Invalid hash\n");
                 }
                 else
                 {
                     if (read(in, buffer, sizeof(buffer)) ==
-                        (ssize_t)sizeof(buffer))
+                        (ssize_t)sizeof(buffer) && read(in, buffer, 1) == 0)
                     {
                         ctx = maid_sign_new(*sign_d, pub, NULL, bits);
 
@@ -565,13 +566,13 @@ sign_verify(int argc, char *argv[], bool verify)
                                 ret = (write(out, buffer, hash_s) ==
                                        (ssize_t)hash_s);
                             else
-                                fprintf(stderr, "Invalid signature");
+                                fprintf(stderr, "Invalid signature\n");
                         }
                         else
                             fprintf(stderr, "Out of memory\n");
                     }
                     else
-                        fprintf(stderr, "Invalid signature");
+                        fprintf(stderr, "Invalid signature\n");
                 }
 
                 maid_sign_del(ctx);
