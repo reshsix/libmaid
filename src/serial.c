@@ -239,7 +239,7 @@ maid_asn1_check(u8 id, const u8 *current, size_t remain)
         }
 
         /* Rejects invalid long form and out of bounds */
-        if (octets == 1 || (ret + octets + 2) > remain)
+        if ((octets && ret == 1) || (ret + octets + 2) > remain)
             ret = 0;
     }
 

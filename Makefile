@@ -69,5 +69,5 @@ build/libmaid.a: $(OBJS) | build
 build/libmaid.so: $(OBJS) | build
 	$(CC) -shared -o $@ $^
 
-build/maid: | build
-	$(CC) cli.c -o $@ -lmaid
+build/maid: cli.c | build
+	$(CC) $(CFLAGS) $^ -o $@ -lmaid
