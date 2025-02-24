@@ -199,6 +199,24 @@ get_data(char *filename, u8 *out, size_t size, bool lt)
     return ret;
 }
 
+extern size_t
+get_data_fd(int fd, u8 *buffer, size_t size)
+{
+    size_t ret = 0;
+
+    if (read(fd, buffer, size) == (ssize_t)size)
+    {
+        if (read(fd, buffer, 1)  == 0)
+            ret = size;
+        else
+            fprintf(stderr, "Wrong size: longer than %ld\n", size);
+    }
+    else
+        fprintf(stderr, "Wrong size: shorter than %ld\n", size);
+
+    return ret;
+}
+
 extern maid_pub *
 get_pub(char *filename, size_t *bits, bool private)
 {
@@ -279,6 +297,13 @@ usage(void)
     fprintf(stderr, "        hmac-sha512/224  (key: 128)\n");
     fprintf(stderr, "        hmac-sha512/256  (key: 128)\n");
     fprintf(stderr, "        poly1305         (key:  32)\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "    maid rng [algorithm] < entropy\n");
+    fprintf(stderr, "    Pseudo-randomly generate bytes\n");
+    fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        ctr-drbg-aes-128 (entropy: 32)\n");
+    fprintf(stderr, "        ctr-drbg-aes-192 (entropy: 40)\n");
+    fprintf(stderr, "        ctr-drbg-aes-256 (entropy: 48)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "    maid hash [algorithm] < message\n");
     fprintf(stderr, "    Hashes a message\n");
@@ -394,9 +419,9 @@ mac(int argc, char *argv[])
     {
         bool oom = true;
 
-        u8 key[32] = {0};
+        u8 key[128] = {0};
 
-        void *ctx = NULL;
+        maid_mac *ctx = NULL;
         if      (strcmp(argv[1], "hmac-sha224") == 0)
             ret = get_data(argv[2], key, 64, false) &&
                   (ctx = maid_mac_new(maid_hmac_sha224, key));
@@ -433,6 +458,59 @@ mac(int argc, char *argv[])
             fprintf(stderr, "Out of memory\n");
 
         maid_mem_clear(key, sizeof(key));
+    }
+    else
+        ret = usage();
+
+    return ret;
+}
+
+extern bool
+rng(int argc, char *argv[])
+{
+    bool ret = false;
+
+    if (argc == 2)
+    {
+        bool oom = true;
+
+        int in  = STDIN_FILENO;
+        int out = STDOUT_FILENO;
+
+        u8 entropy[48] = {0};
+        maid_rng *ctx = NULL;
+        if      (strcmp(argv[1], "ctr-drbg-aes-128") == 0)
+            ret = get_data_fd(in, entropy, 32) &&
+                  (ctx = maid_rng_new(maid_ctr_drbg_aes_128, entropy));
+        else if (strcmp(argv[1], "ctr-drbg-aes-192") == 0)
+            ret = get_data_fd(in, entropy, 40) &&
+                  (ctx = maid_rng_new(maid_ctr_drbg_aes_192, entropy));
+        else if (strcmp(argv[1], "ctr-drbg-aes-256") == 0)
+            ret = get_data_fd(in, entropy, 48) &&
+                  (ctx = maid_rng_new(maid_ctr_drbg_aes_256, entropy));
+        else
+        {
+            ret = usage();
+            oom = false;
+        }
+
+        if (ret)
+        {
+            u8 buffer[4096] = {0};
+            while (true)
+            {
+                maid_rng_generate(ctx, buffer, sizeof(buffer));
+                if (write(out, buffer, sizeof(buffer)) != sizeof(buffer))
+                    break;
+            }
+            maid_mem_clear(buffer, sizeof(buffer));
+
+            maid_rng_del(ctx);
+        }
+        else if (!ctx && oom)
+            fprintf(stderr, "Out of memory\n");
+
+        maid_mem_clear(entropy, sizeof(entropy));
     }
     else
         ret = usage();
@@ -543,6 +621,8 @@ sign_verify(int argc, char *argv[], bool verify)
             if (ret)
             {
                 ret = false;
+
+                /* Don't use get_data_fd here */
 
                 if (!verify)
                 {
@@ -663,10 +743,11 @@ exchange_secret(int argc, char *argv[], bool secret)
             ret = false;
         }
 
-
         if (ret)
         {
             ret = false;
+
+            /* Don't use get_data_fd here */
 
             u8 buffer[key_s], buffer2[key_s];
             if (!secret)
@@ -722,6 +803,8 @@ main(int argc, char *argv[])
             ret = stream(argc, argv);
         else if (strcmp(argv[0], "mac") == 0)
             ret = mac(argc, argv);
+        else if (strcmp(argv[0], "rng") == 0)
+            ret = rng(argc, argv);
         else if (strcmp(argv[0], "hash") == 0)
             ret = hash(argc, argv);
         else if (strcmp(argv[0], "sign") == 0)
