@@ -68,40 +68,43 @@ maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big)
 }
 
 extern void
-maid_mp_debug(size_t words, const char *name,
-              const maid_mp_word *a, bool format)
+maid_mp_debug(FILE *output, size_t words, const char *name,
+              const maid_mp_word *a, bool beautify)
 {
-    if (words && name)
+    if (output && words && name)
     {
-        if (!format)
-        {
-            bool started = false;
-            fprintf(stderr, "%s: 0x", name);
-            for (size_t i = 0; i < words; i++)
-            {
-                maid_mp_word w = a[words - 1 - i];
-                if (!started && w == 0)
-                    continue;
+        volatile bool started = false;
+        volatile maid_mp_word w = 0;
 
-                fprintf(stderr, (started) ? maid_mp_fmt : maid_mp_fmt_ns,
-                        (a) ? a[words - 1 - i] : 0x0);
-                started = true;
-            }
-            fprintf(stderr, "\n");
-        }
-        else
+        fprintf(output, (beautify) ? "%s: \n    " : "%s: 0x", name);
+        for (size_t i = 0; i < words; i++)
         {
-            fprintf(stderr, "%s: \n", name);
-            for (size_t i = 0; i < words; i++)
-            {
-                if (i && i % 4 == 0)
-                    fprintf(stderr, "\n");
+            w = ((a) ? a[words - 1 - i] : 0x0);
+            if (!started && w == 0 && i != words - 1)
+                continue;
 
-                fprintf(stderr, maid_mp_fmt, (a) ? a[words - 1 - i] : 0x0);
-                fprintf(stderr, " ");
+            if (beautify)
+            {
+                size_t bytes = sizeof(maid_mp_word);
+                for (size_t j = 0; j < bytes; j++)
+                {
+                    fprintf(output, "%02x", (u8)(w >> ((bytes - 1 - j) * 8)));
+                    if (i != words - 1 || j != bytes - 1)
+                        fprintf(output, ":");
+                    if (i != 0 && i % 2 == 1 &&
+                        i != words - 1 && j == bytes - 1)
+                        fprintf(output, "\n    ");
+                }
             }
-            fprintf(stderr, "\n\n");
+            else
+                fprintf(output, (started) ? maid_mp_fmt : maid_mp_fmt_ns, w);
+
+            started = true;
         }
+        fprintf(output, (beautify) ? "\n\n" : "\n");
+
+        w = 0;
+        started = false;
     }
 }
 

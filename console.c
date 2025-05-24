@@ -344,6 +344,12 @@ usage(void)
     fprintf(stderr, "    Generates a secret from key exchange\n");
     fprintf(stderr, "    Algorithms:\n");
     fprintf(stderr, "        dh-group14 (public: 256, private: 256)\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "    maid info [algorithm] [file]\n");
+    fprintf(stderr, "    Display file information\n");
+    fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        pem (file: PEM)\n");
+    fprintf(stderr, "\n");
     return false;
 }
 
@@ -789,6 +795,79 @@ exchange_secret(int argc, char *argv[], bool secret)
     return ret;
 }
 
+extern bool
+info(int argc, char *argv[])
+{
+    bool ret = false;
+
+    if (argc == 3)
+    {
+        char *filename = argv[2];
+        FILE *output = stdout;
+
+        if (strcmp(argv[1], "pem") == 0)
+        {
+            struct maid_pem *p = NULL;
+            static u8 buffer[65536] = {0};
+            if (get_data(filename, buffer, sizeof(buffer), true) &&
+                (p = maid_pem_import((char *)buffer, NULL)))
+            {
+                maid_mp_word *params[8] = {NULL};
+                size_t bits = 0;
+
+                enum maid_serial t = maid_serial_import(p, &bits, params);
+                size_t words = maid_mp_words(bits);
+                if (t == MAID_SERIAL_RSA_PUBLIC ||
+                    t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
+                {
+                    fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
+                    maid_mp_debug(output, words, "Modulus",  params[0], true);
+                    maid_mp_debug(output, words, "Exponent", params[1], false);
+                }
+                else if (t == MAID_SERIAL_RSA_PRIVATE ||
+                         t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+                {
+                    fprintf(output, "RSA Private Key (%ld bits)\n\n", bits);
+                    maid_mp_debug(output, words, "Modulus",  params[0], true);
+                    maid_mp_debug(output, words, "Public Exponent",
+                                  params[1], false);
+                    maid_mp_debug(output, words, "Private Exponent",
+                                  params[2], true);
+                    maid_mp_debug(output, words, "Prime 1",
+                                  params[3], true);
+                    maid_mp_debug(output, words, "Prime 2",
+                                  params[4], true);
+                    maid_mp_debug(output, words, "Exponent 1",
+                                  params[5], true);
+                    maid_mp_debug(output, words, "Exponent 2",
+                                  params[6], true);
+                    maid_mp_debug(output, words, "Coefficient",
+                                  params[7], true);
+                }
+                else
+                {
+                    if (t == MAID_SERIAL_UNKNOWN)
+                        fprintf(stderr, "Unknown format\n");
+                    else
+                        fprintf(stderr, "Format unsupported by info\n");
+                }
+
+                for (size_t i = 0; i < 8; i++)
+                    maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+                maid_mem_clear(params, sizeof(params));
+            }
+            else if (p == NULL)
+                fprintf(stderr, "Invalid PEM file\n");
+
+            maid_mem_clear(buffer, sizeof(buffer));
+        }
+        else
+            ret = usage();
+    }
+
+    return ret;
+}
+
 extern int
 main(int argc, char *argv[])
 {
@@ -815,6 +894,8 @@ main(int argc, char *argv[])
             ret = exchange_secret(argc, argv, false);
         else if (strcmp(argv[0], "secret") == 0)
             ret = exchange_secret(argc, argv, true);
+        else if (strcmp(argv[0], "info") == 0)
+            ret = info(argc, argv);
         else
             ret = usage();
     }

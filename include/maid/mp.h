@@ -27,8 +27,9 @@ size_t maid_mp_words(size_t bits);
 void maid_mp_read(size_t words, maid_mp_word *a, const u8 *addr, bool big);
 void maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big);
 
-void maid_mp_debug(size_t words, const char *name,
-                   const maid_mp_word *a, bool format);
+#include <stdio.h>
+void maid_mp_debug(FILE *output, size_t words, const char *name,
+                   const maid_mp_word *a, bool beautify);
 
 void maid_mp_not(size_t words, maid_mp_word *a);
 void maid_mp_and(size_t words, maid_mp_word *a, const maid_mp_word *b);
