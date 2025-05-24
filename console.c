@@ -36,6 +36,7 @@
 #include <maid/sign.h>
 #include <maid/kex.h>
 #include <maid/serial.h>
+#include <maid/keygen.h>
 
 /* Filter functions */
 
@@ -349,6 +350,17 @@ usage(void)
     fprintf(stderr, "    Display file information\n");
     fprintf(stderr, "    Algorithms:\n");
     fprintf(stderr, "        pem (file: PEM)\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "    maid keygen [algorithm] [generator] < entropy\n");
+    fprintf(stderr, "    Generates a key using entropy\n");
+    fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        rsa-2048\n");
+    fprintf(stderr, "        rsa-3072\n");
+    fprintf(stderr, "        rsa-4096\n");
+    fprintf(stderr, "    Generators:\n");
+    fprintf(stderr, "        ctr-drbg-aes-128 (entropy: 32)\n");
+    fprintf(stderr, "        ctr-drbg-aes-192 (entropy: 40)\n");
+    fprintf(stderr, "        ctr-drbg-aes-256 (entropy: 48)\n");
     fprintf(stderr, "\n");
     return false;
 }
@@ -823,6 +835,7 @@ info(int argc, char *argv[])
                     fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
                     maid_mp_debug(output, words, "Modulus",  params[0], true);
                     maid_mp_debug(output, words, "Exponent", params[1], false);
+                    ret = true;
                 }
                 else if (t == MAID_SERIAL_RSA_PRIVATE ||
                          t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
@@ -843,6 +856,7 @@ info(int argc, char *argv[])
                                   params[6], true);
                     maid_mp_debug(output, words, "Coefficient",
                                   params[7], true);
+                    ret = true;
                 }
                 else
                 {
@@ -863,6 +877,84 @@ info(int argc, char *argv[])
         }
         else
             ret = usage();
+    }
+
+    return ret;
+}
+
+extern bool
+keygen(int argc, char *argv[])
+{
+    bool ret = false;
+
+    if (argc == 3)
+    {
+        bool oom = true;
+
+        int in  = STDIN_FILENO;
+        FILE *output = stdout;
+
+        volatile size_t bits = 0;
+
+        ret = true;
+        if (strcmp(argv[1], "rsa-2048") == 0)
+            bits = 2048;
+        else if (strcmp(argv[1], "rsa-3072") == 0)
+            bits = 3072;
+        else if (strcmp(argv[1], "rsa-4096") == 0)
+            bits = 4096;
+        else
+        {
+            ret = usage();
+            oom = false;
+        }
+
+        u8 entropy[48] = {0};
+        maid_rng *gen = NULL;
+        if (ret)
+        {
+            if      (strcmp(argv[2], "ctr-drbg-aes-128") == 0)
+                ret = get_data_fd(in, entropy, 32) &&
+                      (gen = maid_rng_new(maid_ctr_drbg_aes_128, entropy));
+            else if (strcmp(argv[2], "ctr-drbg-aes-192") == 0)
+                ret = get_data_fd(in, entropy, 40) &&
+                      (gen = maid_rng_new(maid_ctr_drbg_aes_192, entropy));
+            else if (strcmp(argv[2], "ctr-drbg-aes-256") == 0)
+                ret = get_data_fd(in, entropy, 48) &&
+                      (gen = maid_rng_new(maid_ctr_drbg_aes_256, entropy));
+            else
+            {
+                ret = usage();
+                oom = false;
+            }
+        }
+
+        if (ret)
+        {
+            maid_mp_word *params[8];
+            size_t words = maid_keygen_rsa(bits, params, gen);
+
+            struct maid_pem *p = NULL;
+            p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC, bits, params);
+            if (p)
+                fprintf(output, "%s\n", maid_pem_export(p));
+            free(p);
+
+            p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PRIVATE, bits, params);
+            if (p)
+                fprintf(output, "%s\n", maid_pem_export(p));
+            free(p);
+
+            for (size_t i = 0; i < 8; i++)
+                maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+            maid_mem_clear(params, sizeof(params));
+        }
+        else if (!gen && oom)
+            fprintf(stderr, "Out of memory\n");
+
+        maid_rng_del(gen);
+        maid_mem_clear(entropy, sizeof(entropy));
+        bits = 0;
     }
 
     return ret;
@@ -896,6 +988,8 @@ main(int argc, char *argv[])
             ret = exchange_secret(argc, argv, true);
         else if (strcmp(argv[0], "info") == 0)
             ret = info(argc, argv);
+        else if (strcmp(argv[0], "keygen") == 0)
+            ret = keygen(argc, argv);
         else
             ret = usage();
     }
