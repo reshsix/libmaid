@@ -249,14 +249,11 @@ get_pub(char *filename, size_t *bits, bool private)
             if (!ret)
                 fprintf(stderr, "Out of memory\n");
         }
+        else if (t == MAID_SERIAL_UNKNOWN)
+            fprintf(stderr, "Unknown format\n");
         else
-        {
-            if (t == MAID_SERIAL_UNKNOWN)
-                fprintf(stderr, "Unknown format\n");
-            else
-                fprintf(stderr, "Not a %s key\n",
-                        (private) ? "private" : "public");
-        }
+            fprintf(stderr, "Not a %s key\n",
+                    (private) ? "private" : "public");
 
         size_t words = maid_mp_words(*bits);
         for (size_t i = 0; i < 8; i++)
@@ -346,13 +343,13 @@ usage(void)
     fprintf(stderr, "    Algorithms:\n");
     fprintf(stderr, "        dh-group14 (public: 256, private: 256)\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "    maid info [algorithm] [file]\n");
+    fprintf(stderr, "    maid info [format] [file]\n");
     fprintf(stderr, "    Display file information\n");
-    fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "    Format:\n");
     fprintf(stderr, "        pem (file: PEM)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "    maid keygen [algorithm] [generator] < entropy\n");
-    fprintf(stderr, "    Generates a key using entropy\n");
+    fprintf(stderr, "    Generates a private key using entropy\n");
     fprintf(stderr, "    Algorithms:\n");
     fprintf(stderr, "        rsa-2048\n");
     fprintf(stderr, "        rsa-3072\n");
@@ -361,6 +358,11 @@ usage(void)
     fprintf(stderr, "        ctr-drbg-aes-128 (entropy: 32)\n");
     fprintf(stderr, "        ctr-drbg-aes-192 (entropy: 40)\n");
     fprintf(stderr, "        ctr-drbg-aes-256 (entropy: 48)\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "    maid pubkey [format] [file]\n");
+    fprintf(stderr, "    Extracts public key from private key\n");
+    fprintf(stderr, "    Format:\n");
+    fprintf(stderr, "        pem (file: PEM)\n");
     fprintf(stderr, "\n");
     return false;
 }
@@ -693,6 +695,8 @@ sign_verify(int argc, char *argv[], bool verify)
         maid_mem_clear(buffer, sizeof(buffer));
         maid_pub_del(pub);
     }
+    else
+        ret = usage();
 
     return ret;
 }
@@ -858,13 +862,10 @@ info(int argc, char *argv[])
                                   params[7], true);
                     ret = true;
                 }
+                else if (t == MAID_SERIAL_UNKNOWN)
+                    fprintf(stderr, "Unknown format\n");
                 else
-                {
-                    if (t == MAID_SERIAL_UNKNOWN)
-                        fprintf(stderr, "Unknown format\n");
-                    else
-                        fprintf(stderr, "Format unsupported by info\n");
-                }
+                    fprintf(stderr, "Format unsupported by info\n");
 
                 for (size_t i = 0; i < 8; i++)
                     maid_mem_clear(params[i], words * sizeof(maid_mp_word));
@@ -878,6 +879,8 @@ info(int argc, char *argv[])
         else
             ret = usage();
     }
+    else
+        ret = usage();
 
     return ret;
 }
@@ -935,14 +938,14 @@ keygen(int argc, char *argv[])
             size_t words = maid_keygen_rsa(bits, params, gen);
 
             struct maid_pem *p = NULL;
-            p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC, bits, params);
-            if (p)
-                fprintf(output, "%s\n", maid_pem_export(p));
-            free(p);
-
             p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PRIVATE, bits, params);
             if (p)
                 fprintf(output, "%s\n", maid_pem_export(p));
+            else
+            {
+                fprintf(stderr, "Failed to export key");
+                ret = false;
+            }
             free(p);
 
             for (size_t i = 0; i < 8; i++)
@@ -956,6 +959,71 @@ keygen(int argc, char *argv[])
         maid_mem_clear(entropy, sizeof(entropy));
         bits = 0;
     }
+    else
+        ret = usage();
+
+    return ret;
+}
+
+extern bool
+pubkey(int argc, char *argv[])
+{
+    bool ret = false;
+
+    if (argc == 3)
+    {
+        char *filename = argv[2];
+        FILE *output = stdout;
+
+        if (strcmp(argv[1], "pem") == 0)
+        {
+            struct maid_pem *p = NULL;
+            static u8 buffer[65536] = {0};
+            if (get_data(filename, buffer, sizeof(buffer), true) &&
+                (p = maid_pem_import((char *)buffer, NULL)))
+            {
+                maid_mp_word *params[8] = {NULL};
+                size_t bits = 0;
+
+                enum maid_serial t = maid_serial_import(p, &bits, params);
+                size_t words = maid_mp_words(bits);
+                if (t == MAID_SERIAL_RSA_PRIVATE ||
+                    t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+                {
+                    struct maid_pem *p = NULL;
+                    p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC,
+                                           bits, params);
+                    if (p)
+                    {
+                        fprintf(output, "%s\n", maid_pem_export(p));
+                        ret = true;
+                    }
+                    else
+                        fprintf(stderr, "Failed to export key\n");
+                    free(p);
+                }
+                else if (t == MAID_SERIAL_RSA_PUBLIC ||
+                         t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
+                    fprintf(stderr, "File is already a public key\n");
+                else if (t == MAID_SERIAL_UNKNOWN)
+                    fprintf(stderr, "Unknown format\n");
+                else
+                    fprintf(stderr, "Format unsupported by info\n");
+
+                for (size_t i = 0; i < 8; i++)
+                    maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+                maid_mem_clear(params, sizeof(params));
+            }
+            else if (p == NULL)
+                fprintf(stderr, "Invalid PEM file\n");
+
+            maid_mem_clear(buffer, sizeof(buffer));
+        }
+        else
+            ret = usage();
+    }
+    else
+        ret = usage();
 
     return ret;
 }
@@ -990,6 +1058,8 @@ main(int argc, char *argv[])
             ret = info(argc, argv);
         else if (strcmp(argv[0], "keygen") == 0)
             ret = keygen(argc, argv);
+        else if (strcmp(argv[0], "pubkey") == 0)
+            ret = pubkey(argc, argv);
         else
             ret = usage();
     }
