@@ -31,6 +31,7 @@
 #include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
+#include <maid/aead.h>
 #include <maid/hash.h>
 #include <maid/pub.h>
 #include <maid/sign.h>
@@ -58,6 +59,30 @@ filter_stream(void *ctx, int out, u8 *buf, size_t buf_c)
     if (buf_c)
     {
         maid_stream_xor(ctx, buf, buf_c);
+        write(out, buf, buf_c);
+    }
+
+    return true;
+}
+
+static bool
+filter_encrypt(void *ctx, int out, u8 *buf, size_t buf_c)
+{
+    if (buf_c)
+    {
+        maid_aead_crypt(ctx, buf, buf_c, false);
+        write(out, buf, buf_c);
+    }
+
+    return true;
+}
+
+static bool
+filter_decrypt(void *ctx, int out, u8 *buf, size_t buf_c)
+{
+    if (buf_c)
+    {
+        maid_aead_crypt(ctx, buf, buf_c, true);
         write(out, buf, buf_c);
     }
 
@@ -296,6 +321,24 @@ usage(void)
     fprintf(stderr, "        hmac-sha512/256  (key: 128)\n");
     fprintf(stderr, "        poly1305         (key:  32)\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "    maid encrypt [algorithm] [key file] [iv file] \n");
+    fprintf(stderr, "                 [tag file] [aad file] < message\n");
+    fprintf(stderr, "    Encrypts and generates a message tag\n");
+    fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        aes-128-gcm      (key: 32, tag: 16, aad: any)\n");
+    fprintf(stderr, "        aes-192-gcm      (key: 48, tag: 16, aad: any)\n");
+    fprintf(stderr, "        aes-256-gcm      (key: 64, tag: 16, aad: any)\n");
+    fprintf(stderr, "        chacha20poly1305 (key: 64, tag: 32, aad: any)\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "    maid decrypt [algorithm] [key file] [iv file] \n");
+    fprintf(stderr, "                 [tag file] [aad file] < message\n");
+    fprintf(stderr, "    Decrypts and validates a message tag\n");
+    fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        aes-128-gcm      (key: 32, tag: 16, aad: any)\n");
+    fprintf(stderr, "        aes-192-gcm      (key: 48, tag: 16, aad: any)\n");
+    fprintf(stderr, "        aes-256-gcm      (key: 64, tag: 16, aad: any)\n");
+    fprintf(stderr, "        chacha20poly1305 (key: 64, tag: 32, aad: any)\n");
+    fprintf(stderr, "\n");
     fprintf(stderr, "    maid rng [algorithm] < entropy\n");
     fprintf(stderr, "    Pseudo-randomly generate bytes\n");
     fprintf(stderr, "    Algorithms:\n");
@@ -478,6 +521,125 @@ mac(int argc, char *argv[])
             fprintf(stderr, "Out of memory\n");
 
         maid_mem_clear(key, sizeof(key));
+    }
+    else
+        ret = usage();
+
+    return ret;
+}
+
+extern bool
+encrypt_decrypt(int argc, char *argv[], bool decrypt)
+{
+    bool ret = false;
+
+    if (argc == 6)
+    {
+        bool oom = true;
+
+        u8  key[32] = {0};
+        u8   iv[16] = {0};
+        ssize_t tag_s = 0;
+
+        maid_aead *ctx = NULL;
+        if      (strcmp(argv[1], "aes-128-gcm") == 0)
+        {
+            tag_s = 16;
+            ret = get_data(argv[2], key, 16, false) &&
+                  get_data(argv[3],  iv, 16, false) &&
+                  (ctx = maid_aead_new(maid_aes_gcm_128, key, iv));
+        }
+        else if (strcmp(argv[1], "aes-192-gcm") == 0)
+        {
+            tag_s = 16;
+            ret = get_data(argv[2], key, 24, false) &&
+                  get_data(argv[3],  iv, 16, false) &&
+                  (ctx = maid_aead_new(maid_aes_gcm_192, key, iv));
+        }
+        else if (strcmp(argv[1], "aes-256-gcm") == 0)
+        {
+            tag_s = 16;
+            ret = get_data(argv[2], key, 32, false) &&
+                  get_data(argv[3],  iv, 16, false) &&
+                  (ctx = maid_aead_new(maid_aes_gcm_256, key, iv));
+        }
+        else if (strcmp(argv[1], "chacha20poly1305") == 0)
+        {
+            tag_s = 32;
+            ret = get_data(argv[2], key, 32, false) &&
+                  get_data(argv[3],  iv, 12, false) &&
+                  (ctx = maid_aead_new(maid_chacha20poly1305, key, iv));
+        }
+        else
+        {
+            ret = usage();
+            oom = false;
+        }
+
+        if (ctx)
+        {
+            ret = true;
+
+            int fd = open(argv[5], O_RDONLY);
+            if (fd < 0)
+            {
+                perror("Error opening file");
+                ret = false;
+            }
+
+            if (ret)
+            {
+                u8 buf[BUFSIZ];
+                ssize_t n = 0;
+                while ((n = read(fd, buf, BUFSIZ)) > 0)
+                    maid_aead_update(ctx, buf, n);
+
+                if (n >= 0)
+                {
+                    run_filter(ctx, (!decrypt) ? filter_encrypt :
+                                                 filter_decrypt);
+                    u8 tag[32] = {0};
+                    maid_aead_digest(ctx, tag);
+                    if (!decrypt)
+                    {
+                        int fd2 = open(argv[4], O_WRONLY | O_CREAT, 0644);
+                        if (fd2 >= 0)
+                        {
+                            if (write(fd2, tag, tag_s) != tag_s)
+                            {
+                                perror("Error writing to file");
+                                ret = false;
+                            }
+                        }
+                        else
+                        {
+                            perror("Error opening file");
+                            ret = false;
+                        }
+                    }
+                    else
+                    {
+                        u8 tag2[32] = {0};
+                        ret = get_data(argv[4], tag2, tag_s, false);
+                        if (ret && memcmp(tag, tag2, tag_s) != 0)
+                        {
+                            fprintf(stderr, "Tag mismatch\n");
+                            ret = false;
+                        }
+                        maid_mem_clear(tag2, sizeof(tag2));
+                    }
+                    maid_mem_clear(tag, sizeof(tag));
+                }
+                else
+                    perror("Error reading from file");
+            }
+        }
+        else if (!ctx & oom)
+            fprintf(stderr, "Out of memory\n");
+
+        maid_mem_clear(key,  sizeof(key));
+        maid_mem_clear(iv,   sizeof(iv));
+        maid_aead_del(ctx);
     }
     else
         ret = usage();
@@ -1042,6 +1204,10 @@ main(int argc, char *argv[])
             ret = stream(argc, argv);
         else if (strcmp(argv[0], "mac") == 0)
             ret = mac(argc, argv);
+        else if (strcmp(argv[0], "encrypt") == 0)
+            ret = encrypt_decrypt(argc, argv, false);
+        else if (strcmp(argv[0], "decrypt") == 0)
+            ret = encrypt_decrypt(argc, argv, true);
         else if (strcmp(argv[0], "rng") == 0)
             ret = rng(argc, argv);
         else if (strcmp(argv[0], "hash") == 0)
