@@ -980,59 +980,71 @@ info(int argc, char *argv[])
         char *filename = argv[1];
         FILE *output = stdout;
 
-        struct maid_pem *p = NULL;
         static u8 buffer[65536] = {0};
-        if (get_data(filename, buffer, sizeof(buffer), true) &&
-            (p = maid_pem_import((char *)buffer, NULL)))
+        if (get_data(filename, buffer, sizeof(buffer), true))
         {
-            maid_mp_word *params[8] = {NULL};
-            size_t bits = 0;
-
-            enum maid_serial t = maid_serial_import(p, &bits, params);
-            size_t words = maid_mp_words(bits);
-            if (t == MAID_SERIAL_RSA_PUBLIC ||
-                t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
+            bool empty = true;
+            char *current = buffer, *endptr = buffer;
+            while (current && current[0] != '\0')
             {
-                fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
-                maid_mp_debug(output, words, "Modulus",  params[0], true);
-                maid_mp_debug(output, words, "Exponent", params[1], false);
-                ret = true;
-            }
-            else if (t == MAID_SERIAL_RSA_PRIVATE ||
-                     t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
-            {
-                fprintf(output, "RSA Private Key (%ld bits)\n\n", bits);
-                maid_mp_debug(output, words, "Modulus",  params[0], true);
-                maid_mp_debug(output, words, "Public Exponent",
-                              params[1], false);
-                maid_mp_debug(output, words, "Private Exponent",
-                              params[2], true);
-                maid_mp_debug(output, words, "Prime 1",
-                              params[3], true);
-                maid_mp_debug(output, words, "Prime 2",
-                              params[4], true);
-                maid_mp_debug(output, words, "Exponent 1",
-                              params[5], true);
-                maid_mp_debug(output, words, "Exponent 2",
-                              params[6], true);
-                maid_mp_debug(output, words, "Coefficient",
-                              params[7], true);
-                ret = true;
-            }
-            else if (t == MAID_SERIAL_UNKNOWN)
-                fprintf(stderr, "Unknown format\n");
-            else
-                fprintf(stderr, "Format unsupported by info\n");
+                struct maid_pem *p = maid_pem_import(current, &endptr);
+                if (!p)
+                    break;
+                empty = false;
 
-            for (size_t i = 0; i < 8; i++)
-                maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-            maid_mem_clear(params, sizeof(params));
+                maid_mp_word *params[8] = {NULL};
+                size_t bits = 0;
+
+                enum maid_serial t = maid_serial_import(p, &bits, params);
+                size_t words = maid_mp_words(bits);
+                if (t == MAID_SERIAL_RSA_PUBLIC ||
+                    t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
+                {
+                    fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
+                    maid_mp_debug(output, words, "Modulus",  params[0], true);
+                    maid_mp_debug(output, words, "Exponent", params[1], false);
+                    fprintf(output, "\n");
+                    ret = true;
+                }
+                else if (t == MAID_SERIAL_RSA_PRIVATE ||
+                         t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+                {
+                    fprintf(output, "RSA Private Key (%ld bits)\n\n", bits);
+                    maid_mp_debug(output, words, "Modulus",  params[0], true);
+                    maid_mp_debug(output, words, "Public Exponent",
+                                  params[1], false);
+                    maid_mp_debug(output, words, "Private Exponent",
+                                  params[2], true);
+                    maid_mp_debug(output, words, "Prime 1",
+                                  params[3], true);
+                    maid_mp_debug(output, words, "Prime 2",
+                                  params[4], true);
+                    maid_mp_debug(output, words, "Exponent 1",
+                                  params[5], true);
+                    maid_mp_debug(output, words, "Exponent 2",
+                                  params[6], true);
+                    maid_mp_debug(output, words, "Coefficient",
+                                  params[7], true);
+                    ret = true;
+                }
+                else if (t == MAID_SERIAL_UNKNOWN)
+                    fprintf(stderr, "Unknown format\n");
+                else
+                    fprintf(stderr, "Format unsupported by info\n");
+
+                for (size_t i = 0; i < 8; i++)
+                    maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+                maid_mem_clear(params, sizeof(params));
+
+                current = endptr;
+                maid_pem_free(p);
+            }
+
+            if (empty)
+                fprintf(stderr, "No PEM data found\n");
         }
-        else if (p == NULL)
-            fprintf(stderr, "Invalid PEM file\n");
 
         maid_mem_clear(buffer, sizeof(buffer));
-        maid_pem_free(p);
     }
     else
         ret = usage();
