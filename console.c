@@ -289,6 +289,7 @@ get_pub(char *filename, size_t *bits, bool private)
         fprintf(stderr, "Invalid PEM file\n");
 
     maid_mem_clear(buffer, sizeof(buffer));
+    maid_pem_free(p);
 
     return ret;
 }
@@ -386,10 +387,8 @@ usage(void)
     fprintf(stderr, "    Algorithms:\n");
     fprintf(stderr, "        dh-group14 (public: 256, private: 256)\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "    maid info [format] [file]\n");
-    fprintf(stderr, "    Display file information\n");
-    fprintf(stderr, "    Format:\n");
-    fprintf(stderr, "        pem (file: PEM)\n");
+    fprintf(stderr, "    maid info [file]\n");
+    fprintf(stderr, "    Displays PEM file information\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "    maid keygen [algorithm] [generator] < entropy\n");
     fprintf(stderr, "    Generates a private key using entropy\n");
@@ -402,10 +401,8 @@ usage(void)
     fprintf(stderr, "        ctr-drbg-aes-192 (entropy: 40)\n");
     fprintf(stderr, "        ctr-drbg-aes-256 (entropy: 48)\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "    maid pubkey [format] [file]\n");
+    fprintf(stderr, "    maid pubkey [key file]\n");
     fprintf(stderr, "    Extracts public key from private key\n");
-    fprintf(stderr, "    Format:\n");
-    fprintf(stderr, "        pem (file: PEM)\n");
     fprintf(stderr, "\n");
     return false;
 }
@@ -978,68 +975,64 @@ info(int argc, char *argv[])
 {
     bool ret = false;
 
-    if (argc == 3)
+    if (argc == 2)
     {
-        char *filename = argv[2];
+        char *filename = argv[1];
         FILE *output = stdout;
 
-        if (strcmp(argv[1], "pem") == 0)
+        struct maid_pem *p = NULL;
+        static u8 buffer[65536] = {0};
+        if (get_data(filename, buffer, sizeof(buffer), true) &&
+            (p = maid_pem_import((char *)buffer, NULL)))
         {
-            struct maid_pem *p = NULL;
-            static u8 buffer[65536] = {0};
-            if (get_data(filename, buffer, sizeof(buffer), true) &&
-                (p = maid_pem_import((char *)buffer, NULL)))
+            maid_mp_word *params[8] = {NULL};
+            size_t bits = 0;
+
+            enum maid_serial t = maid_serial_import(p, &bits, params);
+            size_t words = maid_mp_words(bits);
+            if (t == MAID_SERIAL_RSA_PUBLIC ||
+                t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
             {
-                maid_mp_word *params[8] = {NULL};
-                size_t bits = 0;
-
-                enum maid_serial t = maid_serial_import(p, &bits, params);
-                size_t words = maid_mp_words(bits);
-                if (t == MAID_SERIAL_RSA_PUBLIC ||
-                    t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
-                {
-                    fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
-                    maid_mp_debug(output, words, "Modulus",  params[0], true);
-                    maid_mp_debug(output, words, "Exponent", params[1], false);
-                    ret = true;
-                }
-                else if (t == MAID_SERIAL_RSA_PRIVATE ||
-                         t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
-                {
-                    fprintf(output, "RSA Private Key (%ld bits)\n\n", bits);
-                    maid_mp_debug(output, words, "Modulus",  params[0], true);
-                    maid_mp_debug(output, words, "Public Exponent",
-                                  params[1], false);
-                    maid_mp_debug(output, words, "Private Exponent",
-                                  params[2], true);
-                    maid_mp_debug(output, words, "Prime 1",
-                                  params[3], true);
-                    maid_mp_debug(output, words, "Prime 2",
-                                  params[4], true);
-                    maid_mp_debug(output, words, "Exponent 1",
-                                  params[5], true);
-                    maid_mp_debug(output, words, "Exponent 2",
-                                  params[6], true);
-                    maid_mp_debug(output, words, "Coefficient",
-                                  params[7], true);
-                    ret = true;
-                }
-                else if (t == MAID_SERIAL_UNKNOWN)
-                    fprintf(stderr, "Unknown format\n");
-                else
-                    fprintf(stderr, "Format unsupported by info\n");
-
-                for (size_t i = 0; i < 8; i++)
-                    maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-                maid_mem_clear(params, sizeof(params));
+                fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
+                maid_mp_debug(output, words, "Modulus",  params[0], true);
+                maid_mp_debug(output, words, "Exponent", params[1], false);
+                ret = true;
             }
-            else if (p == NULL)
-                fprintf(stderr, "Invalid PEM file\n");
+            else if (t == MAID_SERIAL_RSA_PRIVATE ||
+                     t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+            {
+                fprintf(output, "RSA Private Key (%ld bits)\n\n", bits);
+                maid_mp_debug(output, words, "Modulus",  params[0], true);
+                maid_mp_debug(output, words, "Public Exponent",
+                              params[1], false);
+                maid_mp_debug(output, words, "Private Exponent",
+                              params[2], true);
+                maid_mp_debug(output, words, "Prime 1",
+                              params[3], true);
+                maid_mp_debug(output, words, "Prime 2",
+                              params[4], true);
+                maid_mp_debug(output, words, "Exponent 1",
+                              params[5], true);
+                maid_mp_debug(output, words, "Exponent 2",
+                              params[6], true);
+                maid_mp_debug(output, words, "Coefficient",
+                              params[7], true);
+                ret = true;
+            }
+            else if (t == MAID_SERIAL_UNKNOWN)
+                fprintf(stderr, "Unknown format\n");
+            else
+                fprintf(stderr, "Format unsupported by info\n");
 
-            maid_mem_clear(buffer, sizeof(buffer));
+            for (size_t i = 0; i < 8; i++)
+                maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+            maid_mem_clear(params, sizeof(params));
         }
-        else
-            ret = usage();
+        else if (p == NULL)
+            fprintf(stderr, "Invalid PEM file\n");
+
+        maid_mem_clear(buffer, sizeof(buffer));
+        maid_pem_free(p);
     }
     else
         ret = usage();
@@ -1108,7 +1101,7 @@ keygen(int argc, char *argv[])
                 fprintf(stderr, "Failed to export key");
                 ret = false;
             }
-            free(p);
+            maid_pem_free(p);
 
             for (size_t i = 0; i < 8; i++)
                 maid_mem_clear(params[i], words * sizeof(maid_mp_word));
@@ -1132,57 +1125,53 @@ pubkey(int argc, char *argv[])
 {
     bool ret = false;
 
-    if (argc == 3)
+    if (argc == 2)
     {
-        char *filename = argv[2];
+        char *filename = argv[1];
         FILE *output = stdout;
 
-        if (strcmp(argv[1], "pem") == 0)
+        struct maid_pem *p = NULL;
+        static u8 buffer[65536] = {0};
+        if (get_data(filename, buffer, sizeof(buffer), true) &&
+            (p = maid_pem_import((char *)buffer, NULL)))
         {
-            struct maid_pem *p = NULL;
-            static u8 buffer[65536] = {0};
-            if (get_data(filename, buffer, sizeof(buffer), true) &&
-                (p = maid_pem_import((char *)buffer, NULL)))
+            maid_mp_word *params[8] = {NULL};
+            size_t bits = 0;
+
+            enum maid_serial t = maid_serial_import(p, &bits, params);
+            size_t words = maid_mp_words(bits);
+            if (t == MAID_SERIAL_RSA_PRIVATE ||
+                t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
             {
-                maid_mp_word *params[8] = {NULL};
-                size_t bits = 0;
-
-                enum maid_serial t = maid_serial_import(p, &bits, params);
-                size_t words = maid_mp_words(bits);
-                if (t == MAID_SERIAL_RSA_PRIVATE ||
-                    t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+                struct maid_pem *p = NULL;
+                p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC,
+                                       bits, params);
+                if (p)
                 {
-                    struct maid_pem *p = NULL;
-                    p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC,
-                                           bits, params);
-                    if (p)
-                    {
-                        fprintf(output, "%s\n", maid_pem_export(p));
-                        ret = true;
-                    }
-                    else
-                        fprintf(stderr, "Failed to export key\n");
-                    free(p);
+                    fprintf(output, "%s\n", maid_pem_export(p));
+                    ret = true;
                 }
-                else if (t == MAID_SERIAL_RSA_PUBLIC ||
-                         t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
-                    fprintf(stderr, "File is already a public key\n");
-                else if (t == MAID_SERIAL_UNKNOWN)
-                    fprintf(stderr, "Unknown format\n");
                 else
-                    fprintf(stderr, "Format unsupported by info\n");
-
-                for (size_t i = 0; i < 8; i++)
-                    maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-                maid_mem_clear(params, sizeof(params));
+                    fprintf(stderr, "Failed to export key\n");
+                maid_pem_free(p);
             }
-            else if (p == NULL)
-                fprintf(stderr, "Invalid PEM file\n");
+            else if (t == MAID_SERIAL_RSA_PUBLIC ||
+                     t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
+                fprintf(stderr, "File is already a public key\n");
+            else if (t == MAID_SERIAL_UNKNOWN)
+                fprintf(stderr, "Unknown format\n");
+            else
+                fprintf(stderr, "Format unsupported by info\n");
 
-            maid_mem_clear(buffer, sizeof(buffer));
+            for (size_t i = 0; i < 8; i++)
+                maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+            maid_mem_clear(params, sizeof(params));
         }
-        else
-            ret = usage();
+        else if (p == NULL)
+            fprintf(stderr, "Invalid PEM file\n");
+
+        maid_mem_clear(buffer, sizeof(buffer));
+        maid_pem_free(p);
     }
     else
         ret = usage();
