@@ -183,8 +183,8 @@ get_data(char *filename, u8 *out, size_t size, bool lt)
         {
             if (st.st_size != (ssize_t)size)
             {
-                fprintf(stderr, "Wrong size: %ld instead of %ld\n",
-                        st.st_size, size);
+                fprintf(stderr, "%s: %ld bytes instead of %ld\n",
+                        filename, st.st_size, size);
                 ret = 0;
             }
         }
@@ -192,8 +192,8 @@ get_data(char *filename, u8 *out, size_t size, bool lt)
         {
             if (st.st_size > (ssize_t)size)
             {
-                fprintf(stderr, "Too large: %ld when %ld is the limit\n",
-                        st.st_size, size);
+                fprintf(stderr, "%s: %ld bytes when %ld is the limit\n",
+                        filename, st.st_size, size);
                 ret = 0;
             }
             else
@@ -226,19 +226,20 @@ get_data(char *filename, u8 *out, size_t size, bool lt)
 }
 
 extern size_t
-get_data_fd(int fd, u8 *buffer, size_t size)
+get_data_fd(int fd, u8 *buffer, size_t size, bool lt)
 {
     size_t ret = 0;
 
-    if (read(fd, buffer, size) == (ssize_t)size)
+    size_t bytes = read(fd, buffer, size);
+    if (bytes == size || (lt && bytes < size))
     {
-        if (read(fd, buffer, 1)  == 0)
+        if (read(fd, buffer, 1) == 0)
             ret = size;
         else
-            fprintf(stderr, "Wrong size: longer than %ld\n", size);
+            fprintf(stderr, "/dev/fd/%d: longer than %ld bytes\n", fd, size);
     }
     else
-        fprintf(stderr, "Wrong size: shorter than %ld\n", size);
+        fprintf(stderr, "/dev/fd/%d: shorter than %ld bytes\n", fd, size);
 
     return ret;
 }
@@ -387,8 +388,8 @@ usage(void)
     fprintf(stderr, "    Algorithms:\n");
     fprintf(stderr, "        dh-group14 (public: 256, private: 256)\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "    maid info [file]\n");
-    fprintf(stderr, "    Displays PEM file information\n");
+    fprintf(stderr, "    maid info < data\n");
+    fprintf(stderr, "    Displays PEM data information\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "    maid keygen [algorithm] [generator] < entropy\n");
     fprintf(stderr, "    Generates a private key using entropy\n");
@@ -414,52 +415,60 @@ stream(int argc, char *argv[])
 
     if (argc == 4)
     {
-        bool oom = true;
-
         u8 key[32] = {0};
         u8  iv[16] = {0};
 
-        void *ctx = NULL;
-        if      (strcmp(argv[1], "aes-128-ctr") == 0)
+        size_t key_s = 0;
+        size_t iv_s  = 0;
+        const struct maid_block_def  *def_b = NULL;
+        const struct maid_stream_def *def_s = NULL;
+
+        ret = true;
+        if (strcmp(argv[1], "aes-128-ctr") == 0)
         {
-            ret = get_data(argv[2], key, 16, false) &&
-                  get_data(argv[3],  iv, 16, false) &&
-                  (ctx = maid_block_new(maid_aes_128, key, iv)) &&
-                  run_filter(ctx, filter_block_ctr);
-            maid_block_del(ctx);
+            key_s  = 16;
+            iv_s   = 16;
+            def_b   = &maid_aes_128;
         }
         else if (strcmp(argv[1], "aes-192-ctr") == 0)
         {
-            ret = get_data(argv[2], key, 24, false) &&
-                  get_data(argv[3],  iv, 16, false) &&
-                  (ctx = maid_block_new(maid_aes_192, key, iv)) &&
-                  run_filter(ctx, filter_block_ctr);
-            maid_block_del(ctx);
+            key_s  = 24;
+            iv_s   = 16;
+            def_b  = &maid_aes_192;
         }
         else if (strcmp(argv[1], "aes-256-ctr") == 0)
         {
-            ret = get_data(argv[2], key, 32, false) &&
-                  get_data(argv[3],  iv, 16, false) &&
-                  (ctx = maid_block_new(maid_aes_256, key, iv)) &&
-                  run_filter(ctx, filter_block_ctr);
-            maid_block_del(ctx);
+            key_s  = 24;
+            iv_s   = 16;
+            def_b  = &maid_aes_192;
         }
         else if (strcmp(argv[1], "chacha20") == 0)
         {
-            ret = get_data(argv[2], key, 32, false) &&
-                  get_data(argv[3],  iv, 12, false) &&
-                  (ctx = maid_stream_new(maid_chacha20, key, iv, 0)) &&
-                  run_filter(ctx, filter_stream);
-            maid_stream_del(ctx);
+            key_s  = 24;
+            iv_s   = 16;
+            def_s  = &maid_chacha20;
         }
         else
-        {
             ret = usage();
-            oom = false;
-        }
 
-        if (!ctx & oom)
-            fprintf(stderr, "Out of memory\n");
+        if (ret && get_data(argv[2], key, key_s, false) &&
+                   get_data(argv[3],  iv, iv_s,  false))
+        {
+            void *ctx = NULL;
+
+            if (def_s)
+                ctx = maid_stream_new(*def_s, key, iv, 0);
+            else
+                ctx = maid_block_new (*def_b, key, iv);
+
+            if (ctx)
+                run_filter(ctx, (def_s) ? filter_stream    :
+                                          filter_block_ctr);
+            else
+                fprintf(stderr, "Out of memory\n");
+
+            maid_stream_del(ctx);
+        }
 
         maid_mem_clear(key, sizeof(key));
         maid_mem_clear(iv,  sizeof(iv));
@@ -477,45 +486,61 @@ mac(int argc, char *argv[])
 
     if (argc == 3)
     {
-        bool oom = true;
-
         u8 key[128] = {0};
 
-        maid_mac *ctx = NULL;
-        if      (strcmp(argv[1], "hmac-sha224") == 0)
-            ret = get_data(argv[2], key, 64, false) &&
-                  (ctx = maid_mac_new(maid_hmac_sha224, key));
-        else if (strcmp(argv[1], "hmac-sha256") == 0)
-            ret = get_data(argv[2], key, 64, false) &&
-                  (ctx = maid_mac_new(maid_hmac_sha256, key));
-        else if (strcmp(argv[1], "hmac-sha384") == 0)
-            ret = get_data(argv[2], key, 128, false) &&
-                  (ctx = maid_mac_new(maid_hmac_sha384, key));
-        else if (strcmp(argv[1], "hmac-sha512") == 0)
-            ret = get_data(argv[2], key, 128, false) &&
-                  (ctx = maid_mac_new(maid_hmac_sha512, key));
-        else if (strcmp(argv[1], "hmac-sha512/224") == 0)
-            ret = get_data(argv[2], key, 128, false) &&
-                  (ctx = maid_mac_new(maid_hmac_sha512_224, key));
-        else if (strcmp(argv[1], "hmac-sha512/256") == 0)
-            ret = get_data(argv[2], key, 128, false) &&
-                  (ctx = maid_mac_new(maid_hmac_sha512_256, key));
-        else if (strcmp(argv[1], "poly1305") == 0)
-            ret = get_data(argv[2], key, 32, false) &&
-                  (ctx = maid_mac_new(maid_poly1305, key));
-        else
-        {
-            ret = usage();
-            oom = false;
-        }
+        size_t key_s = 0;
+        const struct maid_mac_def *def = NULL;
 
-        if (ret)
+        ret = true;
+        if (strcmp(argv[1], "hmac-sha224") == 0)
         {
-            run_filter(ctx, filter_mac);
+            key_s = 64;
+            def   = &maid_hmac_sha224;
+        }
+        else if (strcmp(argv[1], "hmac-sha256") == 0)
+        {
+            key_s = 64;
+            def   = &maid_hmac_sha256;
+        }
+        else if (strcmp(argv[1], "hmac-sha384") == 0)
+        {
+            key_s = 128;
+            def   = &maid_hmac_sha384;
+        }
+        else if (strcmp(argv[1], "hmac-sha512") == 0)
+        {
+            key_s = 128;
+            def   = &maid_hmac_sha512;
+        }
+        else if (strcmp(argv[1], "hmac-sha512/224") == 0)
+        {
+            key_s = 128;
+            def   = &maid_hmac_sha512_224;
+        }
+        else if (strcmp(argv[1], "hmac-sha512/256") == 0)
+        {
+            key_s = 128;
+            def   = &maid_hmac_sha512_256;
+        }
+        else if (strcmp(argv[1], "poly1305") == 0)
+        {
+            key_s = 32;
+            def   = &maid_poly1305;
+        }
+        else
+            ret = usage();
+
+        if (ret && get_data(argv[2], key, key_s, false))
+        {
+            maid_mac *ctx = maid_mac_new(*def, key);
+
+            if (ctx)
+                run_filter(ctx, filter_mac);
+            else
+                fprintf(stderr, "Out of memory\n");
+
             maid_mac_del(ctx);
         }
-        else if (!ctx && oom)
-            fprintf(stderr, "Out of memory\n");
 
         maid_mem_clear(key, sizeof(key));
     }
@@ -532,55 +557,65 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
 
     if (argc == 6)
     {
-        bool oom = true;
+        ret = true;
 
         u8  key[32] = {0};
         u8   iv[16] = {0};
-        ssize_t tag_s = 0;
 
-        maid_aead *ctx = NULL;
-        if      (strcmp(argv[1], "aes-128-gcm") == 0)
+        size_t  key_s = 0;
+        size_t  iv_s  = 0;
+        ssize_t tag_s = 0;
+        const struct maid_aead_def *def = NULL;
+
+        if (strcmp(argv[1], "aes-128-gcm") == 0)
         {
+            key_s = 16;
+            iv_s  = 16;
             tag_s = 16;
-            ret = get_data(argv[2], key, 16, false) &&
-                  get_data(argv[3],  iv, 16, false) &&
-                  (ctx = maid_aead_new(maid_aes_gcm_128, key, iv));
+            def = &maid_aes_gcm_128;
         }
         else if (strcmp(argv[1], "aes-192-gcm") == 0)
         {
+            key_s = 24;
+            iv_s  = 16;
             tag_s = 16;
-            ret = get_data(argv[2], key, 24, false) &&
-                  get_data(argv[3],  iv, 16, false) &&
-                  (ctx = maid_aead_new(maid_aes_gcm_192, key, iv));
+            def = &maid_aes_gcm_192;
         }
         else if (strcmp(argv[1], "aes-256-gcm") == 0)
         {
+            key_s = 32;
+            iv_s  = 16;
             tag_s = 16;
-            ret = get_data(argv[2], key, 32, false) &&
-                  get_data(argv[3],  iv, 16, false) &&
-                  (ctx = maid_aead_new(maid_aes_gcm_256, key, iv));
+            def = &maid_aes_gcm_256;
         }
         else if (strcmp(argv[1], "chacha20poly1305") == 0)
         {
+            key_s = 32;
+            iv_s  = 12;
             tag_s = 32;
-            ret = get_data(argv[2], key, 32, false) &&
-                  get_data(argv[3],  iv, 12, false) &&
-                  (ctx = maid_aead_new(maid_chacha20poly1305, key, iv));
+            def = &maid_chacha20poly1305;
         }
         else
-        {
             ret = usage();
-            oom = false;
-        }
 
-        if (ctx)
+        if (ret && get_data(argv[2], key, key_s, false) &&
+                   get_data(argv[3],  iv, iv_s,  false))
         {
-            ret = true;
+            maid_aead *ctx = maid_aead_new(*def, key, iv);
 
-            int fd = open(argv[5], O_RDONLY);
-            if (fd < 0)
+            int fd = -1;
+            if (ctx)
             {
-                perror("Error opening file");
+                fd = open(argv[5], O_RDONLY);
+                if (fd < 0)
+                {
+                    perror("Error opening file");
+                    ret = false;
+                }
+            }
+            else
+            {
+                fprintf(stderr, "Out of memory\n");
                 ret = false;
             }
 
@@ -630,13 +665,12 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
                 else
                     perror("Error reading from file");
             }
-        }
-        else if (!ctx & oom)
-            fprintf(stderr, "Out of memory\n");
 
-        maid_mem_clear(key,  sizeof(key));
-        maid_mem_clear(iv,   sizeof(iv));
-        maid_aead_del(ctx);
+            maid_aead_del(ctx);
+        }
+
+        maid_mem_clear(key, sizeof(key));
+        maid_mem_clear(iv,  sizeof(iv));
     }
     else
         ret = usage();
@@ -651,43 +685,54 @@ rng(int argc, char *argv[])
 
     if (argc == 2)
     {
-        bool oom = true;
+        ret = true;
 
         int in  = STDIN_FILENO;
         int out = STDOUT_FILENO;
 
         u8 entropy[48] = {0};
-        maid_rng *ctx = NULL;
-        if      (strcmp(argv[1], "ctr-drbg-aes-128") == 0)
-            ret = get_data_fd(in, entropy, 32) &&
-                  (ctx = maid_rng_new(maid_ctr_drbg_aes_128, entropy));
-        else if (strcmp(argv[1], "ctr-drbg-aes-192") == 0)
-            ret = get_data_fd(in, entropy, 40) &&
-                  (ctx = maid_rng_new(maid_ctr_drbg_aes_192, entropy));
-        else if (strcmp(argv[1], "ctr-drbg-aes-256") == 0)
-            ret = get_data_fd(in, entropy, 48) &&
-                  (ctx = maid_rng_new(maid_ctr_drbg_aes_256, entropy));
-        else
-        {
-            ret = usage();
-            oom = false;
-        }
 
-        if (ret)
+        size_t entropy_s = 0;
+        const struct maid_rng_def *def = NULL;
+
+        if (strcmp(argv[1], "ctr-drbg-aes-128") == 0)
         {
-            u8 buffer[4096] = {0};
-            while (true)
+            entropy_s = 32;
+            def       = &maid_ctr_drbg_aes_128;
+        }
+        else if (strcmp(argv[1], "ctr-drbg-aes-192") == 0)
+        {
+            entropy_s = 40;
+            def       = &maid_ctr_drbg_aes_192;
+        }
+        else if (strcmp(argv[1], "ctr-drbg-aes-256") == 0)
+        {
+            entropy_s = 48;
+            def       = &maid_ctr_drbg_aes_256;
+        }
+        else
+            ret = usage();
+
+        if (ret && get_data_fd(in, entropy, entropy_s, false))
+        {
+            maid_rng *ctx = maid_rng_new(*def, entropy);
+
+            if (ctx)
             {
-                maid_rng_generate(ctx, buffer, sizeof(buffer));
-                if (write(out, buffer, sizeof(buffer)) != sizeof(buffer))
-                    break;
+                u8 buffer[4096] = {0};
+                while (true)
+                {
+                    maid_rng_generate(ctx, buffer, sizeof(buffer));
+                    if (write(out, buffer, sizeof(buffer)) != sizeof(buffer))
+                        break;
+                }
+                maid_mem_clear(buffer, sizeof(buffer));
             }
-            maid_mem_clear(buffer, sizeof(buffer));
+            else
+                fprintf(stderr, "Out of memory\n");
 
             maid_rng_del(ctx);
         }
-        else if (!ctx && oom)
-            fprintf(stderr, "Out of memory\n");
 
         maid_mem_clear(entropy, sizeof(entropy));
     }
@@ -704,34 +749,36 @@ hash(int argc, char *argv[])
 
     if (argc == 2)
     {
-        bool oom = true;
+        ret = true;
 
-        void *ctx = NULL;
-        if      (strcmp(argv[1], "sha224") == 0)
-            ret = (ctx = maid_hash_new(maid_sha224));
+        const struct maid_hash_def *def = NULL;
+
+        if (strcmp(argv[1], "sha224") == 0)
+            def = &maid_sha224;
         else if (strcmp(argv[1], "sha256") == 0)
-            ret = (ctx = maid_hash_new(maid_sha256));
+            def = &maid_sha256;
         else if (strcmp(argv[1], "sha384") == 0)
-            ret = (ctx = maid_hash_new(maid_sha384));
+            def = &maid_sha384;
         else if (strcmp(argv[1], "sha512") == 0)
-            ret = (ctx = maid_hash_new(maid_sha512));
+            def = &maid_sha512;
         else if (strcmp(argv[1], "sha512/224") == 0)
-            ret = (ctx = maid_hash_new(maid_sha512_224));
+            def = &maid_sha512_224;
         else if (strcmp(argv[1], "sha512/256") == 0)
-            ret = (ctx = maid_hash_new(maid_sha512_256));
+            def = &maid_sha512_256;
         else
-        {
             ret = usage();
-            oom = false;
-        }
 
         if (ret)
         {
-            run_filter(ctx, filter_hash);
+            maid_hash *ctx = maid_hash_new(*def);
+
+            if (ctx)
+                run_filter(ctx, filter_hash);
+            else
+                fprintf(stderr, "Out of memory\n");
+
             maid_hash_del(ctx);
         }
-        else if (!ctx && oom)
-            fprintf(stderr, "Out of memory\n");
     }
     else
         ret = usage();
@@ -764,7 +811,7 @@ sign_verify(int argc, char *argv[], bool verify)
             const struct maid_sign_def *sign_d = NULL;
             size_t hash_s = 0;
 
-            if      (strcmp(argv[1], "rsa-pkcs1-sha224") == 0)
+            if (strcmp(argv[1], "rsa-pkcs1-sha224") == 0)
             {
                 sign_d = &maid_pkcs1_v1_5_sha224;
                 hash_s = 28;
@@ -975,16 +1022,19 @@ info(int argc, char *argv[])
 {
     bool ret = false;
 
-    if (argc == 2)
+    (void)argv;
+    if (argc == 1)
     {
-        char *filename = argv[1];
+        int in = STDIN_FILENO;
         FILE *output = stdout;
 
         static u8 buffer[65536] = {0};
-        if (get_data(filename, buffer, sizeof(buffer), true))
+        if (get_data_fd(in, buffer, sizeof(buffer), true))
         {
             bool empty = true;
-            char *current = buffer, *endptr = buffer;
+            const char *current = (char*)buffer;
+            const char *endptr  = (char*)buffer;
+
             while (current && current[0] != '\0')
             {
                 struct maid_pem *p = maid_pem_import(current, &endptr);
@@ -1059,14 +1109,13 @@ keygen(int argc, char *argv[])
 
     if (argc == 3)
     {
-        bool oom = true;
+        ret = true;
 
-        int in  = STDIN_FILENO;
+        int in = STDIN_FILENO;
         FILE *output = stdout;
 
-        volatile size_t bits = 0;
+        size_t bits = 0;
 
-        ret = true;
         if (strcmp(argv[1], "rsa-2048") == 0)
             bits = 2048;
         else if (strcmp(argv[1], "rsa-3072") == 0)
@@ -1074,28 +1123,42 @@ keygen(int argc, char *argv[])
         else if (strcmp(argv[1], "rsa-4096") == 0)
             bits = 4096;
         else
-        {
             ret = usage();
-            oom = false;
-        }
 
         u8 entropy[48] = {0};
-        maid_rng *gen = NULL;
+
+        size_t entropy_s = 0;
+        const struct maid_rng_def *def = NULL;
+
         if (ret)
         {
-            if      (strcmp(argv[2], "ctr-drbg-aes-128") == 0)
-                ret = get_data_fd(in, entropy, 32) &&
-                      (gen = maid_rng_new(maid_ctr_drbg_aes_128, entropy));
-            else if (strcmp(argv[2], "ctr-drbg-aes-192") == 0)
-                ret = get_data_fd(in, entropy, 40) &&
-                      (gen = maid_rng_new(maid_ctr_drbg_aes_192, entropy));
-            else if (strcmp(argv[2], "ctr-drbg-aes-256") == 0)
-                ret = get_data_fd(in, entropy, 48) &&
-                      (gen = maid_rng_new(maid_ctr_drbg_aes_256, entropy));
-            else
+            if (strcmp(argv[2], "ctr-drbg-aes-128") == 0)
             {
+                entropy_s = 32;
+                def       = &maid_ctr_drbg_aes_128;
+            }
+            else if (strcmp(argv[2], "ctr-drbg-aes-192") == 0)
+            {
+                entropy_s = 40;
+                def       = &maid_ctr_drbg_aes_192;
+            }
+            else if (strcmp(argv[2], "ctr-drbg-aes-256") == 0)
+            {
+                entropy_s = 48;
+                def       = &maid_ctr_drbg_aes_256;
+            }
+            else
                 ret = usage();
-                oom = false;
+        }
+
+        maid_rng *gen = NULL;
+        if (ret && get_data_fd(in, entropy, entropy_s, false))
+        {
+            gen = maid_rng_new(*def, entropy);
+            if (!gen)
+            {
+                fprintf(stderr, "Out of memory\n");
+                ret = false;
             }
         }
 
@@ -1119,12 +1182,9 @@ keygen(int argc, char *argv[])
                 maid_mem_clear(params[i], words * sizeof(maid_mp_word));
             maid_mem_clear(params, sizeof(params));
         }
-        else if (!gen && oom)
-            fprintf(stderr, "Out of memory\n");
 
         maid_rng_del(gen);
         maid_mem_clear(entropy, sizeof(entropy));
-        bits = 0;
     }
     else
         ret = usage();
