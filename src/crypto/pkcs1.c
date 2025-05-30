@@ -87,7 +87,7 @@ extern void *
 pkcs1_new(u8 version, maid_pub *public, maid_pub *private, size_t bits)
 {
     struct pkcs1 *ret = NULL;
-    if (bits && bits % (sizeof(maid_mp_word) * 8) == 0)
+    if (bits && bits % (sizeof(maid_mp_word) * 8) == 0 && bits >= 2048)
         ret = calloc(1, sizeof(struct pkcs1));
 
     if (ret)
