@@ -157,6 +157,8 @@ AES-256 block cipher (NIST)
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <maid/mem.h>
+
 #include <maid/block.h>
 
 int main(void)
@@ -175,6 +177,8 @@ int main(void)
     for (size_t i = 0; i < sizeof(data); i++)
         printf("%02x", data[i]);
     printf("\n");
+
+    maid_mem_clear(key,  sizeof(key));
 
     return EXIT_SUCCESS;
 }

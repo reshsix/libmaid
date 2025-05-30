@@ -136,6 +136,8 @@ CTR-DRBG with AES-256 (NIST)
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <maid/mem.h>
+
 #include <maid/rng.h>
 
 int main(void)
@@ -156,6 +158,8 @@ int main(void)
     for (size_t i = 0; i < sizeof(data); i++)
         printf("%02x", data[i]);
     printf("\n");
+
+    maid_mem_clear(entropy, sizeof(entropy));
 
     return EXIT_SUCCESS;
 }

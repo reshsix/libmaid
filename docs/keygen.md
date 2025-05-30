@@ -50,9 +50,11 @@ Generates a RSA key
 #include <stdlib.h>
 
 #include <maid/mp.h>
+#include <maid/mem.h>
 #include <maid/rng.h>
-#include <maid/keygen.h>
 #include <maid/serial.h>
+
+#include <maid/keygen.h>
 
 int main(void)
 {
@@ -62,26 +64,39 @@ int main(void)
 
     maid_mp_word *params[8];
     size_t words = maid_keygen_rsa(2048, params, g);
-    maid_mp_debug(words, "N",            params[0], false);
-    maid_mp_debug(words, "e",            params[1], false);
-    maid_mp_debug(words, "d",            params[2], false);
-    maid_mp_debug(words, "p",            params[3], false);
-    maid_mp_debug(words, "q",            params[4], false);
-    maid_mp_debug(words, "d % (p - 1)",  params[5], false);
-    maid_mp_debug(words, "d % (q - 1)",  params[6], false);
-    maid_mp_debug(words, "q^-1 % p",     params[7], false);
+    maid_mp_debug(stdout, words, "N",            params[0], false);
+    maid_mp_debug(stdout, words, "e",            params[1], false);
+    maid_mp_debug(stdout, words, "d",            params[2], false);
+    maid_mp_debug(stdout, words, "p",            params[3], false);
+    maid_mp_debug(stdout, words, "q",            params[4], false);
+    maid_mp_debug(stdout, words, "d % (p - 1)",  params[5], false);
+    maid_mp_debug(stdout, words, "d % (q - 1)",  params[6], false);
+    maid_mp_debug(stdout, words, "q^-1 % p",     params[7], false);
     printf("\n");
 
     struct maid_pem *p = NULL;
+    char *s = NULL;
+
     p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC, 2048, params);
-    if (p)
-        printf("%s\n", maid_pem_export(p));
-    free(p);
+    if (p && (s = maid_pem_export(p)))
+        printf("%s\n", s);
+    maid_pem_free(p);
+    free(s);
 
     p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PRIVATE, 2048, params);
-    if (p)
-        printf("%s\n", maid_pem_export(p));
-    free(p);
+    if (p && (s = maid_pem_export(p)))
+        printf("%s\n", s);
+    maid_pem_free(p);
+    free(s);
+
+    for (size_t i = 0; i < 8; i++)
+    {
+        maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+        free(params[i]);
+    }
+
+    maid_rng_del(g);
+    maid_mem_clear(entropy, sizeof(entropy));
 
     return EXIT_SUCCESS;
 }

@@ -181,6 +181,8 @@ Chacha20 with Poly1305 (IETF)
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <maid/mem.h>
+
 #include <maid/aead.h>
 
 int main(void)
@@ -192,12 +194,12 @@ int main(void)
 
     maid_aead *ae = maid_aead_new(maid_aes_gcm_256, key, iv);
 
-    u8   ad[32] = {0};
+    u8  aad[32] = {0};
     u8 data[64] = {0};
     u8  tag[16] = {0};
     if (ae)
     {
-        maid_aead_update(ae, ad, sizeof(ad));
+        maid_aead_update(ae, aad, sizeof(aad));
         maid_aead_crypt(ae, data, sizeof(data), false);
         maid_aead_digest(ae, tag);
     }
@@ -217,7 +219,7 @@ int main(void)
     u8 tag2[16] = {0};
     if (ae)
     {
-        maid_aead_update(ae, ad, sizeof(ad));
+        maid_aead_update(ae, aad, sizeof(aad));
         maid_aead_crypt(ae, data, sizeof(data), true);
         maid_aead_digest(ae, tag2);
     }
@@ -231,6 +233,9 @@ int main(void)
     for (size_t i = 0; i < sizeof(tag2); i++)
         printf("%02x", tag2[i]);
     printf("\n");
+
+    maid_mem_clear(key,  sizeof(key));
+    maid_mem_clear(data, sizeof(data));
 
     return EXIT_SUCCESS;
 }

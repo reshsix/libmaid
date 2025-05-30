@@ -195,6 +195,8 @@ HMAC-SHA512/256 256-bit MAC (NIST)
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <maid/mem.h>
+
 #include <maid/mac.h>
 
 int main(void)
@@ -218,6 +220,8 @@ int main(void)
     for (size_t i = 0; i < sizeof(tag); i++)
         printf("%02x", tag[i]);
     printf("\n");
+
+    maid_mem_clear(key, sizeof(key));
 
     return EXIT_SUCCESS;
 }

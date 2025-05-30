@@ -156,6 +156,8 @@ Exports ordered multiprecision integers as a serialized object
 #include <stdlib.h>
 
 #include <maid/mp.h>
+#include <maid/mem.h>
+
 #include <maid/serial.h>
 
 int main(void)
@@ -182,17 +184,29 @@ int main(void)
             MAID_SERIAL_PKCS8_RSA_PRIVATE)
         {
             struct maid_pem *p = NULL;
+            char *s = NULL;
+
             p = maid_serial_export(MAID_SERIAL_RSA_PUBLIC, bits, params);
-            if (p)
-                printf("%s\n", maid_pem_export(p));
-            free(p);
+            if (p && (s = maid_pem_export(p)))
+                printf("%s\n", s);
+            maid_pem_free(p);
+            free(s);
 
             p = maid_serial_export(MAID_SERIAL_RSA_PRIVATE, bits, params);
-            if (p)
-                printf("%s\n", maid_pem_export(p));
-            free(p);
+            if (p && (s = maid_pem_export(p)))
+                printf("%s\n", s);
+            maid_pem_free(p);
+            free(s);
+        }
+
+        size_t words = maid_mp_words(bits);
+        for (size_t i = 0; i < 8; i++)
+        {
+            maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+            free(params[i]);
         }
     }
+    maid_pem_free(p);
 
     return EXIT_SUCCESS;
 }

@@ -162,6 +162,7 @@ Diffie-Hellman key exchange (IETF)
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <maid/mem.h>
 #include <maid/hash.h>
 
 #include <maid/kex.h>
@@ -260,8 +261,13 @@ int main(void)
             for (size_t i = 0; i < sizeof(hash); i++)
                 printf("%02x", hash[i]);
             printf("\n");
+
+            maid_mem_clear(hash, sizeof(hash));
         }
         maid_hash_del(h);
+
+        maid_mem_clear(prv,    sizeof(prv));
+        maid_mem_clear(secret, sizeof(secret));
     }
     maid_kex_del(x);
 }

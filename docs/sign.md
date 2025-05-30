@@ -236,6 +236,7 @@ PKCS#1 v1.5 signature with SHA-512/256 (RSA Security)
 
 #include <maid/mem.h>
 #include <maid/pub.h>
+
 #include <maid/sign.h>
 
 static u8 hash[256 / 8] =
@@ -331,6 +332,8 @@ int main(void)
         printf("\n");
     }
     maid_sign_del(s);
+
+    maid_pub_del(pub);
 
     return EXIT_SUCCESS;
 }
