@@ -249,12 +249,13 @@ get_pub(char *filename, size_t *bits, bool private)
 {
     maid_pub *ret = NULL;
 
-    const char *next = NULL;
-    struct maid_pem *p = NULL;
     static u8 buffer[65536] = {0};
+
+    const char *next = NULL;
+    struct maid_pem *p = NULL, *p2 = NULL;
     if (get_data(filename, buffer, sizeof(buffer), true) &&
-        (p = maid_pem_import((char *)buffer, &next))
-        && next && next[0] == '\0')
+         (p  = maid_pem_import((char *)buffer, &next)) &&
+        !(p2 = maid_pem_import(next, NULL)))
     {
         maid_mp_word *params[8] = {NULL};
 
@@ -292,11 +293,13 @@ get_pub(char *filename, size_t *bits, bool private)
     }
     else if (p == NULL || next == NULL)
         fprintf(stderr, "Invalid PEM file\n");
-    else if (next[0] != '\0')
+    else
         fprintf(stderr, "PEM file contain a bundle\n");
 
-    maid_mem_clear(buffer, sizeof(buffer));
     maid_pem_free(p);
+    maid_pem_free(p2);
+
+    maid_mem_clear(buffer, sizeof(buffer));
 
     return ret;
 }
