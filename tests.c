@@ -1950,53 +1950,109 @@ serial_tests(void)
 
     /* Tests with actual keys */
 
-    /* SHA-256 of "test\n" */
-    const u8 hash[] = {
-        0xf2, 0xca, 0x1b, 0xb6, 0xc7, 0xe9, 0x07, 0xd0, 0x6d, 0xaf, 0xe4, 0x68,
-        0x7e, 0x57, 0x9f, 0xce, 0x76, 0xb3, 0x7e, 0x4e, 0x93, 0xb7, 0x60, 0x50,
-        0x22, 0xda, 0x52, 0xe6, 0xcc, 0xc2, 0x6f, 0xd2
-    };
-    const u8 sign[] = {
-        0xc5, 0x56, 0xd6, 0x91, 0x88, 0xc5, 0x61, 0xe6, 0x9f, 0x57, 0xd7, 0x33,
-        0x40, 0x51, 0xd0, 0x4c, 0xa2, 0x4f, 0x95, 0xc7, 0xcb, 0x12, 0x64, 0x50,
-        0x17, 0xb0, 0x68, 0xa0, 0x51, 0x81, 0x84, 0x87, 0xe6, 0x5b, 0x89, 0x7e,
-        0x07, 0x2d, 0x0a, 0xa2, 0x49, 0xdb, 0x9b, 0x44, 0x1b, 0xdc, 0xdc, 0x3d,
-        0xd6, 0x64, 0x20, 0xa7, 0x3e, 0x9c, 0xfa, 0x9b, 0xeb, 0x3c, 0x72, 0x36,
-        0x3f, 0x48, 0x48, 0x4e
-    };
-
-    /* Generated with OpenSSL */
+    const u8 hash[256 / 8] =
+        {0x35, 0x5c, 0xd8, 0x22, 0x9d, 0x6d, 0x67, 0xa9, 0xfd, 0x82, 0xff, 0x31,
+         0xa7, 0x7d, 0x56, 0x36, 0x83, 0x1a, 0x2f, 0xd8, 0xfc, 0x00, 0x7e, 0x46,
+         0x48, 0x74, 0x88, 0xe5, 0x21, 0x3e, 0x5d, 0x7a};
+    const u8 sign[2048 / 8] =
+        {0x2d, 0x43, 0x2e, 0x7d, 0x7a, 0x18, 0x7f, 0x8e, 0x2f, 0x3a, 0xd3, 0x70,
+         0x6c, 0xfb, 0x71, 0x1d, 0xf4, 0x7b, 0xa7, 0x77, 0xdb, 0xcb, 0xa7, 0xcc,
+         0x3b, 0x9b, 0xc5, 0x01, 0xf0, 0xa5, 0xad, 0x65, 0x09, 0x28, 0xec, 0xb7,
+         0x42, 0x2e, 0xbf, 0xc2, 0x74, 0x95, 0x3d, 0xa5, 0xda, 0xd5, 0x8f, 0xac,
+         0xc9, 0xcd, 0xe6, 0x58, 0x9f, 0x00, 0xf0, 0x93, 0x60, 0x39, 0xa4, 0x76,
+         0x97, 0x27, 0xd9, 0x17, 0x6e, 0xd8, 0x3d, 0xf2, 0x26, 0x68, 0x67, 0x82,
+         0xe2, 0x7b, 0x2e, 0xcc, 0x6e, 0x34, 0x78, 0x9b, 0xdb, 0xe8, 0x42, 0xd8,
+         0x29, 0xf3, 0x22, 0xf4, 0x96, 0xab, 0xff, 0x3a, 0x4d, 0x4b, 0xb1, 0xcd,
+         0x0a, 0xa6, 0xed, 0x3f, 0x58, 0xfd, 0x5c, 0x60, 0xc1, 0x7b, 0xb7, 0xc2,
+         0xfb, 0x0c, 0x25, 0x0a, 0x25, 0x30, 0xb0, 0x06, 0xf2, 0x5c, 0x3c, 0x02,
+         0xcc, 0x04, 0x04, 0x2b, 0x88, 0xde, 0x79, 0xe1, 0x0c, 0x2f, 0xbc, 0x77,
+         0xc7, 0xa3, 0x6b, 0xd9, 0x0c, 0xb0, 0x04, 0x30, 0x06, 0xd4, 0xf7, 0x3b,
+         0x36, 0x53, 0x4e, 0x9d, 0x6f, 0x34, 0x5f, 0xba, 0xe1, 0xc5, 0x6b, 0x17,
+         0xda, 0xf0, 0x44, 0x23, 0x88, 0x2e, 0x8e, 0x95, 0x64, 0x5e, 0x36, 0xfa,
+         0x3b, 0x73, 0xc4, 0xe4, 0x33, 0xd6, 0x00, 0xa4, 0x6d, 0x76, 0xf0, 0x77,
+         0x13, 0x43, 0xb1, 0x77, 0x9d, 0xe4, 0x0e, 0x21, 0x68, 0xde, 0x54, 0xe6,
+         0xe5, 0xea, 0x68, 0x3b, 0xae, 0xe1, 0x6b, 0xc4, 0x4f, 0x71, 0x95, 0x35,
+         0xb9, 0xcb, 0xad, 0x36, 0x7d, 0x47, 0xb6, 0xc5, 0x8f, 0xb6, 0x1f, 0xf0,
+         0x1b, 0xc9, 0x65, 0x8e, 0x7f, 0x0e, 0xfe, 0xe0, 0x5b, 0xc3, 0x0a, 0xb1,
+         0x76, 0xbb, 0x85, 0xaf, 0x96, 0xba, 0x7d, 0x66, 0xc7, 0x13, 0xa5, 0x2c,
+         0x05, 0xdd, 0xdd, 0x0a, 0xd3, 0x6d, 0xf7, 0x98, 0x43, 0x7e, 0xd4, 0x2f,
+         0xef, 0x5f, 0xd7, 0x5d};
 
     const char *public =
         "-----BEGIN RSA PUBLIC KEY-----\n"
-        "MEgCQQDOrAiCLeywlbUCMIh5YITLZJI4JNQ9lqaTGYPRs4vHrQP19vDiieCX1rVm\n"
-        "7Z6EPqGqU0zWep/FBI7apVej9KedAgMBAAE=\n"
+        "MIIBCQKCAQBDstz7BoLRNCLY+m7zJGkapVzGW3624kNmqshbeir6os6tIlUN6Zgi\n"
+        "sfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9qcdFtpbiN7EyJq0q5m/jqvm3uf8Rj/r8w\n"
+        "KZ0mZ9WjgPyU9qWqNY/kz69KgztOU2wfjDGUFTQlcpnSBpEaSophY+JvgnN+Ems+\n"
+        "aCVn5mJ0KeSBBOJa+ZnIqG5uMPE5nI16YI3EJ94QNkRRmRQohZSmnElahs9DsS5/\n"
+        "sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNUMrfEKbzfYofCK3tq7El1s7jYIHvY1Jer\n"
+        "wBpO+zHwGozbijidbsOTblc900sl/lplAgMBAAE=\n"
         "-----END RSA PUBLIC KEY-----\n";
     const char *private =
         "-----BEGIN RSA PRIVATE KEY-----\n"
-        "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\n"
+        "MIIEoQIBAAKCAQBDstz7BoLRNCLY+m7zJGkapVzGW3624kNmqshbeir6os6tIlUN\n"
+        "6Zgisfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9qcdFtpbiN7EyJq0q5m/jqvm3uf8Rj\n"
+        "/r8wKZ0mZ9WjgPyU9qWqNY/kz69KgztOU2wfjDGUFTQlcpnSBpEaSophY+JvgnN+\n"
+        "Ems+aCVn5mJ0KeSBBOJa+ZnIqG5uMPE5nI16YI3EJ94QNkRRmRQohZSmnElahs9D\n"
+        "sS5/sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNUMrfEKbzfYofCK3tq7El1s7jYIHvY\n"
+        "1JerwBpO+zHwGozbijidbsOTblc900sl/lplAgMBAAECggEAM7rS/MXm5DDwh9gl\n"
+        "O4mQ/plpIPD9DIYsdqD9ZFkfylDpmIZpc64RYEGY5bPll+soel2uw5AR458UhWFH\n"
+        "3zWALBg4rY46TchIW9IV0WqLc+R7YAklajtYoFbMDHK/XqbLWpB12m//OhowmcFZ\n"
+        "aep47kpUABGLvSmqvD/kVLCsuOmidTh7qSe7RRIAG1H4UluHtbTb3dX5DiuEFreW\n"
+        "t5E4dze7FA+J+2c5+s54V1wPuRdXV6AkEdAzwy9quahpp9ju2QvjTcraBH1dk7Iy\n"
+        "Feo0gnybJ0mGDqeuSj/BqjSVBf0c3harPK6lsngv/3XncjD9Xbz7nfd3MQsneL+1\n"
+        "LLd4gQKBgFyeWYdBkvOc+Xf5Fcud9DxV1epNdA05F17lJwdF45og7ccMTwzIGzHW\n"
+        "Q1usJfl7anJqWRbYkjs91nrFCgCodUe8fMtEa9DzZIC/9MOMK7JBLMVWz5JCalPy\n"
+        "rbooy/rNlunQxPBnRmRD5rWRPqsk0WtACy677tw3vzdLfrgd4v6xAoGBALse8Ir6\n"
+        "Dg9Z9bC1QhP3nMGB/jPRrl6AL87lzZ2Fd3SEj+nMRX0cyl3frn1+cmcSQLagEMmy\n"
+        "g5kS8skwaKTOGLL8Prdb6DF76upO3yNDenf3CMfn54mqTZQfFdFSCzVw9pt2dFoI\n"
+        "t/lt+VdesbRxqM9pnH9UdAxTYWDj6I7Bfwv1AoGAFWXMH1CKB9hbVllorKsocwwN\n"
+        "qN0OE8P930Gn26lM5R34cUUpujU8+y2aUEKcX2Ag/qANRxbv6dnmhGSjY/WHavRk\n"
+        "DH4ZPqQMsyYmAUuQCNW/5zOgLxVDBXQKqPil76Kx3AEMjtH9VErPsWEGDnoqG9In\n"
+        "AzwN+jiy5658b0MQX3ECgYEAnNU8xS76M9GxhC8XuAaUQvgCKEp5PElySJYBdSJV\n"
+        "Ubp9qHaGU2ubDX0aEaK2nj8FMEwOZg8SD217Qjcprd/zgai7pBELFtaGuWXrzfGT\n"
+        "pxLNMEfln1O2/AvlzHBYZq1MdFafBItEL3IGRz1d8iBFXbpl6a7OKTqFZqD+3Q++\n"
+        "vTUCgYAta25nGLvY6j7QoVww1yQoI2i3GRIaRBS1coIyumKClM+yDCGuX6jFC15S\n"
+        "lhfpeyBI62N6MbduGuPbbaawLtm0nEYICfoAvJUzSDx8li3AdqWO9WFjVQv5jRri\n"
+        "x2zTFULnmnGm1ZPBlE6xhgqaVEUU8qRR8IqYmLNq6xq/I3R5Ug==\n"
         "-----END RSA PRIVATE KEY-----\n";
     const char *public2 =
         "-----BEGIN PUBLIC KEY-----\n"
-        "MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAM6sCIIt7LCVtQIwiHlghMtkkjgk1D2W\n"
-        "ppMZg9Gzi8etA/X28OKJ4JfWtWbtnoQ+oapTTNZ6n8UEjtqlV6P0p50CAwEAAQ==\n"
+        "MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQBDstz7BoLRNCLY+m7zJGka\n"
+        "pVzGW3624kNmqshbeir6os6tIlUN6Zgisfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9q\n"
+        "cdFtpbiN7EyJq0q5m/jqvm3uf8Rj/r8wKZ0mZ9WjgPyU9qWqNY/kz69KgztOU2wf\n"
+        "jDGUFTQlcpnSBpEaSophY+JvgnN+Ems+aCVn5mJ0KeSBBOJa+ZnIqG5uMPE5nI16\n"
+        "YI3EJ94QNkRRmRQohZSmnElahs9DsS5/sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNU\n"
+        "MrfEKbzfYofCK3tq7El1s7jYIHvY1JerwBpO+zHwGozbijidbsOTblc900sl/lpl\n"
+        "AgMBAAE=\n"
         "-----END PUBLIC KEY-----\n";
     const char *private2 =
         "-----BEGIN PRIVATE KEY-----\n"
-        "MIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEAzqwIgi3ssJW1AjCI\n"
-        "eWCEy2SSOCTUPZamkxmD0bOLx60D9fbw4ongl9a1Zu2ehD6hqlNM1nqfxQSO2qVX\n"
-        "o/SnnQIDAQABAkEAsaM4ZPwoNtdWj507kGgfe9rjuxIcwxsb7c++d54FhQdrpadU\n"
-        "iUxgjQdxC9MSpW4w3w8N/ydO9WwJb5YK2aw3GQIhAOp+a1QbTadcZksx/3FGqi6T\n"
-        "5J6RxDnogtBif7v4sgrrAiEA4aBltY2F7elx0shNvUtkTVyC2qst5PQia7HgGaqE\n"
-        "5ZcCIH7seImo0aph8BiJcntMxXa6pEdUHQM/H/dNKViEL1KLAiEAthb33rTvwJkl\n"
-        "VmJ3cuzUbybZKFb8PAnXeajdXnlitdMCIGap6SfPU5XLL+a1JqFjz3618hacJtv2\n"
-        "v1Vb37O34dBo\n"
+        "MIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAEOy3PsGgtE0Itj6\n"
+        "bvMkaRqlXMZbfrbiQ2aqyFt6Kvqizq0iVQ3pmCKx9zlkQ3+MgtrtrI7DPvKpniND\n"
+        "AS2jD2px0W2luI3sTImrSrmb+Oq+be5/xGP+vzApnSZn1aOA/JT2pao1j+TPr0qD\n"
+        "O05TbB+MMZQVNCVymdIGkRpKimFj4m+Cc34Saz5oJWfmYnQp5IEE4lr5mciobm4w\n"
+        "8TmcjXpgjcQn3hA2RFGZFCiFlKacSVqGz0OxLn+woALrMdH4ibmtRRtF7hXocSBP\n"
+        "SMns01Qyt8QpvN9ih8Ire2rsSXWzuNgge9jUl6vAGk77MfAajNuKOJ1uw5NuVz3T\n"
+        "SyX+WmUCAwEAAQKCAQAzutL8xebkMPCH2CU7iZD+mWkg8P0Mhix2oP1kWR/KUOmY\n"
+        "hmlzrhFgQZjls+WX6yh6Xa7DkBHjnxSFYUffNYAsGDitjjpNyEhb0hXRaotz5Htg\n"
+        "CSVqO1igVswMcr9epstakHXab/86GjCZwVlp6njuSlQAEYu9Kaq8P+RUsKy46aJ1\n"
+        "OHupJ7tFEgAbUfhSW4e1tNvd1fkOK4QWt5a3kTh3N7sUD4n7Zzn6znhXXA+5F1dX\n"
+        "oCQR0DPDL2q5qGmn2O7ZC+NNytoEfV2TsjIV6jSCfJsnSYYOp65KP8GqNJUF/Rze\n"
+        "Fqs8rqWyeC//dedyMP1dvPud93cxCyd4v7Ust3iBAoGAXJ5Zh0GS85z5d/kVy530\n"
+        "PFXV6k10DTkXXuUnB0XjmiDtxwxPDMgbMdZDW6wl+XtqcmpZFtiSOz3WesUKAKh1\n"
+        "R7x8y0Rr0PNkgL/0w4wrskEsxVbPkkJqU/KtuijL+s2W6dDE8GdGZEPmtZE+qyTR\n"
+        "a0ALLrvu3De/N0t+uB3i/rECgYEAux7wivoOD1n1sLVCE/ecwYH+M9GuXoAvzuXN\n"
+        "nYV3dISP6cxFfRzKXd+ufX5yZxJAtqAQybKDmRLyyTBopM4Ysvw+t1voMXvq6k7f\n"
+        "I0N6d/cIx+fniapNlB8V0VILNXD2m3Z0Wgi3+W35V16xtHGoz2mcf1R0DFNhYOPo\n"
+        "jsF/C/UCgYAVZcwfUIoH2FtWWWisqyhzDA2o3Q4Tw/3fQafbqUzlHfhxRSm6NTz7\n"
+        "LZpQQpxfYCD+oA1HFu/p2eaEZKNj9Ydq9GQMfhk+pAyzJiYBS5AI1b/nM6AvFUMF\n"
+        "dAqo+KXvorHcAQyO0f1USs+xYQYOeiob0icDPA36OLLnrnxvQxBfcQKBgQCc1TzF\n"
+        "Lvoz0bGELxe4BpRC+AIoSnk8SXJIlgF1IlVRun2odoZTa5sNfRoRoraePwUwTA5m\n"
+        "DxIPbXtCNymt3/OBqLukEQsW1oa5ZevN8ZOnEs0wR+WfU7b8C+XMcFhmrUx0Vp8E\n"
+        "i0QvcgZHPV3yIEVdumXprs4pOoVmoP7dD769NQKBgC1rbmcYu9jqPtChXDDXJCgj\n"
+        "aLcZEhpEFLVygjK6YoKUz7IMIa5fqMULXlKWF+l7IEjrY3oxt24a49ttprAu2bSc\n"
+        "RggJ+gC8lTNIPHyWLcB2pY71YWNVC/mNGuLHbNMVQueacabVk8GUTrGGCppURRTy\n"
+        "pFHwipiYs2rrGr8jdHlS\n"
         "-----END PRIVATE KEY-----\n";
 
     const char *pubs[] = {public,  public2};
@@ -2013,13 +2069,13 @@ serial_tests(void)
         struct maid_pem *p  = maid_pem_import(pubs[i], &endptr);
         struct maid_pem *p2 = maid_pem_import(prvs[i], &endptr);
 
-        u8 buffer[64] = {0};
+        u8 buffer[2048 / 8] = {0};
         maid_pub *pub = NULL, *prv = NULL;
         maid_sign *s = NULL;
         if (p && p2)
         {
             size_t bits = 0;
-            maid_mp_word *data[7] = {NULL};
+            maid_mp_word *data[8] = {NULL};
 
             enum maid_serial type = maid_serial_import(p, &bits, data);
             if (type == pub_t[i])
@@ -2062,7 +2118,7 @@ serial_tests(void)
                 free(data[i]);
         }
         if (pub && prv)
-            s = maid_sign_new(maid_pkcs1_v1_5_sha256, pub, prv, 512);
+            s = maid_sign_new(maid_pkcs1_v1_5_sha256, pub, prv, 2048);
         if (s)
         {
             memcpy(buffer, hash, sizeof(hash));
@@ -2093,8 +2149,8 @@ keygen_tests(void)
     maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
     if (g)
     {
-        maid_mp_word *params[7];
-        size_t words = maid_keygen_rsa(512, params, g);
+        maid_mp_word *params[8];
+        size_t words = maid_keygen_rsa(2048, params, g);
         if (words)
         {
             struct maid_rsa_key k1 = {.exponent = params[1],
@@ -2102,14 +2158,14 @@ keygen_tests(void)
             struct maid_rsa_key k2 = {.exponent = params[2],
                                       .modulo   = params[0]};
 
-            maid_pub  *pub = maid_pub_new(maid_rsa_public,  &k1, 512);
-            maid_pub  *prv = maid_pub_new(maid_rsa_private, &k2, 512);
+            maid_pub  *pub = maid_pub_new(maid_rsa_public,  &k1, 2048);
+            maid_pub  *prv = maid_pub_new(maid_rsa_private, &k2, 2048);
             maid_sign *s   = maid_sign_new(maid_pkcs1_v1_5_sha256,
-                                           pub, prv, 512);
+                                           pub, prv, 2048);
 
             if (pub && prv && s)
             {
-                u8 hash[512 / 8] = {0};
+                u8 hash[2048 / 8] = {0};
                 for (size_t i = 0; i < 256 / 8; i++)
                     hash[i] = 0xFF;
 
@@ -2143,9 +2199,12 @@ main(void)
     u16 ret = 0;
 
     #define TEST(name) \
+        printf("%s(): ", #name); \
         u16 name##_fails = name(); \
-        if (name##_fails) \
-            printf("%s() failed %d %s\n", #name, name##_fails, \
+        if (!name##_fails) \
+            printf("success\n"); \
+        else \
+            printf("failed %u %s\n", name##_fails, \
                    (name##_fails == 1) ? "test" : "tests"); \
         ret += name##_fails;
 
