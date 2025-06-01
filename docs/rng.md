@@ -142,26 +142,31 @@ CTR-DRBG with AES-256 (NIST)
 
 int main(void)
 {
+    int ret = EXIT_FAILURE;
+
+    u8    data[64] = {0};
     u8 entropy[32] = {0xc2, 0xae, 0x5a, 0x05, 0x39, 0x3a, 0x57, 0xf6,
                       0x2b, 0xa3, 0xc2, 0xec, 0x80, 0x4a, 0x23, 0xda,
                       0x37, 0x81, 0xa6, 0xa0, 0x94, 0x4a, 0xe7, 0xbf,
                       0xd4, 0xe5, 0xda, 0xc9, 0x29, 0x14, 0x83, 0x65};
 
     maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
-
-    u8 data[64] = {0};
     if (g)
+    {
         maid_rng_generate(g, data, sizeof(data));
+        for (size_t i = 0; i < sizeof(data); i++)
+            printf("%02x", data[i]);
+        printf("\n");
 
+        ret = EXIT_SUCCESS;
+    }
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_rng_del(g);
-
-    for (size_t i = 0; i < sizeof(data); i++)
-        printf("%02x", data[i]);
-    printf("\n");
 
     maid_mem_clear(entropy, sizeof(entropy));
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

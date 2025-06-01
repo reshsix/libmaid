@@ -132,24 +132,29 @@ Chacha20 stream cipher (IETF version)
 
 int main(void)
 {
-    u8 key[32] = {0};
-    u8 iv [16] = {0};
+    int ret = EXIT_FAILURE;
+
+    u8  key[32] = {0};
+    u8   iv[16] = {0};
+    u8 data[64] = {0};
 
     maid_stream *st = maid_stream_new(maid_chacha20, key, iv, 0);
-
-    u8 data[64] = {0};
     if (st)
+    {
         maid_stream_xor(st, data, sizeof(data));
+        for (size_t i = 0; i < sizeof(data); i++)
+            printf("%02x", data[i]);
+        printf("\n");
 
+        ret = EXIT_SUCCESS;
+    }
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_stream_del(st);
-
-    for (size_t i = 0; i < sizeof(data); i++)
-        printf("%02x", data[i]);
-    printf("\n");
 
     maid_mem_clear(key, sizeof(key));
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

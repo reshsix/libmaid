@@ -162,6 +162,8 @@ Exports ordered multiprecision integers as a serialized object
 
 int main(void)
 {
+    int ret = EXIT_FAILURE;
+
     char *key =
         "-----BEGIN PRIVATE KEY-----\n"
         "MIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEAzqwIgi3ssJW1AjCI\n"
@@ -197,7 +199,11 @@ int main(void)
                 printf("%s\n", s);
             maid_pem_free(p);
             free(s);
+
+            ret = EXIT_SUCCESS;
         }
+        else
+            fprintf(stderr, "Not a PKCS8 RSA Private key\n");
 
         size_t words = maid_mp_words(bits);
         for (size_t i = 0; i < 8; i++)
@@ -206,9 +212,11 @@ int main(void)
             free(params[i]);
         }
     }
+    else
+        fprintf(stderr, "Failed to read PEM data\n");
     maid_pem_free(p);
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

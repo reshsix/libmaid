@@ -217,6 +217,8 @@ recv(u8 *data, size_t length)
 
 int main(void)
 {
+    int ret = EXIT_FAILURE;
+
     /* 2048-bit MODP group (14) */
 
     size_t bits = 2048;
@@ -263,13 +265,21 @@ int main(void)
             printf("\n");
 
             maid_mem_clear(hash, sizeof(hash));
+
+            ret = EXIT_SUCCESS;
         }
+        else
+            fprintf(stderr, "Out of memory\n");
         maid_hash_del(h);
 
         maid_mem_clear(prv,    sizeof(prv));
         maid_mem_clear(secret, sizeof(secret));
     }
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_kex_del(x);
+
+    return ret;
 }
 ```
 

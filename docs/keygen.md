@@ -58,47 +58,66 @@ Generates a RSA key
 
 int main(void)
 {
-    /* Entropy needs to be a random or secret number instead*/
+    int ret = EXIT_FAILURE;
+
+    /* Entropy needs to be a random or secret number instead */
     u8 entropy[32] = {};
+
     maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
-
-    maid_mp_word *params[8];
-    size_t words = maid_keygen_rsa(2048, params, g);
-    maid_mp_debug(stdout, words, "N",            params[0], false);
-    maid_mp_debug(stdout, words, "e",            params[1], false);
-    maid_mp_debug(stdout, words, "d",            params[2], false);
-    maid_mp_debug(stdout, words, "p",            params[3], false);
-    maid_mp_debug(stdout, words, "q",            params[4], false);
-    maid_mp_debug(stdout, words, "d % (p - 1)",  params[5], false);
-    maid_mp_debug(stdout, words, "d % (q - 1)",  params[6], false);
-    maid_mp_debug(stdout, words, "q^-1 % p",     params[7], false);
-    printf("\n");
-
-    struct maid_pem *p = NULL;
-    char *s = NULL;
-
-    p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC, 2048, params);
-    if (p && (s = maid_pem_export(p)))
-        printf("%s\n", s);
-    maid_pem_free(p);
-    free(s);
-
-    p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PRIVATE, 2048, params);
-    if (p && (s = maid_pem_export(p)))
-        printf("%s\n", s);
-    maid_pem_free(p);
-    free(s);
-
-    for (size_t i = 0; i < 8; i++)
+    if (g)
     {
-        maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-        free(params[i]);
-    }
+        ret = EXIT_SUCCESS;
 
+        maid_mp_word *params[8];
+        size_t words = maid_keygen_rsa(2048, params, g);
+        maid_mp_debug(stdout, words, "N",            params[0], false);
+        maid_mp_debug(stdout, words, "e",            params[1], false);
+        maid_mp_debug(stdout, words, "d",            params[2], false);
+        maid_mp_debug(stdout, words, "p",            params[3], false);
+        maid_mp_debug(stdout, words, "q",            params[4], false);
+        maid_mp_debug(stdout, words, "d % (p - 1)",  params[5], false);
+        maid_mp_debug(stdout, words, "d % (q - 1)",  params[6], false);
+        maid_mp_debug(stdout, words, "q^-1 % p",     params[7], false);
+        printf("\n");
+
+        struct maid_pem *p = NULL;
+        char *s = NULL;
+
+        p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC, 2048, params);
+        if (p && (s = maid_pem_export(p)))
+            printf("%s\n", s);
+        else
+        {
+            fprintf(stderr, "Failed to export public key\n");
+            ret = EXIT_FAILURE;
+        }
+        maid_pem_free(p);
+        free(s);
+
+        p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PRIVATE, 2048, params);
+        if (p && (s = maid_pem_export(p)))
+            printf("%s\n", s);
+        else
+        {
+            fprintf(stderr, "Failed to export private key\n");
+            ret = EXIT_FAILURE;
+        }
+        maid_pem_free(p);
+        free(s);
+
+        for (size_t i = 0; i < 8; i++)
+        {
+            maid_mem_clear(params[i], words * sizeof(maid_mp_word));
+            free(params[i]);
+        }
+    }
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_rng_del(g);
+
     maid_mem_clear(entropy, sizeof(entropy));
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

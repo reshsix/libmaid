@@ -187,57 +187,58 @@ Chacha20 with Poly1305 (IETF)
 
 int main(void)
 {
-    u8 key[32] = {0};
-    u8  iv[12] = {0};
+    int ret = EXIT_FAILURE;
 
-    /* Encryption */
+    u8  key[32] = {0};
+    u8   iv[12] = {0};
+    u8 data[64] = {0};
+    u8  aad[32] = {0};
+    u8  tag[16] = {0};
+    u8 tag2[16] = {0};
 
     maid_aead *ae = maid_aead_new(maid_aes_gcm_256, key, iv);
-
-    u8  aad[32] = {0};
-    u8 data[64] = {0};
-    u8  tag[16] = {0};
     if (ae)
     {
+        /* Encryption */
+
         maid_aead_update(ae, aad, sizeof(aad));
         maid_aead_crypt(ae, data, sizeof(data), false);
         maid_aead_digest(ae, tag);
-    }
 
-    for (size_t i = 0; i < sizeof(data); i++)
-        printf("%02x", data[i]);
-    printf("\n");
+        for (size_t i = 0; i < sizeof(data); i++)
+            printf("%02x", data[i]);
+        printf("\n");
 
-    for (size_t i = 0; i < sizeof(tag); i++)
-        printf("%02x", tag[i]);
-    printf("\n");
+        for (size_t i = 0; i < sizeof(tag); i++)
+            printf("%02x", tag[i]);
+        printf("\n");
 
-    /* Decryption */
+        /* Decryption */
 
-    maid_aead_renew(ae, key, iv);
+        maid_aead_renew(ae, key, iv);
 
-    u8 tag2[16] = {0};
-    if (ae)
-    {
         maid_aead_update(ae, aad, sizeof(aad));
         maid_aead_crypt(ae, data, sizeof(data), true);
         maid_aead_digest(ae, tag2);
+
+        for (size_t i = 0; i < sizeof(data); i++)
+            printf("%02x", data[i]);
+        printf("\n");
+
+        for (size_t i = 0; i < sizeof(tag2); i++)
+            printf("%02x", tag2[i]);
+        printf("\n");
+
+        ret = EXIT_SUCCESS;
     }
-
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_aead_del(ae);
-
-    for (size_t i = 0; i < sizeof(data); i++)
-        printf("%02x", data[i]);
-    printf("\n");
-
-    for (size_t i = 0; i < sizeof(tag2); i++)
-        printf("%02x", tag2[i]);
-    printf("\n");
 
     maid_mem_clear(key,  sizeof(key));
     maid_mem_clear(data, sizeof(data));
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

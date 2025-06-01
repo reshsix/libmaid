@@ -163,24 +163,29 @@ AES-256 block cipher (NIST)
 
 int main(void)
 {
-    u8 key[32] = {0};
-    u8 iv [16] = {0};
+    int ret = EXIT_FAILURE;
+
+    u8  key[32] = {0};
+    u8   iv[16] = {0};
+    u8 data[64] = {0};
 
     maid_block *bl = maid_block_new(maid_aes_256, key, iv);
-
-    u8 data[64] = {0};
     if (bl)
+    {
         maid_block_ctr(bl, data, sizeof(data));
+        for (size_t i = 0; i < sizeof(data); i++)
+            printf("%02x", data[i]);
+        printf("\n");
 
+        ret = EXIT_SUCCESS;
+    }
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_block_del(bl);
-
-    for (size_t i = 0; i < sizeof(data); i++)
-        printf("%02x", data[i]);
-    printf("\n");
 
     maid_mem_clear(key,  sizeof(key));
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

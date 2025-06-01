@@ -271,6 +271,8 @@ static u8 signature[2048 / 8] =
 
 int main(void)
 {
+    int ret = EXIT_FAILURE;
+
     const char *key =
         "-----BEGIN PUBLIC KEY-----\n"
         "MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQBDstz7BoLRNCLY+m7zJGka\n"
@@ -308,18 +310,26 @@ int main(void)
                 else
                     printf("Signature invalid!\n");
             }
+            else
+                fprintf(stderr, "Out of memory\n");
 
             maid_sign_del(s);
             maid_pub_del(pub);
+
+            ret = EXIT_SUCCESS;
         }
+        else
+            fprintf(stderr, "Not a PKCS8 RSA Public key\n");
 
         size_t words = maid_mp_words(bits);
         for (size_t i = 0; i < 2; i++)
             free(params[i]);
     }
+    else
+        fprintf(stderr, "Failed to read PEM data\n");
     maid_pem_free(p);
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

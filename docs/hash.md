@@ -150,23 +150,28 @@ SHA-2 512-bits hash, truncated to 256-bits (NIST)
 
 int main(void)
 {
-    maid_hash *h = maid_hash_new(maid_sha256);
+    int ret = EXIT_FAILURE;
 
     char *data = "abc";
     u8 output[32] = {0};
+
+    maid_hash *h = maid_hash_new(maid_sha256);
     if (h)
     {
         maid_hash_update(h, (u8*)data, strlen(data));
         maid_hash_digest(h, output);
-    }
 
+        for (size_t i = 0; i < sizeof(output); i++)
+            printf("%02x", output[i]);
+        printf("\n");
+
+        ret = EXIT_SUCCESS;
+    }
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_hash_del(h);
 
-    for (size_t i = 0; i < sizeof(output); i++)
-        printf("%02x", output[i]);
-    printf("\n");
-
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

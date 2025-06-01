@@ -140,6 +140,8 @@ Exports memory as base64
 
 int main(void)
 {
+    int ret = EXIT_FAILURE;
+
     char *b64 = "AAECAwQFBgc=";
 
     u8 memory[8] = {0};
@@ -155,11 +157,13 @@ int main(void)
         char buf[16] = {0};
         maid_mem_export(memory, sizeof(memory), buf, sizeof(buf));
         printf("%s\n", buf);
+
+        ret = EXIT_SUCCESS;
     }
     else
         fprintf(stderr, "Base64 error\n");
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

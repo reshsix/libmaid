@@ -163,6 +163,8 @@ RSA private key (RSA Security)
 
 int main(void)
 {
+    int ret = EXIT_FAILURE;
+
     /* 2048-bit textbook RSA as an example */
 
     const char *key =
@@ -192,20 +194,28 @@ int main(void)
             maid_pub *p = maid_pub_new(maid_rsa_public, &key, 2048);
             if (p)
                 maid_pub_apply(p, buf);
+            else
+                fprintf(stderr, "Out of memory\n");
             maid_pub_del(p);
 
             for (size_t i = 0; i < sizeof(buf); i++)
                 printf("%02x", buf[i]);
             printf("\n");
+
+            ret = EXIT_SUCCESS;
         }
+        else
+            fprintf(stderr, "Not a PKCS8 RSA Public key\n");
 
         size_t words = maid_mp_words(bits);
         for (size_t i = 0; i < 2; i++)
             free(params[i]);
     }
+    else
+        fprintf(stderr, "Failed to read PEM data\n");
     maid_pem_free(p);
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 

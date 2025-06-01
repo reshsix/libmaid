@@ -201,29 +201,33 @@ HMAC-SHA512/256 256-bit MAC (NIST)
 
 int main(void)
 {
-    u8 key[32] = {0};
+    int ret = EXIT_FAILURE;
+
+    u8  key[32] = {0};
+    u8 data[64] = {0};
+    u8  tag[16] = {0};
     for (size_t i = 0; i < sizeof(key); i++)
         key[i] = i;
 
     maid_mac *m = maid_mac_new(maid_poly1305, key);
-
-    u8 data[64] = {0};
-    u8  tag[16] = {0};
     if (m)
     {
         maid_mac_update(m, data, sizeof(data));
         maid_mac_digest(m, tag);
+
+        for (size_t i = 0; i < sizeof(tag); i++)
+            printf("%02x", tag[i]);
+        printf("\n");
+
+        ret = EXIT_SUCCESS;
     }
-
+    else
+        fprintf(stderr, "Out of memory\n");
     maid_mac_del(m);
-
-    for (size_t i = 0; i < sizeof(tag); i++)
-        printf("%02x", tag[i]);
-    printf("\n");
 
     maid_mem_clear(key, sizeof(key));
 
-    return EXIT_SUCCESS;
+    return ret;
 }
 ```
 
