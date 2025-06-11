@@ -660,6 +660,56 @@ maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
 }
 
 extern void
+maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
+               const maid_mp_word *mod)
+{
+    if (words && a && mod)
+    {
+        ALLOC_MP(a2,   2)
+        ALLOC_MP(b2,   2)
+        ALLOC_MP(mod2, 2)
+
+        maid_mp_mov(words, a2,   a);
+        maid_mp_mov(words, b2,   b);
+        maid_mp_mov(words, mod2, mod);
+
+        maid_mp_mov(words, &(a2[words]),   NULL);
+        maid_mp_mov(words, &(b2[words]),   NULL);
+        maid_mp_mov(words, &(mod2[words]), NULL);
+
+        maid_mp_add(words + 1, a2, b2);
+
+        maid_mp_mod(words + 1, a2, mod2);
+        maid_mp_mov(words, a, a2);
+
+        CLEAR_MP(a2)
+        CLEAR_MP(b2)
+        CLEAR_MP(mod2)
+    }
+}
+
+extern void
+maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
+               const maid_mp_word *mod)
+{
+    if (words && a && mod)
+    {
+        ALLOC_MP(buf,  1)
+        ALLOC_MP(buf2, 1)
+
+        maid_mp_mov(words, buf, b);
+        maid_mp_mod(words, buf, mod);
+        maid_mp_mov(words, buf2, mod);
+        maid_mp_sub(words, buf2, buf);
+
+        maid_mp_addmod(words, a, buf2, mod);
+
+        CLEAR_MP(buf)
+        CLEAR_MP(buf2)
+    }
+}
+
+extern void
 maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                const maid_mp_word *mod)
 {

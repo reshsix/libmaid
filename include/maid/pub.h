@@ -52,4 +52,21 @@ struct maid_rsa_key
 extern const struct maid_pub_def maid_rsa_public;
 extern const struct maid_pub_def maid_rsa_private;
 
+struct maid_rsa_key_full
+{
+    maid_mp_word *encryption;
+    maid_mp_word *decryption;
+    maid_mp_word *modulo;
+
+    maid_mp_word *prime1;
+    maid_mp_word *prime2;
+
+    maid_mp_word *exponent1;
+    maid_mp_word *exponent2;
+
+    maid_mp_word *coefficient;
+};
+
+extern const struct maid_pub_def maid_rsa_private_crt;
+
 #endif

@@ -272,9 +272,15 @@ get_pub(char *filename, size_t *bits, bool private)
         else if (private && (t == MAID_SERIAL_RSA_PRIVATE ||
                              t == MAID_SERIAL_PKCS8_RSA_PRIVATE))
         {
-            struct maid_rsa_key rsa = {.modulo   = params[0],
-                                       .exponent = params[2]};
-            ret = maid_pub_new(maid_rsa_private, &rsa, *bits);
+            struct maid_rsa_key_full rsa = {.modulo      = params[0],
+                                            .encryption  = params[1],
+                                            .decryption  = params[2],
+                                            .prime1      = params[3],
+                                            .prime2      = params[4],
+                                            .exponent1   = params[5],
+                                            .exponent2   = params[6],
+                                            .coefficient = params[7]};
+            ret = maid_pub_new(maid_rsa_private_crt, &rsa, *bits);
             if (!ret)
                 fprintf(stderr, "Out of memory\n");
         }
