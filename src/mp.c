@@ -29,6 +29,15 @@ static const size_t maid_mp_bits  = sizeof(maid_mp_word) * 8;
 static const size_t maid_mp_bytes = sizeof(maid_mp_word) * 1;
 static const maid_mp_word maid_mp_max = -1;
 
+/* Allocates stack memory for temporary variables */
+
+#define ALLOC_MP(name, length) \
+    maid_mp_word name[words * length]; \
+    maid_mp_mov(words * length, name, NULL);
+
+#define CLEAR_MP(name) \
+    maid_mem_clear(name, sizeof(name));
+
 extern size_t
 maid_mp_words(size_t bits)
 {
@@ -76,7 +85,7 @@ maid_mp_debug(FILE *output, size_t words, const char *name,
         volatile bool started = false;
         volatile maid_mp_word w = 0;
 
-        fprintf(output, (beautify) ? "%s: \n    " : "%s: 0x", name);
+        fprintf(output, (beautify) ? "%s: \n    " : "%s = 0x", name);
         for (size_t i = 0; i < words; i++)
         {
             w = ((a) ? a[words - 1 - i] : 0x0);
@@ -323,91 +332,125 @@ maid_mp_sar(size_t words, maid_mp_word *a, size_t shift)
     }
 }
 
-/* Allocates stack memory for temporary variables */
-
-#define ALLOC_MP(name, length) \
-    maid_mp_word name[words * length]; \
-    maid_mp_mov(words * length, name, NULL);
-
-#define CLEAR_MP(name) \
-    maid_mem_clear(name, sizeof(name));
-
 static void
 maid_mp_mul_long(size_t words, maid_mp_word *a,
                  const maid_mp_word *b, bool halve)
 {
     if (words && a)
     {
-        ALLOC_MP(tmp, 1)
+        ALLOC_MP(tmp,  1)
+        ALLOC_MP(tmp2, 1)
 
-        /* Halving optimizes mulmod, no need to consider odd words */
+        /* Halving optimizes mulmod, no need to consider odd word length */
         size_t words2 = words;
         if (halve)
             words /= 2;
 
+        /* Uses a lot of space to improve calculations */
+        ALLOC_MP(x, 1)
+        ALLOC_MP(y, 1)
+        ALLOC_MP(z, 1)
+        ALLOC_MP(w, 1)
+
+        ALLOC_MP(xz, 1)
+        ALLOC_MP(xw, 1)
+        ALLOC_MP(yz, 1)
+        ALLOC_MP(yw, 1)
+
+        ALLOC_MP(low,  1)
+        ALLOC_MP(high, 1)
+        ALLOC_MP(org,  1)
+
+        /* Initializes values */
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
 
+        const size_t       half = maid_mp_bits / 2;
+        const maid_mp_word mask = maid_mp_max >> half;
+
+        /* Splits the values into high and low parts */
+        for (size_t i = 0; i < words; i++)
+            x[i] = tmp[i] >> half;
+        for (size_t i = 0; i < words; i++)
+            y[i] = tmp[i] & mask;
+        for (size_t i = 0; i < words; i++)
+            z[i] = ((b) ? b[i] : (i == 0)) >> half;
+        for (size_t i = 0; i < words; i++)
+            w[i] = ((b) ? b[i] : (i == 0)) & mask;
+
         for (size_t i = 0; i < words; i++)
         {
+            /* Does the intermediary multiplications */
+            for (size_t j = 0; j < words; j++)
+            {
+                xz[j] = x[i] * z[j];
+                xw[j] = x[i] * w[j];
+                yz[j] = y[i] * z[j];
+                yw[j] = y[i] * w[j];
+            }
+
+            /* Calculates low part of the words */
+            for (size_t j = 0; j < words; j++)
+                low[j] = yw[j];
+
+            for (size_t j = 0; j < words; j++)
+                org[j] = low[j];
+            for (size_t j = 0; j < words; j++)
+                low[j] += xw[j] << half;
+            for (size_t j = 0; j < words; j++)
+                high[j] = (low[j] < org[j]);
+
+            for (size_t j = 0; j < words; j++)
+                org[j] = low[j];
+            for (size_t j = 0; j < words; j++)
+                low[j] += yz[j] << half;
+            for (size_t j = 0; j < words; j++)
+                high[j] += (low[j] < org[j]);
+
+            /* Calculates high part of the words */
+            for (size_t j = 0; j < words; j++)
+                high[j] += xz[j];
+            for (size_t j = 0; j < words; j++)
+                high[j] += xw[j] >> half;
+            for (size_t j = 0; j < words; j++)
+                high[j] += yz[j] >> half;
+
+            /* Adds words to the total */
+            maid_mp_mov(words2, tmp2, NULL);
             for (size_t j = 0; j < words; j++)
             {
                 size_t idx = (i + j);
-                volatile maid_mp_word val = (b) ? b[j] : (j == 0);
-
-                const size_t       half = maid_mp_bits / 2;
-                const maid_mp_word mask = maid_mp_max >> half;
-
-                volatile maid_mp_word x = tmp[i] >> half;
-                volatile maid_mp_word y = tmp[i] &  mask;
-                volatile maid_mp_word z = val    >> half;
-                volatile maid_mp_word w = val    &  mask;
-
-                volatile maid_mp_word xz = x * z;
-                volatile maid_mp_word xw = x * w;
-                volatile maid_mp_word yz = y * z;
-                volatile maid_mp_word yw = y * w;
-
-                volatile u8 carry = 0;
-                volatile maid_mp_word low = yw;
-                volatile maid_mp_word org = low;
-                low   += xw << half;
-                carry += (low < org);
-                org   = low;
-                low   += yz << half;
-                carry += (low < org);
-                volatile maid_mp_word high = xz + (xw >> half) +
-                                             (yz >> half) + carry;
-
                 if (idx < words2)
                 {
-                    volatile u8 carry = 0;
+                    tmp2[idx]     = low[j];
+                    tmp2[idx + 1] = high[j];
 
-                    for (size_t k = idx; k < words2; k++)
-                    {
-                        volatile maid_mp_word val = 0;
-                        if (k == idx)
-                            val = low;
-                        else if (k == (idx + 1))
-                            val = high;
+                    for (size_t k = idx; k < (idx + 3 + j) && k < words2; k++)
+                        a[k] += tmp2[k];
 
-                        a[k] += val;
-                        a[k] += carry;
-                        carry = (carry) ? (a[k] <= val) : (a[k] < val);
-
-                        val = 0;
-                    }
-
-                    carry = 0;
+                    for (size_t k = idx + 1; k < (idx + 3 + j) &&
+                                             k < words2; k++)
+                        a[k] += (a[k - 1] < tmp2[k - 1]);
                 }
-
-                x = 0, y = 0, z = 0, w = 0;
-                xz = 0, xw = 0, yz = 0, yw = 0;
-                val = 0, carry = 0, low = 0, org = 0, high = 0;
             }
         }
 
         CLEAR_MP(tmp);
+        CLEAR_MP(tmp2);
+
+        CLEAR_MP(x);
+        CLEAR_MP(y);
+        CLEAR_MP(z);
+        CLEAR_MP(w);
+
+        CLEAR_MP(xz);
+        CLEAR_MP(xw);
+        CLEAR_MP(yz);
+        CLEAR_MP(yw);
+
+        CLEAR_MP(low);
+        CLEAR_MP(high);
+        CLEAR_MP(org);
     }
 }
 
@@ -418,9 +461,9 @@ maid_mp_mul_karat_halve(size_t words, maid_mp_word *a, const maid_mp_word *b)
      * which always have half the higher words empty
      *
      * Depends on words being divisible by four
-     * Empirically, starts to be faster above 1024 bits */
+     * Empirically, starts to be faster around 2048 bits */
 
-    if (words <= 16 || words % 4 != 0)
+    if (words <= 32 || words % 4 != 0)
         maid_mp_mul_long(words, a, b, true);
     else
     {
@@ -481,9 +524,9 @@ maid_mp_mul_karat_halve(size_t words, maid_mp_word *a, const maid_mp_word *b)
         maid_mp_sub(words, ab, ac);
 
         maid_mp_mov(words, a, bd);
-        maid_mp_shl(words, ab, sizeof(words) * quarter * 8);
+        maid_mp_shl(words, ab, maid_mp_bits * quarter);
         maid_mp_add(words, a, ab);
-        maid_mp_shl(words, ac, sizeof(words) * half * 8);
+        maid_mp_shl(words, ac, maid_mp_bits * half);
         maid_mp_add(words, a, ac);
 
         CLEAR_MP(ac)

@@ -57,6 +57,10 @@ void maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
                   const maid_mp_word *b);
 
+void maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
+                    const maid_mp_word *mod);
+void maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
+                    const maid_mp_word *mod);
 void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod);
 void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,

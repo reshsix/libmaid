@@ -20,7 +20,7 @@ CFLAGS += --std=c99 -Iinclude -Wall -Wextra
 .PHONY: all debug clean install uninstall
 
 TARGETS = build/libmaid.a build/libmaid.so build/maid
-all: CFLAGS += -O2 -DNDEBUG=1
+all: CFLAGS += -march=native -O3 -DNDEBUG=1
 all: $(TARGETS)
 debug: CFLAGS += -Og -pg -ggdb3
 debug: $(TARGETS) test
@@ -70,4 +70,4 @@ build/libmaid.so: $(OBJS) | build
 	$(CC) -shared -o $@ $^
 
 build/maid: console.c | build
-	$(CC) $(CFLAGS) $^ -o $@ -lmaid
+	$(CC) $(CFLAGS) $^ -o $@ -Lbuild -lmaid
