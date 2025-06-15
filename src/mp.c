@@ -23,6 +23,10 @@
 
 #include <maid/mp.h>
 
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#endif
+
 const char *maid_mp_fmt    = "%016lx";
 const char *maid_mp_fmt_ns = "%lx";
 static const size_t maid_mp_bits  = sizeof(maid_mp_word) * 8;
@@ -216,6 +220,10 @@ maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
         for (size_t i = 0; i < words; i++)
         {
+            #if defined(__x86_64__) || defined(_M_X64)
+            carry = _addcarry_u64(carry, a[i], b ? b[i] : 0,
+                                  (unsigned long long *)&(a[i]));
+            #else
             volatile maid_mp_word val = (b ? b[i] : 0);
 
             a[i] += val;
@@ -223,6 +231,7 @@ maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
             carry = (carry) ? (a[i] <= val) : (a[i] < val);
 
             val = 0;
+            #endif
         }
 
         carry = 0;
@@ -234,22 +243,27 @@ maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        volatile u8 carry = 0;
+        volatile u8 borrow = 0;
 
         for (size_t i = 0; i < words; i++)
         {
+            #if defined(__x86_64__) || defined(_M_X64)
+            borrow = _subborrow_u64(borrow, a[i], b ? b[i] : 0,
+                                    (unsigned long long *)&(a[i]));
+            #else
             volatile maid_mp_word org = a[i];
             volatile maid_mp_word val = (b ? b[i] : 0);
 
             a[i] -= val;
-            a[i] -= carry;
-            carry = (carry) ? (a[i] >= org) : (a[i] > org);
+            a[i] -= borrow;
+            borrow = (borrow) ? (a[i] >= org) : (a[i] > org);
 
             org = 0;
             val = 0;
+            #endif
         }
 
-        carry = 0;
+        borrow = 0;
     }
 }
 
@@ -263,7 +277,7 @@ maid_mp_shl(size_t words, maid_mp_word *a, size_t shift)
         const          u8 id = (maid_mp_bits - d) % maid_mp_bits;
         const maid_mp_word m = d ? (1ULL << id) - 1 : maid_mp_max;
 
-        volatile maid_mp_word x[2] = {0};
+        maid_mp_word x[2] = {0};
         for (size_t i = 0; i < words; i++)
         {
             size_t ii = words - i - 1;
@@ -271,8 +285,7 @@ maid_mp_shl(size_t words, maid_mp_word *a, size_t shift)
             x[1] = (ii >  c) ? a[ii - c - 1] : 0x0;
             a[ii] = ((x[0] & m) << d) | ((x[1] & ~m) >> id);
         }
-        x[0] = 0;
-        x[1] = 0;
+        maid_mem_clear(x, sizeof(x));
     }
 }
 
@@ -286,15 +299,14 @@ maid_mp_shr(size_t words, maid_mp_word *a, size_t shift)
         const          u8 id = (maid_mp_bits - d) % maid_mp_bits;
         const maid_mp_word m = (1ULL << d) - 1;
 
-        volatile maid_mp_word x[2] = {0};
+        maid_mp_word x[2] = {0};
         for (size_t i = 0; i < words; i++)
         {
             x[0] = ((i + c + 0) < words) ? a[i + c + 0] : 0x0;
             x[1] = ((i + c + 1) < words) ? a[i + c + 1] : 0x0;
             a[i] = (x[0] & ~m) >> d | (x[1] & m) << id;
         }
-        x[0] = 0;
-        x[1] = 0;
+        maid_mem_clear(x, sizeof(x));
     }
 }
 
@@ -318,15 +330,14 @@ maid_mp_sar(size_t words, maid_mp_word *a, size_t shift)
         const          u8 id = (maid_mp_bits - d) % maid_mp_bits;
         const maid_mp_word m = (1ULL << d) - 1;
 
-        volatile maid_mp_word x[2] = {0};
+        maid_mp_word x[2] = {0};
         for (size_t i = 0; i < words; i++)
         {
             x[0] = ((i + c + 0) < words) ? a[i + c + 0] : fill;
             x[1] = ((i + c + 1) < words) ? a[i + c + 1] : fill;
             a[i] = (x[0] & ~m) >> d | (x[1] & m) << id;
         }
-        x[0] = 0;
-        x[1] = 0;
+        maid_mem_clear(x, sizeof(x));
 
         fill = 0x0;
     }
@@ -347,6 +358,9 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
             words /= 2;
 
         /* Uses a lot of space to improve calculations */
+        #if defined(__SIZEOF_INT128__)
+        unsigned __int128 results[words];
+        #else
         ALLOC_MP(x, 1)
         ALLOC_MP(y, 1)
         ALLOC_MP(z, 1)
@@ -357,14 +371,16 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
         ALLOC_MP(yz, 1)
         ALLOC_MP(yw, 1)
 
+        ALLOC_MP(org,  1)
+        #endif
         ALLOC_MP(low,  1)
         ALLOC_MP(high, 1)
-        ALLOC_MP(org,  1)
 
         /* Initializes values */
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
 
+        #if !defined(__SIZEOF_INT128__)
         const size_t       half = maid_mp_bits / 2;
         const maid_mp_word mask = maid_mp_max >> half;
 
@@ -377,9 +393,20 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
             z[i] = ((b) ? b[i] : (i == 0)) >> half;
         for (size_t i = 0; i < words; i++)
             w[i] = ((b) ? b[i] : (i == 0)) & mask;
+        #endif
 
         for (size_t i = 0; i < words; i++)
         {
+            #if defined(__SIZEOF_INT128__)
+            for (size_t j = 0; j < words; j++)
+                results[j] = tmp[i];
+            for (size_t j = 0; j < words; j++)
+                results[j] *= ((b) ? b[j] : (j == 0));
+            for (size_t j = 0; j < words; j++)
+                low[j] = results[j];
+            for (size_t j = 0; j < words; j++)
+                high[j] = results[j] >> 64;
+            #else
             /* Does the intermediary multiplications */
             for (size_t j = 0; j < words; j++)
             {
@@ -414,30 +441,29 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
                 high[j] += xw[j] >> half;
             for (size_t j = 0; j < words; j++)
                 high[j] += yz[j] >> half;
+            #endif
 
             /* Adds words to the total */
             maid_mp_mov(words2, tmp2, NULL);
-            for (size_t j = 0; j < words; j++)
+            for (size_t j = 0; j < words && (i + j) < words2; j++)
             {
                 size_t idx = (i + j);
-                if (idx < words2)
-                {
-                    tmp2[idx]     = low[j];
-                    tmp2[idx + 1] = high[j];
+                tmp2[idx]     = low[j];
+                tmp2[idx + 1] = high[j];
 
-                    for (size_t k = idx; k < (idx + 3 + j) && k < words2; k++)
-                        a[k] += tmp2[k];
-
-                    for (size_t k = idx + 1; k < (idx + 3 + j) &&
-                                             k < words2; k++)
-                        a[k] += (a[k - 1] < tmp2[k - 1]);
-                }
+                for (size_t k = idx + 0; k < (idx + 3 + j) && k < words2; k++)
+                    a[k] += tmp2[k];
+                for (size_t k = idx + 1; k < (idx + 3 + j) && k < words2; k++)
+                    a[k] += (a[k - 1] < tmp2[k - 1]);
             }
         }
 
         CLEAR_MP(tmp);
         CLEAR_MP(tmp2);
 
+        #if defined(__SIZEOF_INT128__)
+        maid_mem_clear(results, sizeof(results));
+        #else
         CLEAR_MP(x);
         CLEAR_MP(y);
         CLEAR_MP(z);
@@ -448,9 +474,10 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
         CLEAR_MP(yz);
         CLEAR_MP(yw);
 
+        CLEAR_MP(org);
+        #endif
         CLEAR_MP(low);
         CLEAR_MP(high);
-        CLEAR_MP(org);
     }
 }
 
