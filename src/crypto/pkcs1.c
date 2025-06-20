@@ -25,6 +25,7 @@
 
 enum
 {
+    PKCS1_v1_5_SHA1,
     PKCS1_v1_5_SHA224,     PKCS1_v1_5_SHA256,
     PKCS1_v1_5_SHA384,     PKCS1_v1_5_SHA512,
     PKCS1_v1_5_SHA512_224, PKCS1_v1_5_SHA512_256,
@@ -64,6 +65,8 @@ pkcs1_del(void *pkcs1)
     return NULL;
 }
 
+static u8 sha1_der[] = {0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e,
+                        0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14};
 static u8 sha224_der[] = {0x30, 0x2d, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
                           0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x04, 0x05,
                           0x00, 0x04, 0x1c};
@@ -95,6 +98,11 @@ pkcs1_new(u8 version, maid_pub *public, maid_pub *private, size_t bits)
         ret->words = maid_mp_words(bits);
         switch (version)
         {
+            case PKCS1_v1_5_SHA1:
+                ret->der    = sha1_der;
+                ret->der_s  = sizeof(sha1_der);
+                ret->hash_s = 20;
+                break;
             case PKCS1_v1_5_SHA224:
                 ret->der    = sha224_der;
                 ret->der_s  = sizeof(sha224_der);
@@ -209,6 +217,16 @@ pkcs1_verify(void *pkcs1, u8 *buffer)
 }
 
 /* Maid SIGN definitions */
+
+const struct maid_sign_def maid_pkcs1_v1_5_sha1 =
+{
+    .new      = pkcs1_new,
+    .del      = pkcs1_del,
+    .renew    = pkcs1_renew,
+    .generate = pkcs1_generate,
+    .verify   = pkcs1_verify,
+    .version  = PKCS1_v1_5_SHA1
+};
 
 const struct maid_sign_def maid_pkcs1_v1_5_sha224 =
 {

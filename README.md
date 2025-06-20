@@ -40,10 +40,10 @@ available
 |                                      |                           |
 | [Block ciphers](docs/block.md)       | AES-ECB, AES-CTR          |
 | [Stream ciphers](docs/stream.md)     | Chacha20                  |
-| [MACs](docs/mac.md)                  | Poly1305, HMAC-SHA2       |
+| [MACs](docs/mac.md)                  | Poly1305, HMAC            |
 | [AEADs](docs/aead.md)                | AES-GCM, Chacha20Poly1305 |
 | [CSPRNGs](docs/rng.md)               | CTR-DRBG-AES              |
-| [Hash functions](docs/hash.md)       | SHA-2                     |
+| [Hash functions](docs/hash.md)       | SHA-1, SHA-2              |
 |                                      |                           |
 | [Public-key primitives](docs/pub.md) | RSA                       |
 | [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |

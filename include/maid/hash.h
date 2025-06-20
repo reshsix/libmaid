@@ -45,6 +45,7 @@ size_t maid_hash_digest(maid_hash *m, u8 *output);
 
 /* External algorithms */
 
+extern const struct maid_hash_def maid_sha1;
 extern const struct maid_hash_def maid_sha224;
 extern const struct maid_hash_def maid_sha256;
 extern const struct maid_hash_def maid_sha384;

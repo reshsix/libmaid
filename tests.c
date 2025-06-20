@@ -1249,7 +1249,7 @@ ctr_drbg_tests(void)
 /* SHA-2 NIST CSRC examples */
 
 static u8
-sha2_test(maid_hash *h, char *input, char *output_h)
+sha_test(maid_hash *h, char *input, char *output_h)
 {
     u8 ret = 0;
 
@@ -1273,10 +1273,11 @@ sha2_test(maid_hash *h, char *input, char *output_h)
 }
 
 static u8
-sha2_tests(void)
+sha_tests(void)
 {
-    u8 ret = 12;
+    u8 ret = 14;
 
+    maid_hash *sha1       = maid_hash_new(maid_sha1);
     maid_hash *sha224     = maid_hash_new(maid_sha224);
     maid_hash *sha256     = maid_hash_new(maid_sha256);
     maid_hash *sha384     = maid_hash_new(maid_sha384);
@@ -1289,7 +1290,9 @@ sha2_tests(void)
     char *input2 = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmn"
                    "hijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";
 
-    char *outputs0[] = {"23097d223405d8228642a477bda255b3"
+    char *outputs0[] = {"a9993e364706816aba3e25717850c26c"
+                        "9cd0d89d",
+                        "23097d223405d8228642a477bda255b3"
                         "2aadbce4bda0b3f7e36c9da7",
                         "ba7816bf8f01cfea414140de5dae2223"
                         "b00361a396177a9cb410ff61f20015ad",
@@ -1304,7 +1307,9 @@ sha2_tests(void)
                         "0e37ed265ceee9a43e8924aa",
                         "53048e2681941ef99b2e29b76b4c7dab"
                         "e4c2d0c634fc6d46e0e2f13107e7af23"};
-    char *outputs1[] = {"75388b16512776cc5dba5da1fd890150"
+    char *outputs1[] = {"84983e441c3bd26ebaae4aa1f95129e5"
+                        "e54670f1",
+                        "75388b16512776cc5dba5da1fd890150"
                         "b0c6455cb4f58b1952522525",
                         "248d6a61d20638b8e5c026930c3e6039"
                         "a33ce45964ff2167f6ecedd419db06c1"};
@@ -1320,20 +1325,21 @@ sha2_tests(void)
                         "3928e184fb8690f840da3988121d31be"
                         "65cb9d3ef83ee6146feac861e19b563a"};
 
-    maid_hash *hashes256[] = {sha224, sha256};
-    for (u8 i = 0; i < 2; i++)
+    maid_hash *hashes256[] = {sha1, sha224, sha256};
+    for (u8 i = 0; i < 3; i++)
     {
-        ret -= sha2_test(hashes256[i], input0, outputs0[i]);
-        ret -= sha2_test(hashes256[i], input1, outputs1[i]);
+        ret -= sha_test(hashes256[i], input0, outputs0[i]);
+        ret -= sha_test(hashes256[i], input1, outputs1[i]);
     }
 
     maid_hash *hashes512[] = {sha384, sha512, sha512_224, sha512_256};
     for (u8 i = 0; i < 4; i++)
     {
-        ret -= sha2_test(hashes512[i], input0, outputs0[i + 2]);
-        ret -= sha2_test(hashes512[i], input2, outputs2[i + 0]);
+        ret -= sha_test(hashes512[i], input0, outputs0[i + 3]);
+        ret -= sha_test(hashes512[i], input2, outputs2[i + 0]);
     }
 
+    maid_hash_del(sha1);
     maid_hash_del(sha224);
     maid_hash_del(sha256);
     maid_hash_del(sha384);
@@ -1344,7 +1350,8 @@ sha2_tests(void)
     return ret;
 }
 
-/* HMAC RFC4231 test vectors + comparison with other implementations */
+/* HMAC RFC2202 and RFC4231 test vectors +
+ * comparison with other implementations */
 
 static u8
 hmac_test(maid_mac *m, char *key_h, char *input_h, char *tag_h)
@@ -1379,12 +1386,14 @@ hmac_test(maid_mac *m, char *key_h, char *input_h, char *tag_h)
 static u8
 hmac_tests(void)
 {
-    u8 ret = 6;
+    u8 ret = 7;
 
     char *key = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
     char *data = "4869205468657265";
 
-    char *tags[] = {"896fb1128abbdf196832107cd49df33f"
+    char *tags[] = {"b617318655057264e28bc0b6fb378c8e"
+                    "f146be00",
+                    "896fb1128abbdf196832107cd49df33f"
                     "47b4b1169912ba4f53684b22",
                     "b0344c61d8db38535ca8afceaf0bf12b"
                     "881dc200c9833da726e9376c2e32cff7",
@@ -1401,17 +1410,18 @@ hmac_tests(void)
                     "1feae31bfe70196ff81642b868402eab"};
 
     u8 zeros[128] = {0};
-    maid_mac *macs[] = {maid_mac_new(maid_hmac_sha224,     zeros),
+    maid_mac *macs[] = {maid_mac_new(maid_hmac_sha1,       zeros),
+                        maid_mac_new(maid_hmac_sha224,     zeros),
                         maid_mac_new(maid_hmac_sha256,     zeros),
                         maid_mac_new(maid_hmac_sha384,     zeros),
                         maid_mac_new(maid_hmac_sha512,     zeros),
                         maid_mac_new(maid_hmac_sha512_224, zeros),
                         maid_mac_new(maid_hmac_sha512_256, zeros)};
 
-    for (u8 i = 0; i < 6; i++)
+    for (u8 i = 0; i < 7; i++)
         ret -= hmac_test(macs[i], key, data, tags[i]);
 
-    for (u8 i = 0; i < 6; i++)
+    for (u8 i = 0; i < 7; i++)
         maid_mac_del(macs[i]);
 
     return ret;
@@ -1550,9 +1560,17 @@ pkcs1_test(struct maid_sign_def def, maid_pub *pub, maid_pub *prv,
 static u8
 pkcs1_tests(void)
 {
-    u8 ret = 6;
+    u8 ret = 7;
 
     char *e[] = {
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "0000000000000000000000000000000000000000000000000000000000010001",
          "0000000000000000000000000000000000000000000000000000000000000000"
          "0000000000000000000000000000000000000000000000000000000000000000"
          "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1570,6 +1588,14 @@ pkcs1_tests(void)
          "0000000000000000000000000000000000000000000000000000000000000000"
          "0000000000000000000000000000000000000000000000000000000000101957"};
     char *d[] = {
+         "1dbca92e4245c2d57bfba76210cc06029b502753b7c821a32b799fbd33c98b49"
+         "db10226b1eac0143c8574ef652833b96374d034ef84daa5559c693f3f028d497"
+         "16b82e87a3f682f25424563bd9409dcf9d08110500f73f74076f28e75e0199b1"
+         "f29fa2f70b9a31190dec54e872a740e7a1b1e38c3d11bca8267deb842cef4262"
+         "237ac875725068f32563b478aca8d6a99f34cb8876b97145b2e8529ec8adea83"
+         "ead4ec63e3ff2d17a2ffefb05c902ca7a92168378c89f75c928fc4f0707e4348"
+         "7a4f47df70cae87e24272c136d3e98cf59066d41a3d038857d073d8b4d2c27b8"
+         "f0ea6bfa50d263091a4a18c63f446bc9a61e8c4a688347b2435ec8e72eddaea7",
          "0997634c477c1a039d44c810b2aaa3c7862b0b88d3708272e1e15f66fc938970"
          "9f8a11f3ea6a5af7effa2d01c189c50f0d5bcbe3fa272e56cfc4a4e1d388a9dc"
          "d65df8628902556c8b6bb6a641709b5a35dd2622c73d4640bfa1359d0e76e1f2"
@@ -1587,6 +1613,14 @@ pkcs1_tests(void)
          "b564a756346d65d8c55f1b11b9b092fca7f6b2394ebc3109b3d02ec5a0967ea6"
          "45d127fe0fb9f9fa71637ac6f0b92671809f4aad1278a6cb5e8a7247fe53afdf"};
     char *n[] = {
+         "e0b14b99cd61cd3db9c2076668841324fa3174f33ce66ffd514394d34178d29a"
+         "49493276b6777233e7d46a3e68bc7ca7e899e901d54f6dee0749c3e48ddf6868"
+         "5867ee2ae66df88eb563f6db137a9f6b175a112e0eda8368e88e45efe1ce14bc"
+         "6016d52639627066af1872c72f60b9161c1d237eeb34b0f841b3f0896f9fe0e1"
+         "6b0f74352d101292cc464a7e7861bbeb86f6df6151cb265417c66c565ed8974b"
+         "d8fc984d5ddfd4eb91a3d5234ce1b5467f3ade375f802ec07293f1236efa3068"
+         "bc91b158551c875c5dc0a9d6fa321bf9421f08deac910e35c1c28549ee8eed83"
+         "30cf70595ff70b94b49907e27698a9d911f7ac0706afcb1a4a39feb38b0a8049",
          "cea80475324c1dc8347827818da58bac069d3419c614a6ea1ac6a3b510dcd72c"
          "c516954905e9fef908d45e13006adf27d467a7d83c111d1a5df15ef293771aef"
          "b920032a5bb989f8e4f5e1b05093d3f130f984c07a772a3683f4dc6fb28a9681"
@@ -1605,7 +1639,8 @@ pkcs1_tests(void)
          "abdec6f896a0fa5fb164f9f4298a5a8831f6684dae31f2e76146d6be14c3ea7d"};
 
     char *input[] =
-        {"c34b1a0d795dae5b88559191bb2c1cb75a5fd1d18b5002074560e6ad",
+        {"07c9e2f4386bc85f2c41728948b82a5591011db7",
+         "c34b1a0d795dae5b88559191bb2c1cb75a5fd1d18b5002074560e6ad",
          "077877895a428028f60998b985550820025a2a42c0beab27165c0802d3098150",
          "8e5d03e53c9084db4e808148b55658d3a689ca4084dfc41bdf37bac5f8e11e83"
          "ab7eb6053bcb26be9b51ba03cac2b945",
@@ -1614,7 +1649,15 @@ pkcs1_tests(void)
          "2c0a4d9ce74063da224a7955a045c05bdadf481125f5797fc2e03c59",
          "1ca543685a5698ea6b4f91afeae507e895497e0037c8f074300c96a8af0640b2"};
     char *output[] =
-        {"27da4104eace1991e08bd8e7cfccd97ec48b896a0e156ce7bdc23fd570aaa9a0"
+        {"d0d03ccb3b30b7c9c4d6eeee2ec26d069246e019fb8fa2f3a9b72c9bbe231d93"
+         "ce053df805a045e2ef6bd8d08bfb0c36922e5a6f10b947b2607f596b6cbd3c9e"
+         "efef56f5396805e8b28b1ca182c78c0b12b9796aa856af69c35504f8acc7afa7"
+         "4bc0f77a1d61da94944057a9ee72d2f0a96cbaa2f64676f5318b71e56f519d0d"
+         "a1ce8f42db0ebe5045fcc726e39fb0032f2287918f9190f3fb3d4de542030441"
+         "f6736c6205a2bcd2450eb411085311c7320baa4268fd2fd8bcc8ebfddbb60740"
+         "cff0b3b00f618777ebcfb3468f309d923c957c8170727a5458ac2c9070f93cfc"
+         "37d31cf9f1a35d0cc3abf25af8dc9e1590ce59ab39d01cf0c154ab8d0635c5e9",
+         "27da4104eace1991e08bd8e7cfccd97ec48b896a0e156ce7bdc23fd570aaa9a0"
          "0ed015101f0c6261c7371ceca327a73c3cecfcf6b2d9ed920c9698046e25c89a"
          "db2360887d99983bf632f9e6eb0e5df60715902b9aeaa74bf5027aa246510891"
          "c74ae366a16f397e2c8ccdc8bd56aa10e0d01585e69f8c4856e76b53acfd3d78"
@@ -1667,31 +1710,32 @@ pkcs1_tests(void)
     u8 d8[256] = {0};
     u8 n8[256] = {0};
 
-    hex_read(e8, e[0]);
-    hex_read(d8, d[0]);
-    hex_read(n8, n[0]);
-
     size_t words = maid_mp_words(2048);
     maid_mp_word ee[words];
     maid_mp_word dd[words];
     maid_mp_word nn[words];
 
-    maid_mp_read(words, ee, e8, true);
-    maid_mp_read(words, dd, d8, true);
-    maid_mp_read(words, nn, n8, true);
+    struct maid_sign_def defs[] =
+        {maid_pkcs1_v1_5_sha1,
+         maid_pkcs1_v1_5_sha224,     maid_pkcs1_v1_5_sha256,
+         maid_pkcs1_v1_5_sha384,     maid_pkcs1_v1_5_sha512,
+         maid_pkcs1_v1_5_sha512_224, maid_pkcs1_v1_5_sha512_256};
 
     struct maid_rsa_key pub_key = {.exponent = ee, .modulo = nn};
     struct maid_rsa_key prv_key = {.exponent = dd, .modulo = nn};
 
+    hex_read(e8, e[0]);
+    hex_read(d8, d[0]);
+    hex_read(n8, n[0]);
+
+    maid_mp_read(words, ee, e8, true);
+    maid_mp_read(words, dd, d8, true);
+    maid_mp_read(words, nn, n8, true);
+
     maid_pub *pub = maid_pub_new(maid_rsa_public,  &pub_key, 2048);
     maid_pub *prv = maid_pub_new(maid_rsa_private, &prv_key, 2048);
 
-    struct maid_sign_def defs[] =
-        {maid_pkcs1_v1_5_sha224,     maid_pkcs1_v1_5_sha256,
-         maid_pkcs1_v1_5_sha384,     maid_pkcs1_v1_5_sha512,
-         maid_pkcs1_v1_5_sha512_224, maid_pkcs1_v1_5_sha512_256};
-
-    for (u8 i = 0; i < 4; i++)
+    for (u8 i = 0; i < 1; i++)
         ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
 
     hex_read(e8, e[1]);
@@ -1704,7 +1748,21 @@ pkcs1_tests(void)
 
     maid_pub_renew(pub, &pub_key);
     maid_pub_renew(prv, &prv_key);
-    for (u8 i = 4; i < 6; i++)
+
+    for (u8 i = 1; i < 5; i++)
+        ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
+
+    hex_read(e8, e[2]);
+    hex_read(d8, d[2]);
+    hex_read(n8, n[2]);
+
+    maid_mp_read(words, ee, e8, true);
+    maid_mp_read(words, dd, d8, true);
+    maid_mp_read(words, nn, n8, true);
+
+    maid_pub_renew(pub, &pub_key);
+    maid_pub_renew(prv, &prv_key);
+    for (u8 i = 5; i < 7; i++)
         ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
 
     maid_pub_del(pub);
@@ -2224,7 +2282,7 @@ main(void)
     TEST(chacha20poly1305_tests)
 
     TEST(ctr_drbg_tests)
-    TEST(sha2_tests)
+    TEST(sha_tests)
 
     TEST(hmac_tests)
 

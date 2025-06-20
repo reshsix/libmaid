@@ -130,6 +130,16 @@ Poly1305 128-bit MAC (IETF)
 </details>
 
 <details>
+<summary>const struct maid_mac_def maid_hmac_sha1</summary>
+HMAC-SHA1 160-bit MAC (NIST)
+
+### Parameters
+| name | description |
+|------|-------------|
+| key  | 512-bit key |
+</details>
+
+<details>
 <summary>const struct maid_mac_def maid_hmac_sha224</summary>
 HMAC-SHA224 224-bit MAC (NIST)
 

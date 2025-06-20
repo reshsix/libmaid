@@ -330,6 +330,7 @@ usage(void)
     fprintf(stderr, "    maid mac [algorithm] [key file] < message\n");
     fprintf(stderr, "    Authenticates a message\n");
     fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        hmac-sha1        (key:  64)\n");
     fprintf(stderr, "        hmac-sha224      (key:  64)\n");
     fprintf(stderr, "        hmac-sha256      (key:  64)\n");
     fprintf(stderr, "        hmac-sha384      (key: 128)\n");
@@ -348,6 +349,7 @@ usage(void)
     fprintf(stderr, "    maid hash [algorithm] < message\n");
     fprintf(stderr, "    Hashes a message\n");
     fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        sha1      \n");
     fprintf(stderr, "        sha224    \n");
     fprintf(stderr, "        sha256    \n");
     fprintf(stderr, "        sha384    \n");
@@ -376,6 +378,7 @@ usage(void)
     fprintf(stderr, "    maid sign [algorithm] [key file] < hash\n");
     fprintf(stderr, "    Signs a hash\n");
     fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        rsa-pkcs1-sha1       (key: PEM, hash: 20)\n");
     fprintf(stderr, "        rsa-pkcs1-sha224     (key: PEM, hash: 28)\n");
     fprintf(stderr, "        rsa-pkcs1-sha256     (key: PEM, hash: 32)\n");
     fprintf(stderr, "        rsa-pkcs1-sha384     (key: PEM, hash: 48)\n");
@@ -386,6 +389,7 @@ usage(void)
     fprintf(stderr, "    maid verify [algorithm] [key file] < signature\n");
     fprintf(stderr, "    Verifies a signature\n");
     fprintf(stderr, "    Algorithms:\n");
+    fprintf(stderr, "        rsa-pkcs1-sha1       (key: PEM)\n");
     fprintf(stderr, "        rsa-pkcs1-sha224     (key: PEM)\n");
     fprintf(stderr, "        rsa-pkcs1-sha256     (key: PEM)\n");
     fprintf(stderr, "        rsa-pkcs1-sha384     (key: PEM)\n");
@@ -510,7 +514,12 @@ mac(int argc, char *argv[])
         const struct maid_mac_def *def = NULL;
 
         ret = true;
-        if (strcmp(argv[1], "hmac-sha224") == 0)
+        if (strcmp(argv[1], "hmac-sha1") == 0)
+        {
+            key_s = 64;
+            def   = &maid_hmac_sha1;
+        }
+        else if (strcmp(argv[1], "hmac-sha224") == 0)
         {
             key_s = 64;
             def   = &maid_hmac_sha224;
@@ -643,7 +652,9 @@ hash(int argc, char *argv[])
 
         const struct maid_hash_def *def = NULL;
 
-        if (strcmp(argv[1], "sha224") == 0)
+        if (strcmp(argv[1], "sha1") == 0)
+            def = &maid_sha1;
+        else if (strcmp(argv[1], "sha224") == 0)
             def = &maid_sha224;
         else if (strcmp(argv[1], "sha256") == 0)
             def = &maid_sha256;
@@ -830,7 +841,13 @@ sign_verify(int argc, char *argv[], bool verify)
             size_t hash_s = 0;
             size_t min_bits = 0;
 
-            if (strcmp(argv[1], "rsa-pkcs1-sha224") == 0)
+            if (strcmp(argv[1], "rsa-pkcs1-sha1") == 0)
+            {
+                sign_d   = &maid_pkcs1_v1_5_sha1;
+                hash_s   = 20;
+                min_bits = 2048;
+            }
+            else if (strcmp(argv[1], "rsa-pkcs1-sha224") == 0)
             {
                 sign_d   = &maid_pkcs1_v1_5_sha224;
                 hash_s   = 28;

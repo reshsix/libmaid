@@ -110,6 +110,11 @@ Outputs the hash (One time, ending the hash function instance)
 ## External Algorithms
 
 <details>
+<summary>const struct maid_hash_def maid_sha1</summary>
+SHA-1 160-bits hash (NIST)
+</details>
+
+<details>
 <summary>const struct maid_hash_def maid_sha224</summary>
 SHA-2 224-bits hash (NIST)
 </details>

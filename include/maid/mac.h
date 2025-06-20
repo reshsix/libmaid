@@ -51,6 +51,7 @@ size_t maid_mac_digest(maid_mac *m, u8 *output);
 
 extern const struct maid_mac_def maid_poly1305;
 
+extern const struct maid_mac_def maid_hmac_sha1;
 extern const struct maid_mac_def maid_hmac_sha224;
 extern const struct maid_mac_def maid_hmac_sha256;
 extern const struct maid_mac_def maid_hmac_sha384;

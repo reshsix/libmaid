@@ -120,6 +120,24 @@ Verifies a digital signature
 ## External Algorithms
 
 <details>
+<summary>const struct maid_sign_def maid_pkcs1_v1_5_sha1</summary>
+PKCS#1 v1.5 signature with SHA-1 (RSA Security)
+
+### Parameters
+
+#### maid_sign_generate
+| name   | description             |
+|--------|-------------------------|
+| buffer | 160-bits -> [bits]-bits |
+
+#### maid_sign_verify
+| name   | description             |
+|--------|-------------------------|
+| buffer | [bits]-bits -> 160-bits |
+
+</details>
+
+<details>
 <summary>const struct maid_sign_def maid_pkcs1_v1_5_sha224</summary>
 PKCS#1 v1.5 signature with SHA-224 (RSA Security)
 

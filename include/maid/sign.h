@@ -46,6 +46,7 @@ bool maid_sign_verify(maid_sign *s, u8 *buffer);
 
 /* External algorithms */
 
+extern const struct maid_sign_def maid_pkcs1_v1_5_sha1;
 extern const struct maid_sign_def maid_pkcs1_v1_5_sha224;
 extern const struct maid_sign_def maid_pkcs1_v1_5_sha256;
 extern const struct maid_sign_def maid_pkcs1_v1_5_sha384;
