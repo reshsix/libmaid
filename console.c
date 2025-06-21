@@ -313,117 +313,134 @@ get_pub(char *filename, size_t *bits, bool private)
 /* Main functions */
 
 extern bool
-usage(void)
+usage(char *ctx)
 {
-    fprintf(stderr, "A Cryptography Library for Maids\n");
-    fprintf(stderr, "usage: maid [command] ...\n\n");
-    fprintf(stderr, "Commands: \n");
-    fprintf(stderr, "    maid stream [algorithm] [key file] [iv file]");
-    fprintf(stderr, " < stream\n");
-    fprintf(stderr, "    Encrypts/decrypts a stream\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        aes-128-ctr (key: 16, iv: 16) \n");
-    fprintf(stderr, "        aes-192-ctr (key: 24, iv: 16)\n");
-    fprintf(stderr, "        aes-256-ctr (key: 32, iv: 16)\n");
-    fprintf(stderr, "        chacha20    (key: 32, iv: 12)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid mac [algorithm] [key file] < message\n");
-    fprintf(stderr, "    Authenticates a message\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        hmac-sha1        (key:  64)\n");
-    fprintf(stderr, "        hmac-sha224      (key:  64)\n");
-    fprintf(stderr, "        hmac-sha256      (key:  64)\n");
-    fprintf(stderr, "        hmac-sha384      (key: 128)\n");
-    fprintf(stderr, "        hmac-sha512      (key: 128)\n");
-    fprintf(stderr, "        hmac-sha512-224  (key: 128)\n");
-    fprintf(stderr, "        hmac-sha512-256  (key: 128)\n");
-    fprintf(stderr, "        poly1305         (key:  32)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid rng [algorithm] < entropy\n");
-    fprintf(stderr, "    Pseudo-randomly generate bytes\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        ctr-drbg-aes-128 (entropy: 32)\n");
-    fprintf(stderr, "        ctr-drbg-aes-192 (entropy: 40)\n");
-    fprintf(stderr, "        ctr-drbg-aes-256 (entropy: 48)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid hash [algorithm] < message\n");
-    fprintf(stderr, "    Hashes a message\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        sha1      \n");
-    fprintf(stderr, "        sha224    \n");
-    fprintf(stderr, "        sha256    \n");
-    fprintf(stderr, "        sha384    \n");
-    fprintf(stderr, "        sha512    \n");
-    fprintf(stderr, "        sha512-224\n");
-    fprintf(stderr, "        sha512-256\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid encrypt [algorithm] [key file] [iv file] \n");
-    fprintf(stderr, "                 [tag file] [aad file] < message\n");
-    fprintf(stderr, "    Encrypts and generates a message tag\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        aes-128-gcm      (key: 16, tag: 16, aad: any)\n");
-    fprintf(stderr, "        aes-192-gcm      (key: 24, tag: 16, aad: any)\n");
-    fprintf(stderr, "        aes-256-gcm      (key: 32, tag: 16, aad: any)\n");
-    fprintf(stderr, "        chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid decrypt [algorithm] [key file] [iv file] \n");
-    fprintf(stderr, "                 [tag file] [aad file] < message\n");
-    fprintf(stderr, "    Decrypts and validates a message tag\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        aes-128-gcm      (key: 16, tag: 16, aad: any)\n");
-    fprintf(stderr, "        aes-192-gcm      (key: 24, tag: 16, aad: any)\n");
-    fprintf(stderr, "        aes-256-gcm      (key: 32, tag: 16, aad: any)\n");
-    fprintf(stderr, "        chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid sign [algorithm] [key file] < hash\n");
-    fprintf(stderr, "    Signs a hash\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        rsa-pkcs1-sha1       (key: PEM, hash: 20)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha224     (key: PEM, hash: 28)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha256     (key: PEM, hash: 32)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha384     (key: PEM, hash: 48)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha512     (key: PEM, hash: 64)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha512-224 (key: PEM, hash: 28)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha512-256 (key: PEM, hash: 32)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid verify [algorithm] [key file] < signature\n");
-    fprintf(stderr, "    Verifies a signature\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        rsa-pkcs1-sha1       (key: PEM)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha224     (key: PEM)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha256     (key: PEM)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha384     (key: PEM)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha512     (key: PEM)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha512-224 (key: PEM)\n");
-    fprintf(stderr, "        rsa-pkcs1-sha512-256 (key: PEM)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid exchange [algorithm] < private\n");
-    fprintf(stderr, "    Generates a public-key for key exchange\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        dh-group14 (private: 256)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid secret [algorithm] [private file] < public\n");
-    fprintf(stderr, "    Generates a secret from key exchange\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        dh-group14 (public: 256, private: 256)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid keygen [algorithm] [generator] < entropy\n");
-    fprintf(stderr, "    Generates a private key using entropy\n");
-    fprintf(stderr, "    Algorithms:\n");
-    fprintf(stderr, "        rsa-2048\n");
-    fprintf(stderr, "        rsa-3072\n");
-    fprintf(stderr, "        rsa-4096\n");
-    fprintf(stderr, "    Generators:\n");
-    fprintf(stderr, "        ctr-drbg-aes-128 (entropy: 32)\n");
-    fprintf(stderr, "        ctr-drbg-aes-192 (entropy: 40)\n");
-    fprintf(stderr, "        ctr-drbg-aes-256 (entropy: 48)\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid pubkey [key file]\n");
-    fprintf(stderr, "    Extracts public key from private key\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "    maid info < data\n");
-    fprintf(stderr, "    Displays PEM data information\n");
-    fprintf(stderr, "\n");
+    if (!ctx)
+        fprintf(stderr,
+                "A Cryptography Library for Maids\n"
+                "usage: maid [command] ...\n\n"
+                "Commands:\n"
+                "    stream      Encrypts/decrypts a stream\n"
+                "    mac         Authenticates a message\n"
+                "    rng         Pseudo-randomly generate bytes\n"
+                "    hash        Hashes a message\n\n"
+                "    encrypt     Encrypts and generates a message tag\n"
+                "    decrypt     Decrypts and validates a message tag\n\n"
+                "    sign        Signs a hash\n"
+                "    verify      Verifies a signature\n\n"
+                "    exchange    Generates a public-key for key exchange\n"
+                "    secret      Generates a secret from key exchange\n\n"
+                "    pubkey      Extracts public key from private key\n"
+                "    info        Displays PEM data information\n");
+    else if (strcmp(ctx, "stream") == 0)
+        fprintf(stderr, "maid stream [algorithm] [key file] [iv file]"
+                        " < stream\n"
+                        "Encrypts/decrypts a stream\n\n"
+                        "Algorithms:\n"
+                        "    aes-128-ctr (key: 16, iv: 16)\n"
+                        "    aes-192-ctr (key: 24, iv: 16)\n"
+                        "    aes-256-ctr (key: 32, iv: 16)\n"
+                        "    chacha20    (key: 32, iv: 12)\n");
+    else if (strcmp(ctx, "mac") == 0)
+        fprintf(stderr, "maid mac [algorithm] [key file] < message\n"
+                        "Authenticates a message\n\n"
+                        "Algorithms:\n"
+                        "    hmac-sha1        (key:  64)\n"
+                        "    hmac-sha224      (key:  64)\n"
+                        "    hmac-sha256      (key:  64)\n"
+                        "    hmac-sha384      (key: 128)\n"
+                        "    hmac-sha512      (key: 128)\n"
+                        "    hmac-sha512-224  (key: 128)\n"
+                        "    hmac-sha512-256  (key: 128)\n"
+                        "    poly1305         (key:  32)\n");
+    else if (strcmp(ctx, "rng") == 0)
+        fprintf(stderr, "maid rng [algorithm] < entropy\n"
+                        "Pseudo-randomly generate bytes\n\n"
+                        "Algorithms:\n"
+                        "    ctr-drbg-aes-128 (entropy: 32)\n"
+                        "    ctr-drbg-aes-192 (entropy: 40)\n"
+                        "    ctr-drbg-aes-256 (entropy: 48)\n");
+    else if (strcmp(ctx, "hash") == 0)
+        fprintf(stderr, "maid hash [algorithm] < message\n"
+                        "Hashes a message\n\n"
+                        "Algorithms:\n"
+                        "    sha1      \n"
+                        "    sha224    \n"
+                        "    sha256    \n"
+                        "    sha384    \n"
+                        "    sha512    \n"
+                        "    sha512-224\n"
+                        "    sha512-256\n");
+    else if (strcmp(ctx, "encrypt") == 0)
+        fprintf(stderr, "maid encrypt [algorithm] [key file] [iv file] \n"
+                        "             [tag file] [aad file] < message\n"
+                        "Encrypts and generates a message tag\n\n"
+                        "Algorithms:\n"
+                        "    aes-128-gcm      (key: 16, tag: 16, aad: any)\n"
+                        "    aes-192-gcm      (key: 24, tag: 16, aad: any)\n"
+                        "    aes-256-gcm      (key: 32, tag: 16, aad: any)\n"
+                        "    chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
+    else if (strcmp(ctx, "decrypt") == 0)
+        fprintf(stderr, "maid decrypt [algorithm] [key file] [iv file] \n"
+                        "             [tag file] [aad file] < message\n"
+                        "Decrypts and validates a message tag\n\n"
+                        "Algorithms:\n"
+                        "    aes-128-gcm      (key: 16, tag: 16, aad: any)\n"
+                        "    aes-192-gcm      (key: 24, tag: 16, aad: any)\n"
+                        "    aes-256-gcm      (key: 32, tag: 16, aad: any)\n"
+                        "    chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
+    else if (strcmp(ctx, "sign") == 0)
+        fprintf(stderr, "maid sign [algorithm] [key file] < hash\n"
+                        "Signs a hash\n\n"
+                        "Algorithms:\n"
+                        "    rsa-pkcs1-sha1       (key: PEM, hash: 20)\n"
+                        "    rsa-pkcs1-sha224     (key: PEM, hash: 28)\n"
+                        "    rsa-pkcs1-sha256     (key: PEM, hash: 32)\n"
+                        "    rsa-pkcs1-sha384     (key: PEM, hash: 48)\n"
+                        "    rsa-pkcs1-sha512     (key: PEM, hash: 64)\n"
+                        "    rsa-pkcs1-sha512-224 (key: PEM, hash: 28)\n"
+                        "    rsa-pkcs1-sha512-256 (key: PEM, hash: 32)\n");
+    else if (strcmp(ctx, "verify") == 0)
+        fprintf(stderr, "maid verify [algorithm] [key file] < signature\n"
+                        "Verifies a signature\n\n"
+                        "Algorithms:\n"
+                        "    rsa-pkcs1-sha1       (key: PEM)\n"
+                        "    rsa-pkcs1-sha224     (key: PEM)\n"
+                        "    rsa-pkcs1-sha256     (key: PEM)\n"
+                        "    rsa-pkcs1-sha384     (key: PEM)\n"
+                        "    rsa-pkcs1-sha512     (key: PEM)\n"
+                        "    rsa-pkcs1-sha512-224 (key: PEM)\n"
+                        "    rsa-pkcs1-sha512-256 (key: PEM)\n");
+    else if (strcmp(ctx, "exchange") == 0)
+        fprintf(stderr, "maid exchange [algorithm] < private\n"
+                        "Generates a public-key for key exchange\n\n"
+                        "Algorithms:\n"
+                        "    dh-group14 (private: 256)\n");
+    else if (strcmp(ctx, "secret") == 0)
+        fprintf(stderr, "maid secret [algorithm] [private file] < public\n"
+                        "Generates a secret from key exchange\n\n"
+                        "Algorithms:\n"
+                        "    dh-group14 (public: 256, private: 256)\n");
+    else if (strcmp(ctx, "keygen") == 0)
+        fprintf(stderr, "maid keygen [algorithm] [generator] < entropy\n"
+                        "Generates a private key using entropy\n\n"
+                        "Algorithms:\n"
+                        "    rsa-2048\n"
+                        "    rsa-3072\n"
+                        "    rsa-4096\n\n"
+                        "Generators:\n"
+                        "    ctr-drbg-aes-128 (entropy: 32)\n"
+                        "    ctr-drbg-aes-192 (entropy: 40)\n"
+                        "    ctr-drbg-aes-256 (entropy: 48)\n");
+    else if (strcmp(ctx, "pubkey") == 0)
+        fprintf(stderr, "maid pubkey [key file]\n"
+                        "Extracts public key from private key\n");
+    else if (strcmp(ctx, "info") == 0)
+        fprintf(stderr, "maid info < data\n"
+                        "Displays PEM data information\n");
+    else
+        fprintf(stderr, "maid %s: No usage text found\n", ctx);
+
     return false;
 }
 
@@ -468,7 +485,7 @@ stream(int argc, char *argv[])
             def_s  = &maid_chacha20;
         }
         else
-            ret = usage();
+            ret = usage("stream");
 
         if (ret && get_data(argv[2], key, key_s, false) &&
                    get_data(argv[3],  iv, iv_s,  false))
@@ -496,7 +513,7 @@ stream(int argc, char *argv[])
         maid_mem_clear(iv,  sizeof(iv));
     }
     else
-        ret = usage();
+        ret = usage("stream");
 
     return ret;
 }
@@ -555,7 +572,7 @@ mac(int argc, char *argv[])
             def   = &maid_poly1305;
         }
         else
-            ret = usage();
+            ret = usage("mac");
 
         if (ret && get_data(argv[2], key, key_s, false))
         {
@@ -572,7 +589,7 @@ mac(int argc, char *argv[])
         maid_mem_clear(key, sizeof(key));
     }
     else
-        ret = usage();
+        ret = usage("mac");
 
     return ret;
 }
@@ -610,7 +627,7 @@ rng(int argc, char *argv[])
             def       = &maid_ctr_drbg_aes_256;
         }
         else
-            ret = usage();
+            ret = usage("rng");
 
         if (ret && get_data_fd(in, entropy, entropy_s, false))
         {
@@ -636,7 +653,7 @@ rng(int argc, char *argv[])
         maid_mem_clear(entropy, sizeof(entropy));
     }
     else
-        ret = usage();
+        ret = usage("rng");
 
     return ret;
 }
@@ -667,7 +684,7 @@ hash(int argc, char *argv[])
         else if (strcmp(argv[1], "sha512-256") == 0)
             def = &maid_sha512_256;
         else
-            ret = usage();
+            ret = usage("hash");
 
         if (ret)
         {
@@ -682,7 +699,7 @@ hash(int argc, char *argv[])
         }
     }
     else
-        ret = usage();
+        ret = usage("hash");
 
     return ret;
 }
@@ -733,7 +750,7 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
             def = &maid_chacha20poly1305;
         }
         else
-            ret = usage();
+            ret = usage((decrypt) ? "decrypt" : "encrypt");
 
         if (ret && get_data(argv[2], key, key_s, false) &&
                    get_data(argv[3],  iv, iv_s,  false))
@@ -810,7 +827,7 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
         maid_mem_clear(iv,  sizeof(iv));
     }
     else
-        ret = usage();
+        ret = usage((decrypt) ? "decrypt" : "encrypt");
 
     return ret;
 }
@@ -884,7 +901,7 @@ sign_verify(int argc, char *argv[], bool verify)
                 min_bits = 2048;
             }
             else
-                ret = usage();
+                ret = usage((verify) ? "verify" : "sign");
 
             if (bits < min_bits)
             {
@@ -951,7 +968,7 @@ sign_verify(int argc, char *argv[], bool verify)
         maid_pub_del(pub);
     }
     else
-        ret = usage();
+        ret = usage((verify) ? "verify" : "sign");
 
     return ret;
 }
@@ -1012,7 +1029,7 @@ exchange_secret(int argc, char *argv[], bool secret)
             ctx = maid_kex_new(maid_dh, &group, 2048);
         }
         else
-            ret = usage();
+            ret = usage((secret) ? "secret" : "exchange");
 
         if (ret && !ctx)
         {
@@ -1063,7 +1080,7 @@ exchange_secret(int argc, char *argv[], bool secret)
         maid_kex_del(ctx);
     }
     else
-        ret = usage();
+        ret = usage((secret) ? "secret" : "exchange");
 
     return ret;
 }
@@ -1089,7 +1106,7 @@ keygen(int argc, char *argv[])
         else if (strcmp(argv[1], "rsa-4096") == 0)
             bits = 4096;
         else
-            ret = usage();
+            ret = usage("keygen");
 
         u8 entropy[48] = {0};
 
@@ -1114,7 +1131,7 @@ keygen(int argc, char *argv[])
                 def       = &maid_ctr_drbg_aes_256;
             }
             else
-                ret = usage();
+                ret = usage("keygen");
         }
 
         maid_rng *gen = NULL;
@@ -1162,7 +1179,7 @@ keygen(int argc, char *argv[])
         maid_mem_clear(entropy, sizeof(entropy));
     }
     else
-        ret = usage();
+        ret = usage("keygen");
 
     return ret;
 }
@@ -1226,7 +1243,7 @@ pubkey(int argc, char *argv[])
         maid_pem_free(p);
     }
     else
-        ret = usage();
+        ret = usage("pubkey");
 
     return ret;
 }
@@ -1311,7 +1328,7 @@ info(int argc, char *argv[])
         maid_mem_clear(buffer, sizeof(buffer));
     }
     else
-        ret = usage();
+        ret = usage("info");
 
     return ret;
 }
@@ -1353,10 +1370,10 @@ main(int argc, char *argv[])
         else if (strcmp(argv[0], "info") == 0)
             ret = info(argc, argv);
         else
-            ret = usage();
+            ret = usage(NULL);
     }
     else
-        ret = usage();
+        ret = usage(NULL);
 
     return (ret) ? EXIT_SUCCESS : ((errno) ? errno : EXIT_FAILURE);
 }
