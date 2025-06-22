@@ -331,7 +331,9 @@ usage(char *ctx)
                 "    exchange    Generates a public-key for key exchange\n"
                 "    secret      Generates a secret from key exchange\n\n"
                 "    pubkey      Extracts public key from private key\n"
-                "    info        Displays PEM data information\n");
+                "    info        Displays PEM data information\n\n"
+                "    encode      Encodes data to a certain format\n"
+                "    decode      Decodes data from a certain format\n");
     else if (strcmp(ctx, "stream") == 0)
         fprintf(stderr, "maid stream [algorithm] [key file] [iv file]"
                         " < stream\n"
@@ -438,6 +440,16 @@ usage(char *ctx)
     else if (strcmp(ctx, "info") == 0)
         fprintf(stderr, "maid info < data\n"
                         "Displays PEM data information\n");
+    else if (strcmp(ctx, "encode") == 0)
+        fprintf(stderr, "maid encode [algorithm] < data\n"
+                        "Encodes data to a certain format\n\n"
+                        "Algorithms:\n"
+                        "    base64\n");
+    else if (strcmp(ctx, "decode") == 0)
+        fprintf(stderr, "maid decode [algorithm] < data\n"
+                        "Decodes data from a certain format\n\n"
+                        "Algorithms:\n"
+                        "    base64\n");
     else
         fprintf(stderr, "maid %s: No usage text found\n", ctx);
 
@@ -1333,6 +1345,73 @@ info(int argc, char *argv[])
     return ret;
 }
 
+extern bool
+encode_decode(int argc, char *argv[], bool decode)
+{
+    bool ret = false;
+
+    if (argc == 2)
+    {
+        int in  = STDIN_FILENO;
+        int out = STDOUT_FILENO;
+
+        if (strcmp(argv[1], "base64") == 0)
+        {
+            ret = true;
+
+            if (!decode)
+            {
+                u8    inb[3 * 1024] = {0};
+                char outb[4 * 1024] = {0};
+                while (true)
+                {
+                    size_t bytes = read(in, inb, sizeof(inb));
+                    if (bytes == 0)
+                        break;
+
+                    write(out, outb,
+                          maid_mem_export(inb,  bytes,
+                                          outb, sizeof(outb)));
+                }
+                maid_mem_clear(inb,  sizeof(inb));
+                maid_mem_clear(outb, sizeof(outb));
+            }
+            else
+            {
+                char inb[4 * 1024] = {0};
+                u8  outb[3 * 1024] = {0};
+                while (true)
+                {
+                    size_t bytes = read(in, inb, sizeof(inb));
+                    if (bytes == 0)
+                        break;
+
+                    if ((bytes % 4) == 0)
+                    {
+                        write(out, outb,
+                              maid_mem_import(outb, sizeof(outb),
+                                              inb,  bytes));
+                    }
+                    else
+                    {
+                        fprintf(stderr, "Corrupted input\n");
+                        ret = false;
+                        break;
+                    }
+                }
+                maid_mem_clear(inb,  sizeof(inb));
+                maid_mem_clear(outb, sizeof(outb));
+            }
+        }
+        else
+            ret = usage((decode) ? "decode" : "encode");
+    }
+    else
+        ret = usage((decode) ? "decode" : "encode");
+
+    return ret;
+}
+
 extern int
 main(int argc, char *argv[])
 {
@@ -1369,6 +1448,10 @@ main(int argc, char *argv[])
             ret = pubkey(argc, argv);
         else if (strcmp(argv[0], "info") == 0)
             ret = info(argc, argv);
+        else if (strcmp(argv[0], "encode") == 0)
+            ret = encode_decode(argc, argv, false);
+        else if (strcmp(argv[0], "decode") == 0)
+            ret = encode_decode(argc, argv, true);
         else
             ret = usage(NULL);
     }
