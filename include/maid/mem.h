@@ -27,9 +27,16 @@ void maid_mem_clear(void *addr, size_t length);
 
 bool maid_mem_cmp(const void *addr, const void *addr2, size_t length);
 
-size_t maid_mem_import(void *addr, size_t limit,
+enum maid_mem
+{
+    MAID_BASE16L,
+    MAID_BASE16U,
+    MAID_BASE64,
+    MAID_BASE64URL
+};
+size_t maid_mem_import(enum maid_mem type, void *addr, size_t limit,
                        const char *input, size_t length);
-size_t maid_mem_export(const void *addr, size_t length,
+size_t maid_mem_export(enum maid_mem type, const void *addr, size_t length,
                        char *output, size_t limit);
 
 #endif

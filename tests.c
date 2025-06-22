@@ -127,7 +127,8 @@ mem_tests(void)
         size_t l  = strlen(base64[i]);
         size_t l2 = strlen(ascii[i]);
 
-        ret -= maid_mem_import(buf, sizeof(buf), base64[i], l) == l;
+        ret -= maid_mem_import(MAID_BASE64, buf, sizeof(buf),
+                               base64[i], l) == l;
         ret -= memcmp(buf, ascii[i], l2) == 0;
         ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
     }
@@ -138,7 +139,8 @@ mem_tests(void)
         size_t l = strlen(base64[3]);
         size_t l2 = strlen(ascii[3]);
 
-        ret -= maid_mem_import(buf, sizeof(buf), base64[6], l) == l;
+        ret -= maid_mem_import(MAID_BASE64, buf, sizeof(buf),
+                               base64[6], l) == l;
         ret -= memcmp(buf, ascii[3], l) == 0;
         ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
     }
@@ -149,7 +151,8 @@ mem_tests(void)
         size_t l  = strlen(ascii[i]);
         size_t l2 = strlen(base64[i]);
 
-        ret -= maid_mem_export(ascii[i], l, buf, sizeof(buf)) == l2;
+        ret -= maid_mem_export(MAID_BASE64, ascii[i], l,
+                               buf, sizeof(buf)) == l2;
         ret -= memcmp(buf, base64[i], l2) == 0;
         ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
     }
@@ -161,7 +164,8 @@ mem_tests(void)
         size_t l2 = 5;
         size_t l2m4 = l2 % 4;
 
-        ret -= maid_mem_export(ascii[6], l, buf, l2) == l2 - l2m4;
+        ret -= maid_mem_export(MAID_BASE64, ascii[6], l,
+                               buf, l2) == l2 - l2m4;
         ret -= memcmp(buf, base64[3], l2m4) == 0;
         ret -= memcmp(&(buf[l2 - l2m4]), zeros, sizeof(buf) - l2 + l2m4) == 0;
     }
@@ -172,7 +176,8 @@ mem_tests(void)
         char buf[16] = {0};
         size_t l  = strlen(bad64[i]);
 
-        ret -= maid_mem_import(buf, sizeof(buf), bad64[i], l) == 0;
+        ret -= maid_mem_import(MAID_BASE64, buf, sizeof(buf),
+                               bad64[i], l) == 0;
         ret -= memcmp(buf, zeros, sizeof(buf)) == 0;
     }
 

@@ -444,12 +444,18 @@ usage(char *ctx)
         fprintf(stderr, "maid encode [algorithm] < data\n"
                         "Encodes data to a certain format\n\n"
                         "Algorithms:\n"
-                        "    base64\n");
+                        "    base16l\n"
+                        "    base16u\n"
+                        "    base64\n"
+                        "    base64url\n");
     else if (strcmp(ctx, "decode") == 0)
         fprintf(stderr, "maid decode [algorithm] < data\n"
                         "Decodes data from a certain format\n\n"
                         "Algorithms:\n"
-                        "    base64\n");
+                        "    base16l\n"
+                        "    base16u\n"
+                        "    base64\n"
+                        "    base64url\n");
     else
         fprintf(stderr, "maid %s: No usage text found\n", ctx);
 
@@ -1355,14 +1361,46 @@ encode_decode(int argc, char *argv[], bool decode)
         int in  = STDIN_FILENO;
         int out = STDOUT_FILENO;
 
-        if (strcmp(argv[1], "base64") == 0)
+        enum maid_mem type = 0;
+        u8 memb = 0, forb = 0;
+        if (strcmp(argv[1], "base16l") == 0)
+        {
+            type = MAID_BASE16L;
+            memb = 1;
+            forb = 2;
+        }
+        else if (strcmp(argv[1], "base16u") == 0)
+        {
+            type = MAID_BASE16U;
+            memb = 1;
+            forb = 2;
+        }
+        else if (strcmp(argv[1], "base64") == 0)
+        {
+            type = MAID_BASE64;
+            memb = 3;
+            forb = 4;
+        }
+        else if (strcmp(argv[1], "base64url") == 0)
+        {
+            type = MAID_BASE64URL;
+            memb = 3;
+            forb = 4;
+        }
+        else
+            ret = usage((decode) ? "decode" : "encode");
+
+        if (memb && forb)
         {
             ret = true;
 
             if (!decode)
             {
-                u8    inb[3 * 1024] = {0};
-                char outb[4 * 1024] = {0};
+                u8    inb[memb * 1024];
+                char outb[forb * 1024];
+
+                maid_mem_clear(inb,  sizeof(inb));
+                maid_mem_clear(outb, sizeof(outb));
                 while (true)
                 {
                     size_t bytes = read(in, inb, sizeof(inb));
@@ -1370,7 +1408,7 @@ encode_decode(int argc, char *argv[], bool decode)
                         break;
 
                     write(out, outb,
-                          maid_mem_export(inb,  bytes,
+                          maid_mem_export(type, inb, bytes,
                                           outb, sizeof(outb)));
                 }
                 maid_mem_clear(inb,  sizeof(inb));
@@ -1378,19 +1416,22 @@ encode_decode(int argc, char *argv[], bool decode)
             }
             else
             {
-                char inb[4 * 1024] = {0};
-                u8  outb[3 * 1024] = {0};
+                char inb[forb * 1024];
+                u8  outb[memb * 1024];
+
+                maid_mem_clear(inb,  sizeof(inb));
+                maid_mem_clear(outb, sizeof(outb));
                 while (true)
                 {
                     size_t bytes = read(in, inb, sizeof(inb));
                     if (bytes == 0)
                         break;
 
-                    if ((bytes % 4) == 0)
+                    if ((bytes % forb) == 0)
                     {
                         write(out, outb,
-                              maid_mem_import(outb, sizeof(outb),
-                                              inb,  bytes));
+                              maid_mem_import(type, outb, sizeof(outb),
+                                              inb, bytes));
                     }
                     else
                     {
@@ -1403,8 +1444,6 @@ encode_decode(int argc, char *argv[], bool decode)
                 maid_mem_clear(outb, sizeof(outb));
             }
         }
-        else
-            ret = usage((decode) ? "decode" : "encode");
     }
     else
         ret = usage((decode) ? "decode" : "encode");

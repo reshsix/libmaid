@@ -19,6 +19,8 @@
 
 #include <maid/types.h>
 
+#include <maid/mem.h>
+
 extern u64
 maid_mem_read(const void *addr, size_t index, size_t size, bool big)
 {
@@ -95,8 +97,97 @@ maid_mem_cmp(const void *addr, const void *addr2, size_t length)
     return ret;
 }
 
-extern size_t
-maid_mem_import(void *addr, size_t limit, const char *input, size_t length)
+static size_t
+base16_import(void *addr, size_t limit,
+              const char *input, size_t length, bool upper)
+{
+    size_t ret = 0;
+
+    volatile u8 table[256] = {0};
+    memset((u8*)table, 0xFF, sizeof(table));
+
+    for (int i = 0; i < 10; i++)
+        table['0' + i] = i;
+    for (int i = 0; i < 6; i++)
+        table[((upper) ? 'A' : 'a') + i] = 10 + i;
+
+    /* Won't read if there's any error */
+    volatile bool error = (length % 2 != 0);
+    for (size_t i = 0; i < length; i++)
+    {
+        char c = input[i];
+
+        u8 t = table[(int)c];
+        /* Invalid character */
+        if (t == 0xFF)
+           error = true;
+    }
+
+    /* But will pretend to, avoiding timing attacks */
+    volatile u8 *a = addr;
+    volatile u8 zero = 0;
+    while (length && limit)
+    {
+        size_t l  = (length < 2) ? length : 2;
+        size_t l2 = (limit  < 1) ? limit  : 1;
+
+        volatile u8 digit[2] = {0};
+        for (size_t i = 0; i < 2; i++)
+            digit[i] = (l > i) ? table[(int)input[i]] : 0;
+
+        a[0] = (!error) ? (digit[0] << 4 | digit[1]) : zero;
+
+        input = &(input[2]);
+        length -= l;
+
+        a = &(a[1]);
+        limit -= l2;
+
+        ret += (!error) ? l : zero;
+        for (size_t i = 0; i < sizeof(digit); i++)
+            digit[i] = 0x00;
+    }
+    error = false;
+
+    return ret;
+}
+
+static size_t
+base16_export(const void *addr, size_t length,
+              char *output, size_t limit, bool upper)
+{
+    size_t ret = 0;
+
+    const char chars [16] = "0123456789abcdef";
+    const char chars2[16] = "0123456789ABCDEF";
+    const char *table = (upper) ? chars2 : chars;
+    if (limit % 2 != 0)
+        limit -= limit % 2;
+
+    const u8 *a = addr;
+    while (length && limit)
+    {
+        size_t l  = (length < 1) ? length : 1;
+        size_t l2 = (limit  < 2) ? limit  : 2;
+
+        output[0] = table[a[0] >>  4];
+        output[1] = table[a[0] & 0xF];
+
+        a = &(a[1]);
+        length -= l;
+
+        output = &(output[2]);
+        limit -= l2;
+
+        ret += l2;
+    }
+
+    return ret;
+}
+
+static size_t
+base64_import(void *addr, size_t limit,
+              const char *input, size_t length, bool url)
 {
     size_t ret = 0;
 
@@ -109,8 +200,8 @@ maid_mem_import(void *addr, size_t limit, const char *input, size_t length)
         table['a' + i] = 26 + i;
     for (int i = 0; i < 10; i++)
         table['0' + i] = 52 + i;
-    table['+'] = 62;
-    table['/'] = 63;
+    table[(url) ? '-' : '+'] = 62;
+    table[(url) ? '_' : '/'] = 63;
 
     /* Won't read if there's any error */
     table['='] = 0xFE;
@@ -163,13 +254,17 @@ maid_mem_import(void *addr, size_t limit, const char *input, size_t length)
     return ret;
 }
 
-extern size_t
-maid_mem_export(const void *addr, size_t length, char *output, size_t limit)
+static size_t
+base64_export(const void *addr, size_t length,
+              char *output, size_t limit, bool url)
 {
     size_t ret = 0;
 
-    const char table[64] =
+    const char chars [64] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const char chars2[64] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const char *table = (url) ? chars2 : chars;
 
     if (limit % 4 != 0)
         limit -= limit % 4;
@@ -201,6 +296,56 @@ maid_mem_export(const void *addr, size_t length, char *output, size_t limit)
 
         ret += l2;
         maid_mem_clear(sext, sizeof(sext));
+    }
+
+    return ret;
+}
+
+extern size_t
+maid_mem_import(enum maid_mem type, void *addr, size_t limit,
+                const char *input, size_t length)
+{
+    size_t ret = 0;
+
+    switch (type)
+    {
+        case MAID_BASE16L:
+            ret = base16_import(addr, limit, input, length, false);
+            break;
+        case MAID_BASE16U:
+            ret = base16_import(addr, limit, input, length, true);
+            break;
+        case MAID_BASE64:
+            ret = base64_import(addr, limit, input, length, false);
+            break;
+        case MAID_BASE64URL:
+            ret = base64_import(addr, limit, input, length, true);
+            break;
+    }
+
+    return ret;
+}
+
+extern size_t
+maid_mem_export(enum maid_mem type, const void *addr, size_t length,
+                char *output, size_t limit)
+{
+    size_t ret = 0;
+
+    switch (type)
+    {
+        case MAID_BASE16L:
+            ret = base16_export(addr, length, output, limit, false);
+            break;
+        case MAID_BASE16U:
+            ret = base16_export(addr, length, output, limit, true);
+            break;
+        case MAID_BASE64:
+            ret = base64_export(addr, length, output, limit, false);
+            break;
+        case MAID_BASE64URL:
+            ret = base64_export(addr, length, output, limit, true);
+            break;
     }
 
     return ret;

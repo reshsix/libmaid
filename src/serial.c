@@ -98,7 +98,7 @@ maid_pem_import(const char *input, const char **endptr)
                                 byte_s -= b[line_s - 3] == '=';
                             }
 
-                            if (maid_mem_import(buffer, limit,
+                            if (maid_mem_import(MAID_BASE64, buffer, limit,
                                                 b, line_s - 1) == 0)
                             {
                                 *endptr = input;
@@ -192,7 +192,7 @@ maid_pem_export(struct maid_pem *p)
         while (size)
         {
             size_t limit = (size > 48) ? 48 : size;
-            size_t written = maid_mem_export(in, limit, out, 64);
+            size_t written = maid_mem_export(MAID_BASE64, in, limit, out, 64);
 
             if (written == 0)
             {
