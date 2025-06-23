@@ -186,6 +186,152 @@ base16_export(const void *addr, size_t length,
 }
 
 static size_t
+base32_import(void *addr, size_t limit,
+              const char *input, size_t length, bool hex)
+{
+    size_t ret = 0;
+
+    volatile u8 table[256] = {0};
+    memset((u8*)table, 0xFF, sizeof(table));
+
+    if (!hex)
+    {
+        for (int i = 0; i < 26; i++)
+            table['A' + i] = i;
+        for (int i = 0; i < 6; i++)
+            table['2' + i] = 26 + i;
+    }
+    else
+    {
+        for (int i = 0; i < 10; i++)
+            table['0' + i] = i;
+        for (int i = 0; i < 22; i++)
+            table['A' + i] = 10 + i;
+    }
+
+    /* Won't read if there's any error */
+    table['='] = 0xFE;
+    volatile bool pad = false;
+    volatile bool error = (length % 8 != 0);
+    for (size_t i = 0; i < length; i++)
+    {
+        char c = input[i];
+
+        u8 t = table[(int)c];
+        /* Invalid character */
+        if (t == 0xFF)
+           error = true;
+        if (t == 0xFE)
+        {
+            /* Padding not at the end */
+            if (i < length - 6)
+               error = true;
+            else
+            {
+                /* Padding starts in the wrong byte */
+                if (!pad && (i == length - 2 || i == length - 5))
+                   error = true;
+            }
+            pad = true;
+        }
+        else if (pad)
+        {
+            /* Padding interrupted */
+            error = true;
+        }
+    }
+    pad = false;
+
+    /* But will pretend to, avoiding timing attacks */
+    table['='] = 0x00;
+    volatile u8 *a = addr;
+    volatile u8 z = 0;
+    while (length && limit)
+    {
+        size_t l  = (length < 8) ? length : 8;
+        size_t l2 = (limit  < 5) ? limit  : 5;
+
+        volatile u8 quint[8] = {0};
+        for (size_t i = 0; i < 8; i++)
+            quint[i] = (l > i) ? table[(int)input[i]] : 0;
+
+        a[0] = (!error) ? (quint[0] << 3 | quint[1] >> 2) : z;
+        a[1] = (!error) ? (quint[1] << 6 | quint[2] << 1 | quint[3] >> 4) : z;
+        a[2] = (!error) ? (quint[3] << 4 | quint[4] >> 1) : z;
+        a[3] = (!error) ? (quint[4] << 7 | quint[5] << 2 | quint[6] >> 3) : z;
+        a[4] = (!error) ? (quint[6] << 5 | quint[7]) : z;
+
+        input = &(input[8]);
+        length -= l;
+
+        a = &(a[5]);
+        limit -= l2;
+
+        ret += (!error) ? l : z;
+        for (size_t i = 0; i < sizeof(quint); i++)
+            quint[i] = 0x00;
+    }
+    error = false;
+
+    return ret;
+}
+
+static size_t
+base32_export(const void *addr, size_t length,
+              char *output, size_t limit, bool hex)
+{
+    size_t ret = 0;
+
+    const char chars [32] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    const char chars2[32] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
+    const char *table = (hex) ? chars2 : chars;
+
+    if (limit % 8 != 0)
+        limit -= limit % 8;
+
+    const u8 *a = addr;
+    while (length && limit)
+    {
+        size_t l  = (length < 5) ? length : 5;
+        size_t l2 = (limit  < 8) ? limit  : 8;
+
+        u8 quint[8] = {0};
+        quint[0] =  (a[0] >> 3);
+        quint[1] =  (a[0] << 2) & 0x1C;
+        quint[1] |= (l > 1) ? (a[1] >> 6) : 0;
+        quint[2] =  (l > 1) ? (a[1] >> 1) & 0x1F : 0;
+        quint[3] =  (l > 1) ? (a[1] << 4) & 0x10 : 0;
+        quint[3] |= (l > 2) ? (a[2] >> 4) & 0x0F : 0;
+        quint[4] =  (l > 2) ? (a[2] << 1) & 0x1E : 0;
+        quint[4] |= (l > 3) ? (a[3] >> 7) & 0x01 : 0;
+        quint[5] =  (l > 3) ? (a[3] >> 2) & 0x1F : 0;
+        quint[6] =  (l > 3) ? (a[3] << 3) & 0x18 : 0;
+        quint[6] |= (l > 4) ? (a[4] >> 5) & 0x07 : 0;
+        quint[7] =  (l > 4) ? (a[4] & 0x1F) : 0;
+
+        output[0] = table[quint[0]];
+        if (l2 > 1) output[1] = table[quint[1]];
+        if (l2 > 2) output[2] = (l > 1) ? table[quint[2]] : '=';
+        if (l2 > 3) output[3] = (l > 1) ? table[quint[3]] : '=';
+        if (l2 > 4) output[4] = (l > 2) ? table[quint[4]] : '=';
+        if (l2 > 5) output[5] = (l > 3) ? table[quint[5]] : '=';
+        if (l2 > 6) output[6] = (l > 3) ? table[quint[6]] : '=';
+        if (l2 > 7) output[7] = (l > 4) ? table[quint[7]] : '=';
+
+        a = &(a[5]);
+        length -= l;
+
+        output = &(output[8]);
+        limit -= l2;
+
+        ret += l2;
+        maid_mem_clear(quint, sizeof(quint));
+    }
+
+    return ret;
+}
+
+static size_t
 base64_import(void *addr, size_t limit,
               const char *input, size_t length, bool url)
 {
@@ -315,6 +461,12 @@ maid_mem_import(enum maid_mem type, void *addr, size_t limit,
         case MAID_BASE16U:
             ret = base16_import(addr, limit, input, length, true);
             break;
+        case MAID_BASE32:
+            ret = base32_import(addr, limit, input, length, false);
+            break;
+        case MAID_BASE32HEX:
+            ret = base32_import(addr, limit, input, length, true);
+            break;
         case MAID_BASE64:
             ret = base64_import(addr, limit, input, length, false);
             break;
@@ -339,6 +491,12 @@ maid_mem_export(enum maid_mem type, const void *addr, size_t length,
             break;
         case MAID_BASE16U:
             ret = base16_export(addr, length, output, limit, true);
+            break;
+        case MAID_BASE32:
+            ret = base32_export(addr, length, output, limit, false);
+            break;
+        case MAID_BASE32HEX:
+            ret = base32_export(addr, length, output, limit, true);
             break;
         case MAID_BASE64:
             ret = base64_export(addr, length, output, limit, false);

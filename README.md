@@ -35,7 +35,7 @@ available
 | Category                             | Algorithms                |
 | ------------------------------------:|---------------------------|
 | [Type aliases](docs/types.md)        | ------------------------- |
-| [Memory utils](docs/mem.md)          | Base16, Base64            |
+| [Memory utils](docs/mem.md)          | Base16, Base32, Base64    |
 | [Multiprecision](docs/mp.md)         | ------------------------- |
 |                                      |                           |
 | [Block ciphers](docs/block.md)       | AES-ECB, AES-CTR          |

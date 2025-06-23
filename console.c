@@ -446,6 +446,8 @@ usage(char *ctx)
                         "Algorithms:\n"
                         "    base16l\n"
                         "    base16u\n"
+                        "    base32\n"
+                        "    base32hex\n"
                         "    base64\n"
                         "    base64url\n");
     else if (strcmp(ctx, "decode") == 0)
@@ -454,6 +456,8 @@ usage(char *ctx)
                         "Algorithms:\n"
                         "    base16l\n"
                         "    base16u\n"
+                        "    base32\n"
+                        "    base32hex\n"
                         "    base64\n"
                         "    base64url\n");
     else
@@ -1375,6 +1379,18 @@ encode_decode(int argc, char *argv[], bool decode)
             memb = 1;
             forb = 2;
         }
+        else if (strcmp(argv[1], "base32") == 0)
+        {
+            type = MAID_BASE32;
+            memb = 5;
+            forb = 8;
+        }
+        else if (strcmp(argv[1], "base32hex") == 0)
+        {
+            type = MAID_BASE32HEX;
+            memb = 5;
+            forb = 8;
+        }
         else if (strcmp(argv[1], "base64") == 0)
         {
             type = MAID_BASE64;
@@ -1407,9 +1423,16 @@ encode_decode(int argc, char *argv[], bool decode)
                     if (bytes == 0)
                         break;
 
-                    write(out, outb,
-                          maid_mem_export(type, inb, bytes,
-                                          outb, sizeof(outb)));
+                    size_t conv = maid_mem_export(type, inb, bytes,
+                                                  outb, sizeof(outb));
+                    if (conv)
+                        write(out, outb, conv);
+                    else
+                    {
+                        fprintf(stderr, "Corrupted input\n");
+                        ret = false;
+                        break;
+                    }
                 }
                 maid_mem_clear(inb,  sizeof(inb));
                 maid_mem_clear(outb, sizeof(outb));
@@ -1427,12 +1450,11 @@ encode_decode(int argc, char *argv[], bool decode)
                     if (bytes == 0)
                         break;
 
-                    if ((bytes % forb) == 0)
-                    {
-                        write(out, outb,
-                              maid_mem_import(type, outb, sizeof(outb),
-                                              inb, bytes));
-                    }
+                    size_t conv = 0;
+                    if ((bytes % forb) == 0 &&
+                        (conv = maid_mem_import(type, outb, sizeof(outb),
+                                                inb, bytes)))
+                        write(out, outb, (conv * memb) / forb);
                     else
                     {
                         fprintf(stderr, "Corrupted input\n");
