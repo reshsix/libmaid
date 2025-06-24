@@ -164,10 +164,8 @@ run_filter(void *ctx, bool (*f)(void *, int, u8 *, size_t))
 }
 
 extern size_t
-get_data(char *filename, u8 *out, size_t size, bool lt)
+get_data_file(char *filename, u8 *out, size_t size, bool lt)
 {
-    /* lt = Allows smaller sizes, !lt =  Needs the exact size */
-
     size_t ret = size;
 
     struct stat st = {0};
@@ -182,23 +180,20 @@ get_data(char *filename, u8 *out, size_t size, bool lt)
         if (!lt)
         {
             if (st.st_size != (ssize_t)size)
-            {
-                fprintf(stderr, "%s: %ld bytes instead of %ld\n",
-                        filename, st.st_size, size);
                 ret = 0;
-            }
         }
         else
         {
             if (st.st_size > (ssize_t)size)
-            {
-                fprintf(stderr, "%s: %ld bytes when %ld is the limit\n",
-                        filename, st.st_size, size);
                 ret = 0;
-            }
             else
                 size = st.st_size;
         }
+
+        if (!ret)
+            fprintf(stderr, "%s: %s than %ld bytes (%ld bytes)\n", filename,
+                    (st.st_size < (ssize_t)size) ? "shorter" : "longer",
+                    size, st.st_size);
     }
 
     int in = -1;
@@ -240,6 +235,78 @@ get_data_fd(int fd, u8 *buffer, size_t size, bool lt)
     }
     else
         fprintf(stderr, "/dev/fd/%d: shorter than %ld bytes\n", fd, size);
+
+    return ret;
+}
+
+extern size_t
+get_data(char *input, u8 *out, size_t size, bool lt)
+{
+    /* lt = Allows smaller sizes, !lt =  Needs the exact size */
+    size_t ret = 0;
+
+    enum maid_mem type = 0;
+    size_t conv = 0;
+    if (strncmp(input, "file:", 5) == 0)
+        ret = get_data_file(&(input[5]), out, size, lt);
+    else if (strncmp(input, "b16l:", 5) == 0)
+    {
+        type = MAID_BASE16L;
+        input = &(input[5]);
+        conv = size * 2;
+    }
+    else if (strncmp(input, "b16u:", 5) == 0)
+    {
+        type = MAID_BASE16U;
+        input = &(input[5]);
+        conv = size * 2;
+    }
+    else if (strncmp(input, "b32:", 4) == 0)
+    {
+        type = MAID_BASE32;
+        input = &(input[4]);
+        conv = (size * 8) / 5;
+    }
+    else if (strncmp(input, "b32hex:", 7) == 0)
+    {
+        type = MAID_BASE32HEX;
+        input = &(input[7]);
+        conv = (size * 8) / 5;
+    }
+    else if (strncmp(input, "b64:", 4) == 0)
+    {
+        type = MAID_BASE64;
+        input = &(input[4]);
+        conv = (size * 4) / 3;
+    }
+    else if (strncmp(input, "b64url:", 7) == 0)
+    {
+        type = MAID_BASE64URL;
+        input = &(input[7]);
+        conv = (size * 4) / 3;
+    }
+    else if (strcmp(input, "zeros") == 0)
+    {
+        maid_mem_clear(out, size);
+        ret = size;
+    }
+    else
+        fprintf(stderr, "Invalid argument: '%s'\n", input);
+
+    if (conv)
+    {
+        size_t len = strlen(input);
+        if (len == conv || (lt && len < conv))
+        {
+            if (maid_mem_import(type, out, size, input, len) == len)
+                ret = size;
+            else
+                fprintf(stderr, "Corrupted input\n");
+        }
+        else
+            fprintf(stderr, "%s: %s than %ld chars (%ld chars)\n",
+                    input, ((len < conv) ? "shorter" : "longer"), conv, len);
+    }
 
     return ret;
 }
@@ -318,7 +385,7 @@ usage(char *ctx)
     if (!ctx)
         fprintf(stderr,
                 "A Cryptography Library for Maids\n"
-                "usage: maid [command] ...\n\n"
+                "usage: maid [command] [args] ...\n\n"
                 "Commands:\n"
                 "    stream      Encrypts/decrypts a stream\n"
                 "    mac         Authenticates a message\n"
@@ -333,9 +400,18 @@ usage(char *ctx)
                 "    pubkey      Extracts public key from private key\n"
                 "    info        Displays PEM data information\n\n"
                 "    encode      Encodes data to a certain format\n"
-                "    decode      Decodes data from a certain format\n");
+                "    decode      Decodes data from a certain format\n\n"
+                "Arguments:\n"
+                "    file:       Binary data from a file\n"
+                "    b16l:       Base16 string (lowercase)\n"
+                "    b16u:       Base16 string (uppercase)\n"
+                "    b32:        Base32 string\n"
+                "    b32hex:     Base32 string (extended hex)\n"
+                "    b64:        Base64 string\n"
+                "    b64url:     Base64 string (url-safe)\n"
+                "    zeros       All zeros\n");
     else if (strcmp(ctx, "stream") == 0)
-        fprintf(stderr, "maid stream [algorithm] [key file] [iv file]"
+        fprintf(stderr, "maid stream [algorithm] [key] [iv]"
                         " < stream\n"
                         "Encrypts/decrypts a stream\n\n"
                         "Algorithms:\n"
@@ -344,7 +420,7 @@ usage(char *ctx)
                         "    aes-256-ctr (key: 32, iv: 16)\n"
                         "    chacha20    (key: 32, iv: 12)\n");
     else if (strcmp(ctx, "mac") == 0)
-        fprintf(stderr, "maid mac [algorithm] [key file] < message\n"
+        fprintf(stderr, "maid mac [algorithm] [key] < message\n"
                         "Authenticates a message\n\n"
                         "Algorithms:\n"
                         "    hmac-sha1        (key:  64)\n"
@@ -374,8 +450,8 @@ usage(char *ctx)
                         "    sha512-224\n"
                         "    sha512-256\n");
     else if (strcmp(ctx, "encrypt") == 0)
-        fprintf(stderr, "maid encrypt [algorithm] [key file] [iv file] \n"
-                        "             [tag file] [aad file] < message\n"
+        fprintf(stderr, "maid encrypt [algorithm] [key] [iv]"
+                        " [tag outfile] [aad file] < message\n"
                         "Encrypts and generates a message tag\n\n"
                         "Algorithms:\n"
                         "    aes-128-gcm      (key: 16, tag: 16, aad: any)\n"
@@ -383,8 +459,8 @@ usage(char *ctx)
                         "    aes-256-gcm      (key: 32, tag: 16, aad: any)\n"
                         "    chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
     else if (strcmp(ctx, "decrypt") == 0)
-        fprintf(stderr, "maid decrypt [algorithm] [key file] [iv file] \n"
-                        "             [tag file] [aad file] < message\n"
+        fprintf(stderr, "maid decrypt [algorithm] [key] [iv]"
+                        " [tag] [aad file] < message\n"
                         "Decrypts and validates a message tag\n\n"
                         "Algorithms:\n"
                         "    aes-128-gcm      (key: 16, tag: 16, aad: any)\n"
@@ -392,7 +468,7 @@ usage(char *ctx)
                         "    aes-256-gcm      (key: 32, tag: 16, aad: any)\n"
                         "    chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
     else if (strcmp(ctx, "sign") == 0)
-        fprintf(stderr, "maid sign [algorithm] [key file] < hash\n"
+        fprintf(stderr, "maid sign [algorithm] [key] < hash\n"
                         "Signs a hash\n\n"
                         "Algorithms:\n"
                         "    rsa-pkcs1-sha1       (key: PEM, hash: 20)\n"
@@ -403,7 +479,7 @@ usage(char *ctx)
                         "    rsa-pkcs1-sha512-224 (key: PEM, hash: 28)\n"
                         "    rsa-pkcs1-sha512-256 (key: PEM, hash: 32)\n");
     else if (strcmp(ctx, "verify") == 0)
-        fprintf(stderr, "maid verify [algorithm] [key file] < signature\n"
+        fprintf(stderr, "maid verify [algorithm] [key] < signature\n"
                         "Verifies a signature\n\n"
                         "Algorithms:\n"
                         "    rsa-pkcs1-sha1       (key: PEM)\n"
@@ -419,7 +495,7 @@ usage(char *ctx)
                         "Algorithms:\n"
                         "    dh-group14 (private: 256)\n");
     else if (strcmp(ctx, "secret") == 0)
-        fprintf(stderr, "maid secret [algorithm] [private file] < public\n"
+        fprintf(stderr, "maid secret [algorithm] [private] < public\n"
                         "Generates a secret from key exchange\n\n"
                         "Algorithms:\n"
                         "    dh-group14 (public: 256, private: 256)\n");
@@ -435,7 +511,7 @@ usage(char *ctx)
                         "    ctr-drbg-aes-192 (entropy: 40)\n"
                         "    ctr-drbg-aes-256 (entropy: 48)\n");
     else if (strcmp(ctx, "pubkey") == 0)
-        fprintf(stderr, "maid pubkey [key file]\n"
+        fprintf(stderr, "maid pubkey [key]\n"
                         "Extracts public key from private key\n");
     else if (strcmp(ctx, "info") == 0)
         fprintf(stderr, "maid info < data\n"
