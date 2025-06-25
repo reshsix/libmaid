@@ -420,22 +420,22 @@ usage(char *ctx)
                         "    sha512-256\n");
     else if (strcmp(ctx, "encrypt") == 0)
         fprintf(stderr, "maid encrypt [algorithm] [key] [iv]"
-                        " [tag outfile] [aad file] < message\n"
+                        " [aad file] < message\n"
                         "Encrypts and generates a message tag\n\n"
                         "Algorithms:\n"
-                        "    aes-128-gcm      (key: 16, tag: 16, aad: any)\n"
-                        "    aes-192-gcm      (key: 24, tag: 16, aad: any)\n"
-                        "    aes-256-gcm      (key: 32, tag: 16, aad: any)\n"
-                        "    chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
+                        "    aes-128-gcm      (key: 16, aad: any)\n"
+                        "    aes-192-gcm      (key: 24, aad: any)\n"
+                        "    aes-256-gcm      (key: 32, aad: any)\n"
+                        "    chacha20poly1305 (key: 32, aad: any)\n");
     else if (strcmp(ctx, "decrypt") == 0)
         fprintf(stderr, "maid decrypt [algorithm] [key] [iv]"
-                        " [tag] [aad file] < message\n"
+                        " [aad file] < message\n"
                         "Decrypts and validates a message tag\n\n"
                         "Algorithms:\n"
-                        "    aes-128-gcm      (key: 16, tag: 16, aad: any)\n"
-                        "    aes-192-gcm      (key: 24, tag: 16, aad: any)\n"
-                        "    aes-256-gcm      (key: 32, tag: 16, aad: any)\n"
-                        "    chacha20poly1305 (key: 32, tag: 32, aad: any)\n");
+                        "    aes-128-gcm      (key: 16, aad: any)\n"
+                        "    aes-192-gcm      (key: 24, aad: any)\n"
+                        "    aes-256-gcm      (key: 32, aad: any)\n"
+                        "    chacha20poly1305 (key: 32, aad: any)\n");
     else if (strcmp(ctx, "sign") == 0)
         fprintf(stderr, "maid sign [algorithm] [key] < hash\n"
                         "Signs a hash\n\n"
@@ -776,9 +776,12 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
 {
     bool ret = false;
 
-    if (argc == 6)
+    if (argc == 5)
     {
         ret = true;
+
+        int in  = STDIN_FILENO;
+        int out = STDOUT_FILENO;
 
         u8  key[32] = {0};
         u8   iv[16] = {0};
@@ -827,10 +830,10 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
             int fd = -1;
             if (ctx)
             {
-                fd = open(argv[5], O_RDONLY);
+                fd = open(argv[4], O_RDONLY);
                 if (fd < 0)
                 {
-                    perror(argv[5]);
+                    perror(argv[4]);
                     ret = false;
                 }
             }
@@ -849,31 +852,58 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
 
                 if (n >= 0)
                 {
-                    run_filter(ctx, (!decrypt) ? filter_encrypt :
-                                                 filter_decrypt);
                     u8 tag[32] = {0};
-                    maid_aead_digest(ctx, tag);
                     if (!decrypt)
                     {
-                        int fd2 = open(argv[4], O_WRONLY | O_CREAT, 0644);
-                        if (fd2 >= 0)
-                        {
-                            if (write(fd2, tag, tag_s) != tag_s)
-                            {
-                                perror(argv[4]);
-                                ret = false;
-                            }
-                        }
-                        else
-                        {
-                            perror(argv[4]);
-                            ret = false;
-                        }
+                        run_filter(ctx, filter_encrypt);
+                        maid_aead_digest(ctx, tag);
+                        write(out, tag, tag_s);
                     }
                     else
                     {
+                        u8 buf[4096 * 3] = {0};
+                        size_t bytes = read(in, buf, sizeof(buf) / 2);
+                        if (bytes < (size_t)tag_s)
+                        {
+                            fprintf(stderr, "Corrupted input\n");
+                            ret = false;
+                        }
+
+                        size_t bytes2 = 0;
+                        for (u8 i = 0; ret; i++)
+                        {
+                            u8 *curr = (i % 2) ? &(buf[4096]) : buf;
+                            u8 *next = (i % 2) ? buf          : &(buf[4096]);
+
+                            bytes2 = read(in, next, sizeof(buf) / 2);
+                            if (bytes == bytes2)
+                            {
+                                maid_aead_crypt(ctx, curr, bytes, true);
+                                write(out, curr, bytes);
+                            }
+                            else
+                            {
+                                if (i % 2)
+                                {
+                                    for (size_t j = 0; j < 4096; j++)
+                                    {
+                                        u8 tmp  = curr[i];
+                                        curr[i] = next[i];
+                                        next[i] = tmp;
+                                    }
+                                }
+
+                                size_t remain = bytes + bytes2 - tag_s;
+                                memcpy(tag, &(buf[remain]), tag_s);
+                                maid_aead_crypt(ctx, buf, remain, true);
+                                write(out, buf, remain);
+                                break;
+                            }
+                        }
+                        maid_mem_clear(buf, sizeof(buf));
+
                         u8 tag2[32] = {0};
-                        ret = get_data(argv[4], tag2, tag_s, false);
+                        maid_aead_digest(ctx, tag2);
                         if (ret && memcmp(tag, tag2, tag_s) != 0)
                         {
                             fprintf(stderr, "Tag mismatch\n");
