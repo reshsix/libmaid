@@ -22,9 +22,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/poll.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
 
 #include <maid/mem.h>
 
@@ -124,39 +122,10 @@ run_filter(void *ctx, bool (*f)(void *, int, u8 *, size_t))
     u8 buf[4096] = {0};
     while (ret)
     {
-        struct pollfd pfds = {.fd = in, .events = POLLIN | POLLHUP};
-        if (poll(&pfds, 1, -1) >= 0)
-        {
-            if (pfds.revents & POLLIN)
-            {
-                size_t bytes = 0;
-                if (ioctl(in, FIONREAD, &bytes) == 0 && bytes != 0)
-                {
-                    size_t buf_c = 0;
-                    while (ret && bytes)
-                    {
-                        buf_c = (bytes) < sizeof(buf) ? bytes : sizeof(buf);
-
-                        read(in, buf, buf_c);
-                        ret = f(ctx, out, buf, buf_c);
-
-                        bytes -= buf_c;
-                    }
-
-                    maid_mem_clear(buf, sizeof(buf));
-                }
-                else
-                {
-                    ret = f(ctx, out, buf, 0);
-                    break;
-                }
-            }
-            else
-            {
-                ret = f(ctx, out, buf, 0);
-                break;
-            }
-        }
+        size_t bytes = read(in, buf, sizeof(buf));
+        ret = f(ctx, out, buf, bytes);
+        if (!bytes)
+            break;
     }
     maid_mem_clear(buf, sizeof(buf));
 
