@@ -190,25 +190,6 @@ get_data_file(char *filename, u8 *out, size_t size, bool lt)
 }
 
 extern size_t
-get_data_fd(int fd, u8 *buffer, size_t size, bool lt)
-{
-    size_t ret = 0;
-
-    size_t bytes = read(fd, buffer, size);
-    if (bytes == size || (lt && bytes < size))
-    {
-        if (read(fd, buffer, 1) == 0)
-            ret = size;
-        else
-            fprintf(stderr, "/dev/fd/%d: longer than %ld bytes\n", fd, size);
-    }
-    else
-        fprintf(stderr, "/dev/fd/%d: shorter than %ld bytes\n", fd, size);
-
-    return ret;
-}
-
-extern size_t
 get_data(char *input, u8 *out, size_t size, bool lt)
 {
     /* lt = Allows smaller sizes, !lt =  Needs the exact size */
@@ -401,7 +382,7 @@ usage(char *ctx)
                         "    hmac-sha512-256  (key: 128)\n"
                         "    poly1305         (key:  32)\n");
     else if (strcmp(ctx, "rng") == 0)
-        fprintf(stderr, "maid rng [algorithm] < entropy\n"
+        fprintf(stderr, "maid rng [algorithm] [entropy]\n"
                         "Pseudo-randomly generate bytes\n\n"
                         "Algorithms:\n"
                         "    ctr-drbg-aes-128 (entropy: 32)\n"
@@ -437,7 +418,7 @@ usage(char *ctx)
                         "    aes-256-gcm      (key: 32, aad: any)\n"
                         "    chacha20poly1305 (key: 32, aad: any)\n");
     else if (strcmp(ctx, "sign") == 0)
-        fprintf(stderr, "maid sign [algorithm] [key] < hash\n"
+        fprintf(stderr, "maid sign [algorithm] [key] [hash]\n"
                         "Signs a hash\n\n"
                         "Algorithms:\n"
                         "    rsa-pkcs1-sha1       (key: PEM, hash: 20)\n"
@@ -448,7 +429,7 @@ usage(char *ctx)
                         "    rsa-pkcs1-sha512-224 (key: PEM, hash: 28)\n"
                         "    rsa-pkcs1-sha512-256 (key: PEM, hash: 32)\n");
     else if (strcmp(ctx, "verify") == 0)
-        fprintf(stderr, "maid verify [algorithm] [key] < signature\n"
+        fprintf(stderr, "maid verify [algorithm] [key] [signature]\n"
                         "Verifies a signature\n\n"
                         "Algorithms:\n"
                         "    rsa-pkcs1-sha1       (key: PEM)\n"
@@ -459,17 +440,17 @@ usage(char *ctx)
                         "    rsa-pkcs1-sha512-224 (key: PEM)\n"
                         "    rsa-pkcs1-sha512-256 (key: PEM)\n");
     else if (strcmp(ctx, "exchange") == 0)
-        fprintf(stderr, "maid exchange [algorithm] < private\n"
+        fprintf(stderr, "maid exchange [algorithm] [private]\n"
                         "Generates a public-key for key exchange\n\n"
                         "Algorithms:\n"
                         "    dh-group14 (private: 256)\n");
     else if (strcmp(ctx, "secret") == 0)
-        fprintf(stderr, "maid secret [algorithm] [private] < public\n"
+        fprintf(stderr, "maid secret [algorithm] [private] [public]\n"
                         "Generates a secret from key exchange\n\n"
                         "Algorithms:\n"
-                        "    dh-group14 (public: 256, private: 256)\n");
+                        "    dh-group14 (private: 256, public: 256)\n");
     else if (strcmp(ctx, "keygen") == 0)
-        fprintf(stderr, "maid keygen [algorithm] [generator] < entropy\n"
+        fprintf(stderr, "maid keygen [algorithm] [generator] [entropy]\n"
                         "Generates a private key using entropy\n\n"
                         "Algorithms:\n"
                         "    rsa-2048\n"
@@ -483,7 +464,7 @@ usage(char *ctx)
         fprintf(stderr, "maid pubkey [key]\n"
                         "Extracts public key from private key\n");
     else if (strcmp(ctx, "info") == 0)
-        fprintf(stderr, "maid info < data\n"
+        fprintf(stderr, "maid info [data]\n"
                         "Displays PEM data information\n");
     else if (strcmp(ctx, "encode") == 0)
         fprintf(stderr, "maid encode [algorithm] < data\n"
@@ -666,11 +647,10 @@ rng(int argc, char *argv[])
 {
     bool ret = false;
 
-    if (argc == 2)
+    if (argc == 3)
     {
         ret = true;
 
-        int in  = STDIN_FILENO;
         int out = STDOUT_FILENO;
 
         u8 entropy[48] = {0};
@@ -696,7 +676,7 @@ rng(int argc, char *argv[])
         else
             ret = usage("rng");
 
-        if (ret && get_data_fd(in, entropy, entropy_s, false))
+        if (ret && get_data(argv[2], entropy, entropy_s, false))
         {
             maid_rng *ctx = maid_rng_new(*def, entropy);
 
@@ -934,9 +914,8 @@ sign_verify(int argc, char *argv[], bool verify)
 {
     bool ret = false;
 
-    if (argc == 3)
+    if (argc == 4)
     {
-        int in  = STDIN_FILENO;
         int out = STDOUT_FILENO;
 
         volatile size_t bits = 0;
@@ -1011,48 +990,34 @@ sign_verify(int argc, char *argv[], bool verify)
             {
                 ret = false;
 
-                /* Don't use get_data_fd here */
-
-                if (!verify)
+                if (!verify && get_data(argv[3], buffer, hash_s, false))
                 {
-                    if (read(in, buffer, hash_s) == (ssize_t)hash_s &&
-                        read(in, buffer, 1) == 0)
-                    {
-                        ctx = maid_sign_new(*sign_d, NULL, pub, bits);
+                    ctx = maid_sign_new(*sign_d, NULL, pub, bits);
 
-                        if (ctx)
-                        {
-                            maid_sign_generate(ctx, buffer);
-                            size_t sign_s = words * sizeof(maid_mp_word);
-                            ret = (write(out, buffer, sign_s) ==
-                                   (ssize_t)sign_s);
-                        }
-                        else
-                            fprintf(stderr, "Out of memory\n");
+                    if (ctx)
+                    {
+                        maid_sign_generate(ctx, buffer);
+                        size_t sign_s = words * sizeof(maid_mp_word);
+                        ret = (write(out, buffer, sign_s) ==
+                               (ssize_t)sign_s);
                     }
                     else
-                        fprintf(stderr, "Invalid hash\n");
+                        fprintf(stderr, "Out of memory\n");
                 }
-                else
+                else if (get_data(argv[3], buffer, sizeof(buffer), false))
                 {
-                    if (read(in, buffer, sizeof(buffer)) ==
-                        (ssize_t)sizeof(buffer) && read(in, buffer, 1) == 0)
-                    {
-                        ctx = maid_sign_new(*sign_d, pub, NULL, bits);
+                    ctx = maid_sign_new(*sign_d, pub, NULL, bits);
 
-                        if (ctx)
-                        {
-                            if (maid_sign_verify(ctx, buffer))
-                                ret = (write(out, buffer, hash_s) ==
-                                       (ssize_t)hash_s);
-                            else
-                                fprintf(stderr, "Invalid signature\n");
-                        }
+                    if (ctx)
+                    {
+                        if (maid_sign_verify(ctx, buffer))
+                            ret = (write(out, buffer, hash_s) ==
+                                   (ssize_t)hash_s);
                         else
-                            fprintf(stderr, "Out of memory\n");
+                            fprintf(stderr, "Invalid signature\n");
                     }
                     else
-                        fprintf(stderr, "Invalid signature\n");
+                        fprintf(stderr, "Out of memory\n");
                 }
 
                 maid_sign_del(ctx);
@@ -1099,11 +1064,10 @@ exchange_secret(int argc, char *argv[], bool secret)
 {
     bool ret = false;
 
-    if ((!secret && argc == 2) || (secret && argc == 3))
+    if ((!secret && argc == 3) || (secret && argc == 4))
     {
         ret = true;
 
-        int in  = STDIN_FILENO;
         int out = STDOUT_FILENO;
 
         size_t key_s = 0;
@@ -1138,36 +1102,21 @@ exchange_secret(int argc, char *argv[], bool secret)
         {
             ret = false;
 
-            /* Don't use get_data_fd here */
-
             u8 buffer[key_s], buffer2[key_s];
-            if (!secret)
+            if (!secret && get_data(argv[2], buffer, key_s, false))
             {
-                if (read(in, buffer, key_s) == (ssize_t)key_s &&
-                    read(in, buffer, 1) == 0)
-                {
-                    maid_kex_gpub(ctx, buffer, buffer2);
-                    ret = (write(out, buffer2, key_s) == (ssize_t)key_s);
-                }
-                else
-                    fprintf(stderr, "Invalid private key\n");
+                maid_kex_gpub(ctx, buffer, buffer2);
+                ret = (write(out, buffer2, key_s) == (ssize_t)key_s);
             }
             else
             {
                 u8 secret[key_s];
-                if (read(in, buffer, key_s) == (ssize_t)key_s &&
-                    read(in, buffer, 1) == 0)
+                if (get_data(argv[2], buffer2, key_s, false) &&
+                    get_data(argv[3], buffer,  key_s, false))
                 {
-                    if (get_data(argv[2], buffer2, key_s, false))
-                    {
-                        maid_kex_gsec(ctx, buffer2, buffer, secret);
-                        ret = (write(out, secret, key_s) == (ssize_t)key_s);
-                    }
-                    else
-                        fprintf(stderr, "Invalid private key\n");
+                    maid_kex_gsec(ctx, buffer2, buffer, secret);
+                    ret = (write(out, secret, key_s) == (ssize_t)key_s);
                 }
-                else
-                    fprintf(stderr, "Invalid public key\n");
                 maid_mem_clear(secret,  sizeof(secret));
             }
             maid_mem_clear(buffer,  sizeof(buffer));
@@ -1187,13 +1136,11 @@ keygen(int argc, char *argv[])
 {
     bool ret = false;
 
-    if (argc == 3)
+    if (argc == 4)
     {
         ret = true;
 
-        int in = STDIN_FILENO;
         FILE *output = stdout;
-
         size_t bits = 0;
 
         if (strcmp(argv[1], "rsa-2048") == 0)
@@ -1232,7 +1179,7 @@ keygen(int argc, char *argv[])
         }
 
         maid_rng *gen = NULL;
-        if (ret && get_data_fd(in, entropy, entropy_s, false))
+        if (ret && get_data(argv[3], entropy, entropy_s, false))
         {
             gen = maid_rng_new(*def, entropy);
             if (!gen)
@@ -1351,13 +1298,12 @@ info(int argc, char *argv[])
     bool ret = false;
 
     (void)argv;
-    if (argc == 1)
+    if (argc == 2)
     {
-        int in = STDIN_FILENO;
         FILE *output = stdout;
 
         static u8 buffer[65536] = {0};
-        if (get_data_fd(in, buffer, sizeof(buffer), true))
+        if (get_data(argv[1], buffer, sizeof(buffer), true))
         {
             bool empty = true;
             const char *current = (char*)buffer;
