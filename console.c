@@ -109,12 +109,17 @@ run_filter(void *ctx, bool (*f)(void *, int, u8 *, size_t))
     return ret;
 }
 
+static bool get_data_fz = false;
 static size_t
 get_data(char *input, u8 *out, size_t size, bool lt)
 {
     /* lt = Allows smaller sizes, !lt =  Needs the exact size */
     size_t ret = 0;
 
+    /* Will be set in case return 0 is not an error */
+    get_data_fz = false;
+
+    char *org = input;
     enum maid_mem type = 0;
     size_t conv = 0;
     if (strncmp(input, "file:", 5) == 0)
@@ -135,11 +140,14 @@ get_data(char *input, u8 *out, size_t size, bool lt)
                 if (st.st_size > (ssize_t)size)
                     ret = 0;
                 else
+                {
                     size = st.st_size;
+                    get_data_fz = (size == 0);
+                }
             }
 
             if (!ret)
-                fprintf(stderr, "%s: %s than %ld bytes (%ld bytes)\n", filename,
+                fprintf(stderr, "%s: %s than %ld bytes (%ld bytes)\n", input,
                         (st.st_size < (ssize_t)size) ? "shorter" : "longer",
                         size, st.st_size);
         }
@@ -203,10 +211,20 @@ get_data(char *input, u8 *out, size_t size, bool lt)
         input = &(input[5]);
         conv = (size * 4) / 3;
     }
-    else if (strcmp(input, "zeros") == 0)
+    else if (strcmp(input, "zero:") == 0)
     {
         maid_mem_clear(out, size);
+        get_data_fz = (size == 0);
         ret = size;
+    }
+    else if (strcmp(input, "null:") == 0)
+    {
+        if (size == 0 || lt)
+            get_data_fz = true;
+        else
+            fprintf(stderr, "%s: shorter than %ld bytes (0 bytes)\n",
+                    org, size);
+        ret = 0;
     }
     else
         fprintf(stderr, "Invalid argument: '%s'\n", input);
@@ -220,10 +238,12 @@ get_data(char *input, u8 *out, size_t size, bool lt)
                 ret = (len * size) / conv;
             else
                 fprintf(stderr, "Corrupted input\n");
+
+            get_data_fz = (ret == 0);
         }
         else
             fprintf(stderr, "%s: %s than %ld chars (%ld chars)\n",
-                    input, ((len < conv) ? "shorter" : "longer"), conv, len);
+                    org, ((len < conv) ? "shorter" : "longer"), conv, len);
     }
 
     return ret;
@@ -326,7 +346,8 @@ usage(char *ctx)
                 "    b32h:       Base32 string (extended hex)\n"
                 "    b64:        Base64 string\n"
                 "    b64u:       Base64 string (url-safe)\n"
-                "    zeros       All zeros\n");
+                "    zero:       Full zeros\n"
+                "    null:       Empty argument\n");
     else if (strcmp(ctx, "stream") == 0)
         fprintf(stderr, "maid stream [algorithm] [key] [iv]"
                         " < stream\n"
@@ -783,8 +804,8 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
             {
                 u8 aad[4096] = {0};
 
-                size_t n = 0;
-                if ((n = get_data(argv[4], aad, sizeof(aad), true)))
+                size_t n = get_data(argv[4], aad, sizeof(aad), true);
+                if (n || get_data_fz)
                 {
                     maid_aead_update(ctx, aad, n);
 
