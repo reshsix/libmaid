@@ -52,7 +52,7 @@ $(FOLDERS):
 
 OBJS = crypto/aes.o crypto/chacha.o \
        crypto/poly1305.o crypto/gcm.o crypto/hmac.o \
-       crypto/drbg.o crypto/sha.o \
+       crypto/drbg.o crypto/sha.o crypto/blake2.o \
 	   crypto/rsa.o crypto/pkcs1.o crypto/dh.o \
        mem.o mp.o \
 	   block.o stream.o mac.o aead.o \

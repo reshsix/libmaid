@@ -59,4 +59,13 @@ extern const struct maid_mac_def maid_hmac_sha512;
 extern const struct maid_mac_def maid_hmac_sha512_224;
 extern const struct maid_mac_def maid_hmac_sha512_256;
 
+extern const struct maid_mac_def maid_blake2s_128k;
+extern const struct maid_mac_def maid_blake2s_160k;
+extern const struct maid_mac_def maid_blake2s_224k;
+extern const struct maid_mac_def maid_blake2s_256k;
+extern const struct maid_mac_def maid_blake2b_160k;
+extern const struct maid_mac_def maid_blake2b_256k;
+extern const struct maid_mac_def maid_blake2b_384k;
+extern const struct maid_mac_def maid_blake2b_512k;
+
 #endif

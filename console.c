@@ -368,7 +368,15 @@ usage(char *ctx)
                         "    hmac-sha512      (key: 128)\n"
                         "    hmac-sha512-224  (key: 128)\n"
                         "    hmac-sha512-256  (key: 128)\n"
-                        "    poly1305         (key:  32)\n");
+                        "    poly1305         (key:  32)\n"
+                        "    blake2s-128      (key:  32)\n"
+                        "    blake2s-160      (key:  32)\n"
+                        "    blake2s-224      (key:  32)\n"
+                        "    blake2s-256      (key:  32)\n"
+                        "    blake2b-160      (key:  64)\n"
+                        "    blake2b-256      (key:  64)\n"
+                        "    blake2b-384      (key:  64)\n"
+                        "    blake2b-512      (key:  64)\n");
     else if (strcmp(ctx, "rng") == 0)
         fprintf(stderr, "maid rng [algorithm] [entropy]\n"
                         "Pseudo-randomly generate bytes\n\n"
@@ -386,7 +394,15 @@ usage(char *ctx)
                         "    sha384    \n"
                         "    sha512    \n"
                         "    sha512-224\n"
-                        "    sha512-256\n");
+                        "    sha512-256\n"
+                        "    blake2s-128\n"
+                        "    blake2s-160\n"
+                        "    blake2s-224\n"
+                        "    blake2s-256\n"
+                        "    blake2b-160\n"
+                        "    blake2b-256\n"
+                        "    blake2b-384\n"
+                        "    blake2b-512\n");
     else if (strcmp(ctx, "encrypt") == 0)
         fprintf(stderr, "maid encrypt [algorithm] [key] [iv] [aad] < message\n"
                         "Encrypts a message\n\n"
@@ -607,6 +623,46 @@ mac(int argc, char *argv[])
             key_s = 32;
             def   = &maid_poly1305;
         }
+        else if (strcmp(argv[1], "blake2s-128") == 0)
+        {
+            key_s = 32;
+            def   = &maid_blake2s_128k;
+        }
+        else if (strcmp(argv[1], "blake2s-160") == 0)
+        {
+            key_s = 32;
+            def   = &maid_blake2s_160k;
+        }
+        else if (strcmp(argv[1], "blake2s-224") == 0)
+        {
+            key_s = 32;
+            def   = &maid_blake2s_224k;
+        }
+        else if (strcmp(argv[1], "blake2s-256") == 0)
+        {
+            key_s = 32;
+            def   = &maid_blake2s_256k;
+        }
+        else if (strcmp(argv[1], "blake2b-160") == 0)
+        {
+            key_s = 64;
+            def   = &maid_blake2b_160k;
+        }
+        else if (strcmp(argv[1], "blake2b-256") == 0)
+        {
+            key_s = 64;
+            def   = &maid_blake2b_256k;
+        }
+        else if (strcmp(argv[1], "blake2b-384") == 0)
+        {
+            key_s = 64;
+            def   = &maid_blake2b_384k;
+        }
+        else if (strcmp(argv[1], "blake2b-512") == 0)
+        {
+            key_s = 64;
+            def   = &maid_blake2b_512k;
+        }
         else
             ret = usage("mac");
 
@@ -718,6 +774,22 @@ hash(int argc, char *argv[])
             def = &maid_sha512_224;
         else if (strcmp(argv[1], "sha512-256") == 0)
             def = &maid_sha512_256;
+        else if (strcmp(argv[1], "blake2s-128") == 0)
+            def = &maid_blake2s_128;
+        else if (strcmp(argv[1], "blake2s-160") == 0)
+            def = &maid_blake2s_160;
+        else if (strcmp(argv[1], "blake2s-224") == 0)
+            def = &maid_blake2s_224;
+        else if (strcmp(argv[1], "blake2s-256") == 0)
+            def = &maid_blake2s_256;
+        else if (strcmp(argv[1], "blake2b-160") == 0)
+            def = &maid_blake2b_160;
+        else if (strcmp(argv[1], "blake2b-256") == 0)
+            def = &maid_blake2b_256;
+        else if (strcmp(argv[1], "blake2b-384") == 0)
+            def = &maid_blake2b_384;
+        else if (strcmp(argv[1], "blake2b-512") == 0)
+            def = &maid_blake2b_512;
         else
             ret = usage("hash");
 
