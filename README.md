@@ -51,3 +51,5 @@ available
 |                                      |                           |
 | [Serialization](docs/serial.md)      | PEM, PKCS#1, PKCS#8       |
 | [Key generation](docs/keygen.md)     | RSA                       |
+|                                      |                           |
+| [Password hashing](docs/pass.md)     | PBKDF2                    |
