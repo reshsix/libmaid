@@ -22,7 +22,6 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
-
 static u32
 rr32(u32 a, u8 n)
 {
@@ -166,84 +165,35 @@ f64(u64 *h, const u64 *m, u64 th, u64 tl, bool f)
 
 enum
 {
-    BLAKE2S_128,  BLAKE2S_160,  BLAKE2S_224, BLAKE2S_256,
-    BLAKE2B_160,  BLAKE2B_256,  BLAKE2B_384, BLAKE2B_512,
-
-    BLAKE2S_128K, BLAKE2S_160K, BLAKE2S_224K, BLAKE2S_256K,
-    BLAKE2B_160K, BLAKE2B_256K, BLAKE2B_384K, BLAKE2B_512K,
+    BLAKE2S  = 0,
+    BLAKE2B  = BLAKE2S  + 64,
+    BLAKE2SK = BLAKE2B  + 64,
+    BLAKE2BK = BLAKE2SK + 64
 };
 
 static void
-blake2_init(u8 version, void *h, u8 *nn)
+blake2_init(u8 version, void *h, u8 *nn, bool *bits64, bool *keyed)
 {
     size_t kk = 0;
     bool v64 = false;
-    switch (version)
+    *nn = version + 1;
+    if (version < BLAKE2B)
+        *nn -= BLAKE2S;
+    else if (version < BLAKE2SK)
     {
-        case BLAKE2B_160:
-        case BLAKE2B_256:
-        case BLAKE2B_384:
-        case BLAKE2B_512:
-            v64 = true;
-            break;
-
-        case BLAKE2S_128K:
-        case BLAKE2S_160K:
-        case BLAKE2S_224K:
-        case BLAKE2S_256K:
-            kk = 32;
-            break;
-
-        case BLAKE2B_160K:
-        case BLAKE2B_256K:
-        case BLAKE2B_384K:
-        case BLAKE2B_512K:
-            v64 = true;
-            kk = 64;
-            break;
-
-        default:
-            break;
+        v64 = true;
+        *nn -= BLAKE2B;
     }
-
-    switch (version)
+    else if (version < BLAKE2BK)
     {
-        case BLAKE2S_128:
-        case BLAKE2S_128K:
-            *nn = 16;
-            break;
-
-        case BLAKE2S_160:
-        case BLAKE2B_160:
-        case BLAKE2S_160K:
-        case BLAKE2B_160K:
-            *nn = 20;
-            break;
-
-        case BLAKE2S_224:
-        case BLAKE2S_224K:
-            *nn = 28;
-            break;
-
-        case BLAKE2S_256:
-        case BLAKE2B_256:
-        case BLAKE2S_256K:
-        case BLAKE2B_256K:
-            *nn = 32;
-            break;
-
-        case BLAKE2B_384:
-        case BLAKE2B_384K:
-            *nn = 48;
-            break;
-
-        case BLAKE2B_512:
-        case BLAKE2B_512K:
-            *nn = 64;
-            break;
-
-        default:
-            break;
+        kk = 32;
+        *nn -= BLAKE2SK;
+    }
+    else
+    {
+        kk = 64;
+        v64 = true;
+        *nn -= BLAKE2BK;
     }
 
     if (v64)
@@ -256,6 +206,9 @@ blake2_init(u8 version, void *h, u8 *nn)
         memcpy(h, iv32, sizeof(iv32));
         ((u32*)h)[0] ^= (0x01010000 | (kk << 8) | *nn);
     }
+
+    *bits64 = v64;
+    *keyed  = (kk != 0);
 }
 
 static void
@@ -323,35 +276,8 @@ blake2_new(u8 version)
     {
         b2->version = version;
         b2->first = true;
-        blake2_init(b2->version, &(b2->h), &(b2->nn));
-
-        switch (b2->version)
-        {
-            case BLAKE2B_160:
-            case BLAKE2B_256:
-            case BLAKE2B_384:
-            case BLAKE2B_512:
-            case BLAKE2B_160K:
-            case BLAKE2B_256K:
-            case BLAKE2B_384K:
-            case BLAKE2B_512K:
-                b2->bits64 = true;
-                break;
-        }
-
-        switch (b2->version)
-        {
-            case BLAKE2S_128K:
-            case BLAKE2S_160K:
-            case BLAKE2S_224K:
-            case BLAKE2S_256K:
-            case BLAKE2B_160K:
-            case BLAKE2B_256K:
-            case BLAKE2B_384K:
-            case BLAKE2B_512K:
-                b2->keyed = true;
-                break;
-        }
+        blake2_init(b2->version, &(b2->h), &(b2->nn),
+                    &(b2->bits64), &(b2->keyed));
     }
 
     return b2;
@@ -363,7 +289,8 @@ blake2_renew(void *ctx)
     if (ctx)
     {
         struct blake2 *b2 = ctx;
-        blake2_init(b2->version, &(b2->h), &(b2->nn));
+        blake2_init(b2->version, &(b2->h), &(b2->nn),
+                    &(b2->bits64), &(b2->keyed));
         b2->length = 0;
         b2->first = true;
         b2->last = false;
@@ -414,6 +341,42 @@ blake2_digest(void *ctx, u8 *output)
     }
 }
 
+extern struct maid_hash_def
+maid_blake2s(u8 digest_s)
+{
+    const struct maid_hash_def ret =
+    {
+        .new = (digest_s && digest_s <= 64) ? blake2_new : NULL,
+        .del = blake2_del,
+        .renew = blake2_renew,
+        .update = blake2_update,
+        .digest = blake2_digest,
+        .state_s = 64,
+        .digest_s = digest_s,
+        .version = BLAKE2S + digest_s - 1
+    };
+
+    return ret;
+}
+
+extern struct maid_hash_def
+maid_blake2b(u8 digest_s)
+{
+    const struct maid_hash_def ret =
+    {
+        .new = (digest_s && digest_s <= 64) ? blake2_new : NULL,
+        .del = blake2_del,
+        .renew = blake2_renew,
+        .update = blake2_update,
+        .digest = blake2_digest,
+        .state_s = 128,
+        .digest_s = digest_s,
+        .version = BLAKE2B + digest_s - 1
+    };
+
+    return ret;
+}
+
 const struct maid_hash_def maid_blake2s_128 =
 {
     .new = blake2_new,
@@ -423,7 +386,7 @@ const struct maid_hash_def maid_blake2s_128 =
     .digest = blake2_digest,
     .state_s = 64,
     .digest_s = 20,
-    .version = BLAKE2S_128
+    .version = BLAKE2S + 20 - 1
 };
 
 const struct maid_hash_def maid_blake2s_160 =
@@ -435,7 +398,7 @@ const struct maid_hash_def maid_blake2s_160 =
     .digest = blake2_digest,
     .state_s = 64,
     .digest_s = 24,
-    .version = BLAKE2S_160
+    .version = BLAKE2S + 24 - 1
 };
 
 const struct maid_hash_def maid_blake2s_224 =
@@ -447,7 +410,7 @@ const struct maid_hash_def maid_blake2s_224 =
     .digest = blake2_digest,
     .state_s = 64,
     .digest_s = 28,
-    .version = BLAKE2S_224
+    .version = BLAKE2S + 28 - 1
 };
 
 const struct maid_hash_def maid_blake2s_256 =
@@ -459,7 +422,7 @@ const struct maid_hash_def maid_blake2s_256 =
     .digest = blake2_digest,
     .state_s = 64,
     .digest_s = 32,
-    .version = BLAKE2S_256
+    .version = BLAKE2S + 32 - 1
 };
 
 const struct maid_hash_def maid_blake2b_160 =
@@ -471,7 +434,7 @@ const struct maid_hash_def maid_blake2b_160 =
     .digest = blake2_digest,
     .state_s = 128,
     .digest_s = 24,
-    .version = BLAKE2B_160
+    .version = BLAKE2B + 24 - 1
 };
 
 const struct maid_hash_def maid_blake2b_256 =
@@ -483,7 +446,7 @@ const struct maid_hash_def maid_blake2b_256 =
     .digest = blake2_digest,
     .state_s = 128,
     .digest_s = 32,
-    .version = BLAKE2B_256
+    .version = BLAKE2B + 32 - 1
 };
 
 const struct maid_hash_def maid_blake2b_384 =
@@ -495,7 +458,7 @@ const struct maid_hash_def maid_blake2b_384 =
     .digest = blake2_digest,
     .state_s = 128,
     .digest_s = 48,
-    .version = BLAKE2B_512
+    .version = BLAKE2B + 48 - 1
 };
 
 const struct maid_hash_def maid_blake2b_512 =
@@ -507,7 +470,7 @@ const struct maid_hash_def maid_blake2b_512 =
     .digest = blake2_digest,
     .state_s = 128,
     .digest_s = 64,
-    .version = BLAKE2B_512
+    .version = BLAKE2B + 64 - 1
 };
 
 /* Maid MAC definition */
@@ -525,24 +488,7 @@ blake2k_init(void *ctx, const u8 *key)
     {
         struct blake2k *b2k = ctx;
 
-        size_t kk = 0;
-        switch (b2k->version)
-        {
-            case BLAKE2S_128K:
-            case BLAKE2S_160K:
-            case BLAKE2S_224K:
-            case BLAKE2S_256K:
-                kk = 32;
-                break;
-
-            case BLAKE2B_160K:
-            case BLAKE2B_256K:
-            case BLAKE2B_384K:
-            case BLAKE2B_512K:
-                kk = 64;
-                break;
-        }
-
+        size_t kk = (b2k->version >= BLAKE2BK) ? 64 : 32;
         if (b2k->b2)
             blake2_renew(b2k->b2);
         else
@@ -612,6 +558,42 @@ blake2k_digest(void *ctx, u8 *output)
     }
 }
 
+extern struct maid_mac_def
+maid_blake2s_k(u8 digest_s)
+{
+    const struct maid_mac_def ret =
+    {
+        .new = (digest_s && digest_s <= 64) ? blake2k_new : NULL,
+        .del = blake2k_del,
+        .renew = blake2k_renew,
+        .update = blake2k_update,
+        .digest = blake2k_digest,
+        .state_s = 64,
+        .digest_s = digest_s,
+        .version = BLAKE2SK + digest_s - 1
+    };
+
+    return ret;
+}
+
+extern struct maid_mac_def
+maid_blake2b_k(u8 digest_s)
+{
+    const struct maid_mac_def ret =
+    {
+        .new = (digest_s && digest_s <= 64) ? blake2k_new : NULL,
+        .del = blake2k_del,
+        .renew = blake2k_renew,
+        .update = blake2k_update,
+        .digest = blake2k_digest,
+        .state_s = 128,
+        .digest_s = digest_s,
+        .version = BLAKE2BK + digest_s - 1
+    };
+
+    return ret;
+}
+
 const struct maid_mac_def maid_blake2s_128k =
 {
     .new = blake2k_new,
@@ -621,7 +603,7 @@ const struct maid_mac_def maid_blake2s_128k =
     .digest = blake2k_digest,
     .state_s = 64,
     .digest_s = 20,
-    .version = BLAKE2S_128K
+    .version = BLAKE2SK + 20 - 1
 };
 
 const struct maid_mac_def maid_blake2s_160k =
@@ -633,7 +615,7 @@ const struct maid_mac_def maid_blake2s_160k =
     .digest = blake2k_digest,
     .state_s = 64,
     .digest_s = 24,
-    .version = BLAKE2S_160K
+    .version = BLAKE2SK + 24 - 1
 };
 
 const struct maid_mac_def maid_blake2s_224k =
@@ -645,7 +627,7 @@ const struct maid_mac_def maid_blake2s_224k =
     .digest = blake2k_digest,
     .state_s = 64,
     .digest_s = 28,
-    .version = BLAKE2S_224K
+    .version = BLAKE2SK + 28 - 1
 };
 
 const struct maid_mac_def maid_blake2s_256k =
@@ -657,7 +639,7 @@ const struct maid_mac_def maid_blake2s_256k =
     .digest = blake2k_digest,
     .state_s = 64,
     .digest_s = 32,
-    .version = BLAKE2S_256K
+    .version = BLAKE2SK + 32 - 1
 };
 
 const struct maid_mac_def maid_blake2b_160k =
@@ -669,7 +651,7 @@ const struct maid_mac_def maid_blake2b_160k =
     .digest = blake2k_digest,
     .state_s = 128,
     .digest_s = 24,
-    .version = BLAKE2B_160K
+    .version = BLAKE2BK + 24 - 1
 };
 
 const struct maid_mac_def maid_blake2b_256k =
@@ -681,7 +663,7 @@ const struct maid_mac_def maid_blake2b_256k =
     .digest = blake2k_digest,
     .state_s = 128,
     .digest_s = 32,
-    .version = BLAKE2B_256K
+    .version = BLAKE2BK + 32 - 1
 };
 
 const struct maid_mac_def maid_blake2b_384k =
@@ -693,7 +675,7 @@ const struct maid_mac_def maid_blake2b_384k =
     .digest = blake2k_digest,
     .state_s = 128,
     .digest_s = 48,
-    .version = BLAKE2B_384K
+    .version = BLAKE2BK + 48 - 1
 };
 
 const struct maid_mac_def maid_blake2b_512k =
@@ -705,6 +687,6 @@ const struct maid_mac_def maid_blake2b_512k =
     .digest = blake2k_digest,
     .state_s = 128,
     .digest_s = 64,
-    .version = BLAKE2B_512K
+    .version = BLAKE2BK + 64 - 1
 };
 

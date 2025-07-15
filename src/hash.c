@@ -53,8 +53,11 @@ maid_hash_new(struct maid_hash_def def)
     {
         memcpy(&(ret->def), &def, sizeof(struct maid_hash_def));
 
-        ret->ctx = def.new(def.version);
-        ret->buffer = calloc(1, def.state_s);
+        if (def.new)
+        {
+            ret->ctx = def.new(def.version);
+            ret->buffer = calloc(1, def.state_s);
+        }
         if (!(ret->ctx && ret->buffer))
             ret = maid_hash_del(ret);
     }

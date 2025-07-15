@@ -53,6 +53,8 @@ extern const struct maid_hash_def maid_sha512;
 extern const struct maid_hash_def maid_sha512_224;
 extern const struct maid_hash_def maid_sha512_256;
 
+struct maid_hash_def maid_blake2s(u8 digest_s);
+struct maid_hash_def maid_blake2b(u8 digest_s);
 extern const struct maid_hash_def maid_blake2s_128;
 extern const struct maid_hash_def maid_blake2s_160;
 extern const struct maid_hash_def maid_blake2s_224;
