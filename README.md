@@ -1,37 +1,42 @@
-<div align="center">
-    <h3 align="center">A Cryptography Library for Maids</h3>
-    <a href="https://github.com/reshsix/libmaid">
-        <img src="logo.png" width="96" height="96">
-    </a>
-</div>
+# Evil Maid of Babylon
+> "And the woman was dressed in purple and scarlet...
+having a golden cup full of abominations"
 
-## ☕ About
+## 🏛️ Overview
 Version: **1.4 alpha**
 
-## 🎬 Getting Started
+This is a cryptography library for those who are not afraid to live
 
-### Prerequisites
+Written from scratch by a single person,
+it embodies the spirit of rolling your own cryptography
+
+There's no certifications, money going to corporations,
+or experts bribed in the process of making it
+
+## 🔥 Ritual
+
+### Requirements
 - A C99 compiler
 
-### Build
-Files are created in `build`
+### Forging the Seal
+Files are forged in `build`
 ```sh
 make
 make test
 ```
 
-### Installation
-Files are installed in `/usr/local`
+### Binding the System
+Files are placed in `/usr/local`
 ```sh
 sudo make install
 sudo ldconfig
 ```
 
-### Usage
-The library can be linked with -lmaid, and a command-line tool `maid` is
+### Wielding
+The library can be wielded with -lmaid, and a command-line tool `maid` is
 available
 
-## 📖 Reference
+## 📜 The Codex
 | Category                             | Algorithms                |
 | ------------------------------------:|---------------------------|
 | [Type aliases](docs/types.md)        | ------------------------- |
