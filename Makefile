@@ -23,8 +23,7 @@ TARGETS = build/libmaid.a build/libmaid.so build/maid
 all: CFLAGS += -march=native -O3 -DNDEBUG=1
 all: $(TARGETS)
 debug: CFLAGS += -Og -pg -ggdb3
-debug: $(TARGETS) test
-	gdb build/tests
+debug: $(TARGETS)
 clean:
 	rm -rf build
 
@@ -42,10 +41,6 @@ uninstall:
 	rm -rf "$(DESTDIR)/lib/libmaid.so"
 	rm -rf "$(DESTDIR)/bin/maid"
 
-test:
-	$(CC) $(CFLAGS) -static tests.c -o build/tests -Lbuild -lmaid
-	build/tests
-
 FOLDERS = build build/crypto
 $(FOLDERS):
 	mkdir -p $@
@@ -59,7 +54,8 @@ OBJS = crypto/aes.o crypto/chacha.o \
 	   block.o stream.o mac.o aead.o \
 	   rng.o hash.o \
 	   pub.o sign.o kex.o \
-	   serial.o keygen.o pass.o
+	   serial.o keygen.o \
+	   pass.o test.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@

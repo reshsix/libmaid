@@ -15,7 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -36,56 +35,990 @@
 #include <maid/serial.h>
 #include <maid/keygen.h>
 
-/* Helper functions */
+/* Test macros */
 
-static u8
-hex_digit(char c)
+#define TEST_EMPTY(name, dlen) \
+    u8 name[strlen(dlen) / 2]; \
+    maid_mem_clear(name, sizeof(name));
+
+#define TEST_IMPORT(name, input) \
+    u8 name[strlen(input) / 2]; \
+    ret &= (maid_mem_import(MAID_BASE16L, name,  sizeof(name), \
+                            input, strlen(input)) == strlen(input));
+
+#define TEST_EMPTY_MP(words, name) \
+    maid_mp_word name[words]; \
+    if (ret) \
+        maid_mp_mov(words, name, NULL);
+
+#define TEST_IMPORT_MP(words, name, buf, input) \
+    u8 buf[strlen(input) / 2]; \
+    if (ret) \
+        ret &= (maid_mem_import(MAID_BASE16L, buf,  sizeof(buf), \
+                                input, strlen(input)) == strlen(input)); \
+    maid_mp_word name[words]; \
+    if (ret) \
+        maid_mp_read(words, name, buf, true);
+
+#define TEST_REIMPORT_MP(words, name, buf) \
+    if (ret) \
+        maid_mp_read(words, name, buf, true); \
+
+/* Test functions */
+
+static bool
+test_mem_import(enum maid_mem t, char *input, char *output)
 {
-    u8 ret = 0;
+    size_t l  = strlen(input);
+    size_t l2 = strlen(output);
 
-    if (c >= '0' && c <= '9')
-        ret = c - '0';
-    else if (c >= 'a' && c <= 'f')
-        ret = 10 + (c - 'a');
-    else if (c >= 'A' && c <= 'F')
-        ret = 10 + (c - 'A');
+    char buf[l2 + 1];
+    maid_mem_clear(buf, sizeof(buf));
+
+    return maid_mem_import(t, buf, sizeof(buf), input, l) == l &&
+           memcmp(buf, output, l2) == 0 && buf[l2] == '\0';
+}
+
+static bool
+test_mem_export(enum maid_mem t, char *input, char *output)
+{
+    size_t l  = strlen(input);
+    size_t l2 = strlen(output);
+
+    char buf[l2 + 1];
+    maid_mem_clear(buf, sizeof(buf));
+
+    return maid_mem_export(t, input, l, buf, sizeof(buf)) == l2 &&
+           memcmp(buf, output, l2) == 0 && buf[l2] == '\0';
+}
+
+static bool
+test_mp_rw(size_t words, char *a, char *r)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        maid_mp_write(words, am, ab, false);
+        maid_mp_read(words, am, ab, true);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
 
     return ret;
 }
 
-static size_t
-hex_read(u8 *data, char *hex)
+static bool
+test_mp_not(size_t words, char *a)
 {
-    size_t ret = 0;
+    bool ret = true;
 
-    if (hex)
+    TEST_EMPTY_MP(words, zm)
+    TEST_IMPORT_MP(words, am, ab, a)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
     {
-        /* Using very low pointer values as zeros */
-        if ((u64)hex < 1024)
+        for (size_t i = 0; i < words; i++)
+            zm[i] = ~(am[i]);
+
+        maid_mp_not(words, am);
+        ret &= maid_mem_cmp(am, zm, size);
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_a(size_t words,
+          void (*f)(size_t, maid_mp_word *, const maid_mp_word *),
+          char *a, char *b, bool zeros, char *r)
+{
+    bool ret = true;
+
+    TEST_EMPTY_MP(words, zm)
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, bm, bb, b)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        f(words, am, bm);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    if (ret)
+    {
+        f(words, am, NULL);
+        ret &= maid_mem_cmp(am, (zeros) ? zm : rm, size);
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_cmp(size_t words, char *bigger, char *smaller)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, bm, bb, bigger)
+    TEST_IMPORT_MP(words, sm, sb, smaller)
+
+    ret &= maid_mp_cmp(words, bm, sm)    == -1 &&
+           maid_mp_cmp(words, sm, bm)    ==  1 &&
+           maid_mp_cmp(words, bm, bm)    ==  0 &&
+           maid_mp_cmp(words, sm, sm)    ==  0 &&
+           maid_mp_cmp(words, bm, NULL)  == -1 &&
+           maid_mp_cmp(words, NULL, sm)  ==  1;
+
+    return ret;
+}
+
+static bool
+test_mp_s(size_t words, void (*f)(size_t, maid_mp_word *, size_t),
+          char *a, size_t shift, bool zeros, char *r)
+{
+    bool ret = true;
+
+    TEST_EMPTY_MP(words, zm)
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        f(words, am, shift);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    if (ret)
+    {
+        f(words, am, size * 8);
+        if (!zeros)
         {
-            ret = (size_t)hex;
-            memset(data, '\0', ret);
+            TEST_EMPTY_MP(words, one)
+            one[0] = 1;
+
+            maid_mp_sub(words, zm, one);
         }
-        else
+        ret &= maid_mem_cmp(am, zm, size);
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_div2(size_t words, char *a, char *b, char *r, char *m)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, bm, bb, b)
+    TEST_IMPORT_MP(words, rm, rb, r)
+    TEST_IMPORT_MP(words, mm, mb, m)
+    TEST_EMPTY_MP(words, mm2)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        maid_mp_div2(words, am, mm2, bm);
+        ret &= maid_mem_cmp(am, rm,  size) &&
+               maid_mem_cmp(mm, mm2, size);
+    }
+
+    if (ret)
+    {
+        TEST_REIMPORT_MP(words, am, ab);
+        maid_mp_mov(words, rm,  am);
+        maid_mp_mov(words, mm2, bm);
+        maid_mp_div2(words, am, mm2, NULL);
+        ret &= maid_mem_cmp(am, rm,  size);
+               maid_mem_cmp(bm, mm2, size);
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_mulmod(size_t words, char *a, char *b, char *m, char *r)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, bm, bb, b)
+    TEST_IMPORT_MP(words, mm, mb, m)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        maid_mp_mulmod(words, am, bm, mm);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_expmod(size_t words,
+               void (*f)(size_t, maid_mp_word *, const maid_mp_word *,
+                         const maid_mp_word *, bool),
+               char *a, char *b, char *m, char *r)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, bm, bb, b)
+    TEST_IMPORT_MP(words, mm, mb, m)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        f(words, am, bm, mm, false);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    if (ret)
+    {
+        TEST_REIMPORT_MP(words, am, ab);
+        f(words, am, bm, mm, true);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_invmod(size_t words, char *a, char *n, char *m, char *r)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, nm, nb, n)
+    TEST_IMPORT_MP(words, mm, mb, m)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+        ret &= !maid_mp_invmod(words, nm, mm);
+
+    if (ret)
+        ret &= maid_mp_invmod(words, am, mm);
+
+    if (ret)
+        ret &= maid_mem_cmp(am, rm, size);
+
+    return ret;
+}
+
+static bool
+test_mp_random(size_t words, maid_rng *g, u8 exp, u8 exp2)
+{
+    bool ret = true;
+
+    size_t bits = sizeof(maid_mp_word) * 8;
+
+    /* Limit = middle / 2^exp */
+    size_t middle = (words * bits) / 2;
+    size_t limit = middle >> exp;
+    size_t low  = middle - limit;
+    size_t high = middle + limit;
+
+    TEST_EMPTY_MP(words, rm)
+    for (size_t i = 0; i < (1ULL << exp2); i++)
+    {
+        maid_mp_random(words, rm, g, words * bits);
+
+        size_t iset = 0;
+        for (size_t i = 0; i < words; i++)
+            for (u8 j = 0; j < bits; j++)
+                if (rm[i] & (1ULL << j))
+                    iset++;
+
+        if (iset <= low || iset >= high)
         {
-            ret = strlen(hex) / 2;
-            for (size_t i = 0; i < ret; i++)
-            {
-                data[i] = (hex_digit(hex[(i * 2) + 0]) << 4) |
-                          (hex_digit(hex[(i * 2) + 1]) << 0) ;
-            }
+            ret = false;
+            break;
         }
     }
 
     return ret;
 }
 
-/* Memory utilities */
-
-static u8
-mem_tests(void)
+static bool
+test_mp_random2(size_t words, maid_rng *g,
+                char *low, char *high, u8 exp, u8 exp2)
 {
-    u8 ret = 64;
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, lm, lb, low)
+    TEST_IMPORT_MP(words, hm, hb, high)
+    TEST_EMPTY_MP(words, rm)
+    TEST_EMPTY_MP(words, am)
+
+    for (size_t i = 0; i < (1ULL << exp2); i++)
+    {
+        maid_mp_random2(words, rm, g, lm, hm);
+
+        if (maid_mp_cmp(words, rm, lm) > 0 ||
+            maid_mp_cmp(words, rm, hm) < 0)
+        {
+            ret = false;
+            break;
+        }
+
+        /* Average of the results */
+        maid_mp_shr(words, rm, exp2);
+        maid_mp_add(words, am, rm);
+    }
+
+    if (ret)
+    {
+        /* Middle value */
+        TEST_EMPTY_MP(words, mm)
+        maid_mp_shr(words, lm, 1);
+        maid_mp_shr(words, hm, 1);
+        maid_mp_add(words, mm, hm);
+        maid_mp_add(words, mm, lm);
+
+        /* Limit value */
+        TEST_EMPTY_MP(words, im)
+        maid_mp_mov(words, im, mm);
+        maid_mp_shr(words, im, exp);
+
+        /* New lowest */
+        maid_mp_mov(words, lm, mm);
+        maid_mp_sub(words, lm, im);
+
+        /* New highest */
+        maid_mp_mov(words, hm, mm);
+        maid_mp_add(words, hm, im);
+
+        /* Checks if the average is smaller than the lowest,
+         * or higher than the highest (unless it overflows) */
+        if (maid_mp_cmp(words, am, lm) > 0 ||
+            (maid_mp_cmp(words, am, hm) < 0 &&
+             maid_mp_cmp(words, hm, im) < 0))
+            ret = false;
+    }
+
+    return ret;
+}
+
+static bool
+test_mp_prime(size_t words, maid_rng *g)
+{
+    bool ret = true;
+
+    TEST_EMPTY_MP(words, am)
+    TEST_EMPTY_MP(words, bm)
+
+    size_t bits = (sizeof(maid_mp_word) * words * 8) / 2;
+    maid_mp_prime(words, am, g, bits, 16);
+    maid_mp_prime(words, bm, g, bits, 16);
+
+    TEST_EMPTY_MP(words, cm)
+    /* c = ab */
+    maid_mp_mov(words, cm, am);
+    maid_mp_mul(words, cm, bm);
+
+    TEST_EMPTY_MP(words, dm)
+    TEST_EMPTY_MP(words, om)
+    /* b = tot(ab) */
+    maid_mp_mov(words, dm, am);
+    om[0] = 1;
+    maid_mp_sub(words, bm, om);
+    maid_mp_sub(words, dm, om);
+    maid_mp_mul(words, bm, dm);
+
+    /* 2^tot(ab) % ab = 1 */
+    om[0] = 2;
+    maid_mp_expmod(words, om, bm, cm, false);
+    maid_mp_mov(words, cm, NULL);
+    cm[0] = 1;
+    if (maid_mp_cmp(words, om, cm) != 0)
+        ret = false;
+
+    return ret;
+}
+
+static bool
+test_ecb(struct maid_block_def def, char *key,
+         char *input, char *output, bool decrypt)
+{
+    bool ret = true;
+
+    TEST_EMPTY(empty,  key);
+    TEST_EMPTY(empty2, key);
+
+    maid_block *bl = maid_block_new(def, empty, empty);
+    if (bl)
+    {
+        TEST_IMPORT(key_b,    key);
+        TEST_IMPORT(input_b,  input);
+        TEST_IMPORT(output_b, output);
+
+        if (ret)
+        {
+            maid_block_renew(bl, key_b, NULL);
+            maid_block_ecb(bl, input_b, decrypt);
+            ret = maid_mem_cmp(input_b, output_b, sizeof(output_b));
+        }
+    }
+    else
+        ret = false;
+    maid_block_del(bl);
+
+    return ret;
+}
+
+static bool
+test_ctr(struct maid_block_def def, char *key, char *iv,
+         char *input, char *output)
+{
+    bool ret = true;
+
+    TEST_EMPTY(empty,  key);
+    TEST_EMPTY(empty2, iv);
+
+    maid_block *bl = maid_block_new(def, empty, empty2);
+    if (bl)
+    {
+        TEST_IMPORT(key_b,    key);
+        TEST_IMPORT(iv_b,     iv);
+        TEST_IMPORT(input_b,  input);
+        TEST_IMPORT(output_b, output);
+
+        if (ret)
+        {
+            maid_block_renew(bl, key_b, iv_b);
+            maid_block_ctr(bl, input_b, sizeof(output_b));
+            ret = maid_mem_cmp(input_b, output_b, sizeof(output_b));
+        }
+    }
+    else
+        ret = false;
+    maid_block_del(bl);
+
+    return ret;
+}
+
+static bool
+test_stream(struct maid_stream_def def, char *key, char *nonce, u32 counter,
+            char *input, char *output)
+{
+    bool ret = true;
+
+    TEST_EMPTY(empty,  key);
+    TEST_EMPTY(empty2, nonce);
+
+    maid_stream *st = maid_stream_new(def, empty, empty2, 0);
+    if (st)
+    {
+        TEST_IMPORT(key_b,    key);
+        TEST_IMPORT(nonce_b,  nonce);
+        TEST_IMPORT(input_b,  input);
+        TEST_IMPORT(output_b, output);
+
+        if (ret)
+        {
+            maid_stream_renew(st, key_b, nonce_b, counter);
+            maid_stream_xor(st, input_b, sizeof(output_b));
+            ret = maid_mem_cmp(input_b, output_b, sizeof(output_b));
+        }
+    }
+    else
+        ret = false;
+    maid_stream_del(st);
+
+    return ret;
+}
+
+static bool
+test_mac(struct maid_mac_def def, char *key, char *input, char *tag)
+{
+    bool ret = true;
+
+    TEST_EMPTY(empty, key);
+
+    maid_mac *m = maid_mac_new(def, empty);
+    if (m)
+    {
+        TEST_IMPORT(key_b,   key);
+        TEST_IMPORT(input_b, input);
+        TEST_IMPORT(tag_b,   tag);
+
+        if (ret)
+        {
+            maid_mac_renew(m, key_b);
+            maid_mac_update(m, input_b, sizeof(input_b));
+
+            TEST_EMPTY(tag2_b, tag);
+            maid_mac_digest(m, tag2_b);
+            ret = maid_mem_cmp(tag_b, tag2_b, sizeof(tag_b));
+        }
+    }
+    else
+        ret = false;
+    maid_mac_del(m);
+
+    return ret;
+}
+
+static bool
+test_aead(struct maid_aead_def def, char *key, char *nonce,
+          char *ad, char *input, char *output, char *tag, bool decrypt)
+{
+    bool ret = true;
+
+    TEST_EMPTY(empty,  key)
+    TEST_EMPTY(empty2, nonce)
+
+    maid_aead *ae = maid_aead_new(def, empty, empty2);
+    if (ae)
+    {
+        TEST_IMPORT(key_b,    key)
+        TEST_IMPORT(nonce_b,  nonce)
+        TEST_IMPORT(ad_b,     ad)
+        TEST_IMPORT(input_b,  input)
+        TEST_IMPORT(output_b, output)
+        TEST_IMPORT(tag_b,    tag)
+
+        if (ret)
+        {
+            maid_aead_renew(ae, key_b, nonce_b);
+            maid_aead_update(ae, ad_b, sizeof(ad_b));
+            maid_aead_crypt(ae, input_b, sizeof(input_b), decrypt);
+
+            TEST_EMPTY(tag2_b, tag)
+            maid_aead_digest(ae, tag2_b);
+
+            ret = maid_mem_cmp(input_b, output_b, sizeof(input_b)) &&
+                  maid_mem_cmp(tag2_b,  tag_b,    sizeof(tag));
+        }
+    }
+    else
+        ret = false;
+    maid_aead_del(ae);
+
+    return ret;
+}
+
+static bool
+test_hash(struct maid_hash_def def, char *input, char *output)
+{
+    bool ret = true;
+
+    maid_hash *h = maid_hash_new(def);
+    if (h)
+    {
+        TEST_IMPORT(input_b,  input);
+        TEST_IMPORT(output_b, output);
+
+        if (ret)
+        {
+            TEST_EMPTY(output2_b, output);
+
+            maid_hash_renew(h);
+            maid_hash_update(h, input_b, sizeof(input_b));
+            maid_hash_digest(h, output2_b);
+
+            ret = maid_mem_cmp(output_b, output2_b, sizeof(output_b));
+        }
+    }
+    else
+        ret = false;
+    maid_hash_del(h);
+
+    return ret;
+}
+
+
+static bool
+test_rng(struct maid_rng_def def, char *entropy, char *output)
+{
+    bool ret = true;
+
+    TEST_EMPTY(empty, entropy);
+
+    maid_rng *g = maid_rng_new(def, empty);
+    if (g)
+    {
+        TEST_IMPORT(entropy_b, entropy);
+        TEST_IMPORT(output_b,  output);
+
+        if (ret)
+        {
+            TEST_EMPTY(result_b, output);
+            maid_rng_renew(g, entropy_b);
+            maid_rng_generate(g, result_b, sizeof(result_b));
+
+            ret = maid_mem_cmp(result_b, output_b, sizeof(result_b));
+        }
+    }
+    else
+        ret = false;
+    maid_rng_del(g);
+
+    return ret;
+}
+
+static bool
+test_rsa(size_t bits, char *e, char *d, char *N, char *input, char *output)
+{
+    bool ret = true;
+
+    u8 zeros[bits / 8];
+    maid_mem_clear(zeros, sizeof(zeros));
+
+    struct maid_rsa_key zkey = {.exponent = (void *)zeros,
+                                .modulo   = (void *)zeros};
+    maid_pub *pub = maid_pub_new(maid_rsa_public,  &zkey, bits);
+    maid_pub *prv = maid_pub_new(maid_rsa_private, &zkey, bits);
+
+    if (pub && prv)
+    {
+        size_t words = maid_mp_words(bits);
+        TEST_IMPORT_MP(words, em, eb, e)
+        TEST_IMPORT_MP(words, dm, db, d)
+        TEST_IMPORT_MP(words, Nm, Nb, N)
+        TEST_IMPORT(ib, input)
+        TEST_IMPORT(ob, output)
+        TEST_IMPORT(bb, input)
+
+        if (ret)
+        {
+            struct maid_rsa_key pub_k = {.exponent = em, .modulo = Nm};
+            struct maid_rsa_key prv_k = {.exponent = dm, .modulo = Nm};
+            maid_pub_renew(pub, &pub_k);
+            maid_pub_renew(prv, &prv_k);
+
+            maid_pub_apply(pub, bb);
+            ret = maid_mem_cmp(bb, ob, sizeof(ob));
+        }
+
+        if (ret)
+        {
+            maid_pub_apply(prv, bb);
+            ret = maid_mem_cmp(bb, ib, sizeof(ib));
+        }
+    }
+    else
+        ret = false;
+
+    maid_pub_del(pub);
+    maid_pub_del(prv);
+
+    return ret;
+}
+
+static bool
+test_pkcs1(struct maid_sign_def def, size_t bits,
+           char *e, char *d, char *N, char *input, char *output)
+{
+    bool ret = true;
+
+    size_t words = maid_mp_words(bits);
+    TEST_IMPORT_MP(words, em, eb, e)
+    TEST_IMPORT_MP(words, dm, db, d)
+    TEST_IMPORT_MP(words, Nm, Nb, N)
+
+    TEST_IMPORT(ib, input)
+    TEST_IMPORT(ob, output)
+
+    if (ret)
+    {
+        u8 bb[words * sizeof(maid_mp_word)];
+        maid_mem_clear(bb, sizeof(bb));
+        memcpy(bb, ib, sizeof(ib));
+
+        struct maid_rsa_key key1 = {.exponent = em, .modulo = Nm};
+        struct maid_rsa_key key2 = {.exponent = dm, .modulo = Nm};
+
+        maid_pub *pub = maid_pub_new(maid_rsa_public,  &key1, bits);
+        maid_pub *prv = maid_pub_new(maid_rsa_private, &key2, bits);
+        maid_sign *s = maid_sign_new(def, NULL, NULL, bits);
+
+        if (pub && prv && s)
+        {
+            maid_sign_renew(s, pub, prv);
+            maid_sign_generate(s, bb);
+
+            ret = maid_mem_cmp(bb, ob, sizeof(ob)) &&
+                  maid_sign_verify(s, bb)          &&
+                  maid_mem_cmp(bb, ib, sizeof(ib));
+        }
+        else
+            ret = false;
+
+        maid_pub_del(pub);
+        maid_pub_del(prv);
+        maid_sign_del(s);
+    }
+
+    return ret;
+}
+
+
+static bool
+test_dh(size_t bits, char *g, char *p,
+        char *prv, char *pub, char *pub2, char *secret)
+{
+    bool ret = true;
+
+    u8 zeros[bits / 8];
+    struct maid_dh_group zgroup = {.generator = (void *)zeros,
+                                   .modulo    = (void *)zeros};
+
+    maid_kex *x = maid_kex_new(maid_dh, &zgroup, bits);
+
+    if (x)
+    {
+        size_t words = maid_mp_words(bits);
+        TEST_IMPORT_MP(words, gm, gb, g)
+        TEST_IMPORT_MP(words, pm, pb, p)
+
+        TEST_IMPORT(rb, prv)
+        TEST_IMPORT(ub, pub)
+        TEST_IMPORT(vb, pub2)
+        TEST_IMPORT(sb, secret)
+
+        TEST_EMPTY(bb, pub)
+        if (ret)
+        {
+            struct maid_dh_group group = {.generator = gm, .modulo = pm};
+            maid_kex_renew(x, &group);
+
+            maid_kex_gpub(x, rb, bb);
+            ret = maid_mem_cmp(bb, ub, sizeof(bb));
+        }
+
+        if (ret)
+        {
+            maid_kex_gsec(x, rb, vb, bb);
+            ret = maid_mem_cmp(bb, sb, sizeof(bb));
+        }
+    }
+    else
+        ret = false;
+
+    maid_kex_del(x);
+
+    return ret;
+}
+
+static bool
+test_pem(const char *input, size_t items,
+         enum maid_pem_t *type, char **data, char **export)
+{
+    bool ret = true;
+
+    const char *current = input;
+    const char *endptr = NULL;
+    size_t i = 0;
+    do
+    {
+        struct maid_pem *p = maid_pem_import(current, &endptr);
+
+        if (p && i < items)
+        {
+            TEST_IMPORT(db, data[i]);
+            ret = p->type == type[i] &&
+                  maid_mem_cmp(p->data, db, sizeof(db)) &&
+                  p->size == sizeof(db);
+
+            if (ret)
+            {
+                char *str = maid_pem_export(p);
+                if (str)
+                    ret = (strcmp(str, export[i]) == 0);
+                free(str);
+            }
+        }
+        else
+        {
+            ret = false;
+            break;
+        }
+
+        maid_pem_free(p);
+
+        current = endptr;
+        i++;
+    } while (endptr && *endptr != '\0');
+
+    return ret;
+}
+
+static maid_pub *
+test_serial_rsa_pub(enum maid_serial type, const char *input)
+{
+    maid_pub *ret = NULL;
+
+    const char *endptr = NULL;
+    struct maid_pem *p = maid_pem_import(input, &endptr);
+    if (p)
+    {
+        size_t bits = 0;
+        maid_mp_word *data[8] = {NULL};
+
+        enum maid_serial type2 = maid_serial_import(p, &bits, data);
+        if (type == type2)
+        {
+            switch (type)
+            {
+                case MAID_SERIAL_RSA_PUBLIC:
+                case MAID_SERIAL_PKCS8_RSA_PUBLIC:;
+                    struct maid_rsa_key k1 = {.modulo   = data[0],
+                                              .exponent = data[1]};
+                    ret = maid_pub_new(maid_rsa_public, &k1, bits);
+
+                    break;
+
+                case MAID_SERIAL_RSA_PRIVATE:
+                case MAID_SERIAL_PKCS8_RSA_PRIVATE:;
+                    struct maid_rsa_key k2 = {.modulo   = data[0],
+                                              .exponent = data[2]};
+                    ret = maid_pub_new(maid_rsa_private, &k2, bits);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        if (ret)
+        {
+            struct maid_pem *p2 = maid_serial_export(type, bits, data);
+            char *export = (p2) ? maid_pem_export(p2) : NULL;
+
+            if (!export || strcmp(input, export) != 0)
+                ret = maid_pub_del(ret);
+
+            free(export);
+            maid_pem_free(p2);
+        }
+
+        for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
+            free(data[i]);
+    }
+    maid_pem_free(p);
+
+    return ret;
+}
+
+static bool
+test_serial_rsa(size_t bits, char *public, char *private,
+                char *hash, char *sign, bool pkcs8)
+{
+    bool ret = true;
+
+    TEST_IMPORT(hb, hash)
+    TEST_IMPORT(sb, sign)
+
+    if (ret)
+    {
+        enum maid_serial types[] = {MAID_SERIAL_RSA_PUBLIC,
+                                    MAID_SERIAL_RSA_PRIVATE,
+                                    MAID_SERIAL_PKCS8_RSA_PUBLIC,
+                                    MAID_SERIAL_PKCS8_RSA_PRIVATE};
+
+        maid_pub *pub = test_serial_rsa_pub(types[(pkcs8 << 1) + 0], public);
+        maid_pub *prv = test_serial_rsa_pub(types[(pkcs8 << 1) + 1], private);
+        maid_sign *s  = maid_sign_new(maid_pkcs1_v1_5_sha256, pub, prv, bits);
+
+        if (pub && prv && s)
+        {
+            u8 bb[bits / 8];
+            memcpy(bb, hb, sizeof(hb));
+
+            maid_sign_generate(s, bb);
+            ret = maid_mem_cmp(bb, sb, sizeof(sb)) &&
+                  maid_sign_verify(s, bb)          &&
+                  maid_mem_cmp(bb, hb, sizeof(hb));
+        }
+        else
+            ret = false;
+
+        maid_pub_del(pub);
+        maid_pub_del(prv);
+        maid_sign_del(s);
+    }
+
+    return ret;
+}
+
+static bool
+test_keygen_rsa(size_t bits)
+{
+    bool ret = true;
+
+    u8 entropy[32] = {0};
+    maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
+    if (g)
+    {
+        maid_mp_word *params[8];
+        size_t words = maid_keygen_rsa(bits, params, g);
+        if (words)
+        {
+            struct maid_rsa_key k1 = {.exponent = params[1],
+                                      .modulo   = params[0]};
+            struct maid_rsa_key k2 = {.exponent = params[2],
+                                      .modulo   = params[0]};
+
+            maid_pub  *pub = maid_pub_new(maid_rsa_public,  &k1, bits);
+            maid_pub  *prv = maid_pub_new(maid_rsa_private, &k2, bits);
+            maid_sign *s   = maid_sign_new(maid_pkcs1_v1_5_sha256,
+                                           pub, prv, bits);
+            if (pub && prv && s)
+            {
+                u8 hash[bits / 8];
+                memset(hash, 0xFF, 256 / 8);
+
+                maid_sign_generate(s, hash);
+                ret = maid_sign_verify(s, hash);
+
+                if (ret)
+                {
+                    for (size_t i = 0; i < (256 / 8); i++)
+                    {
+                        if (hash[i] != 0xFF)
+                        {
+                            ret = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+                ret = false;
+
+            maid_pub_del(pub);
+            maid_pub_del(prv);
+            maid_sign_del(s);
+        }
+
+        for (size_t i = 0; i < sizeof(params) / sizeof(maid_mp_word *); i++)
+            free(params[i]);
+    }
+    else
+        ret = false;
+    maid_rng_del(g);
+
+    return ret;
+}
+
+/* Implemented tests */
+
+extern u8
+maid_test_mem(void)
+{
+    u8 ret = 26;
 
     u8 mem[24] = {0x00, 0x00, 0x00, 0x00, 0xb0, 0x0b, 0x00, 0x00};
 
@@ -120,357 +1053,104 @@ mem_tests(void)
                       "Zm9vYmE=", "Zm9vYmFy"};
     char  *ascii[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
 
-    memset(zeros, '\0', sizeof(zeros));
     for (size_t i = 0; i < 7; i++)
     {
-        char buf[16] = {0};
-        size_t l  = strlen(base64[i]);
-        size_t l2 = strlen(ascii[i]);
-
-        ret -= maid_mem_import(MAID_BASE64, buf, sizeof(buf),
-                               base64[i], l) == l;
-        ret -= memcmp(buf, ascii[i], l2) == 0;
-        ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
-    }
-
-    for (size_t i = 0; i < 1; i++)
-    {
-        char buf[16] = {0};
-        size_t l = strlen(base64[3]);
-        size_t l2 = strlen(ascii[3]);
-
-        ret -= maid_mem_import(MAID_BASE64, buf, sizeof(buf),
-                               base64[6], l) == l;
-        ret -= memcmp(buf, ascii[3], l) == 0;
-        ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
-    }
-
-    for (size_t i = 0; i < 7; i++)
-    {
-        char buf[16] = {0};
-        size_t l  = strlen(ascii[i]);
-        size_t l2 = strlen(base64[i]);
-
-        ret -= maid_mem_export(MAID_BASE64, ascii[i], l,
-                               buf, sizeof(buf)) == l2;
-        ret -= memcmp(buf, base64[i], l2) == 0;
-        ret -= memcmp(&(buf[l2]), zeros, sizeof(buf) - l2) == 0;
-    }
-
-    for (size_t i = 0; i < 1; i++)
-    {
-        char buf[16] = {0};
-        size_t l  = strlen(ascii[6]);
-        size_t l2 = 5;
-        size_t l2m4 = l2 % 4;
-
-        ret -= maid_mem_export(MAID_BASE64, ascii[6], l,
-                               buf, l2) == l2 - l2m4;
-        ret -= memcmp(buf, base64[3], l2m4) == 0;
-        ret -= memcmp(&(buf[l2 - l2m4]), zeros, sizeof(buf) - l2 + l2m4) == 0;
+        ret -= test_mem_import(MAID_BASE64, base64[i], ascii[i]);
+        ret -= test_mem_export(MAID_BASE64, ascii[i], base64[i]);
     }
 
     char *bad64[] = {"Zm9vYg", "Zm9vY%", "Zm9vY=Fy", "Zm9vYm=y"};
     for (size_t i = 0; i < 4; i++)
-    {
-        char buf[16] = {0};
-        size_t l  = strlen(bad64[i]);
-
-        ret -= maid_mem_import(MAID_BASE64, buf, sizeof(buf),
-                               bad64[i], l) == 0;
-        ret -= memcmp(buf, zeros, sizeof(buf)) == 0;
-    }
+        ret -= !test_mem_import(MAID_BASE64, bad64[i], ascii[6]);
 
     return ret;
 }
 
-/* Multiprecision utilities */
-
-static void
-mp_test(size_t words, u8 *val, maid_mp_word *a, maid_mp_word *b,
-        maid_mp_word *c, maid_mp_word *d,
-        size_t ia, size_t ib, size_t ic, size_t id)
+extern u8
+maid_test_mp(void)
 {
-    size_t size = sizeof(maid_mp_word) * words;
+    u8 ret = 26;
 
-    for (u8 i = 0; i < words; i++)
-    {
-        maid_mp_read(words, a, &(val[ia * size]), true);
-        maid_mp_read(words, b, &(val[ib * size]), true);
-        maid_mp_read(words, c, &(val[ic * size]), true);
-        maid_mp_read(words, d, &(val[id * size]), true);
-    }
-}
+    size_t words = maid_mp_words(256);
+    ret -= (words == 4);
 
-static u8
-mp_tests(void)
-{
-    u8 ret = 54;
+    char *sa = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
+               "11b1d0dec0d1f1eddeadbea7cafebe7a";
+    char *sb = "deadc0dedeadfacebeefbabe0badcafe"
+               "0bea57facaded003ed11b1d00badbea7";
 
-    size_t words = maid_mp_words(128);
-    ret -= (words == 2);
+    ret -= test_mp_rw(words, sa,
+           "7abefecaa7beaddeedf1d1c0ded0b111edf1e10dbebafecad0b11100edf1d1c0");
 
-    u8 val[] = {
-    /* a */            0xc0, 0xd1, 0xf1, 0xed, 0x00, 0x11, 0xb1, 0xd0,
-                       0xca, 0xfe, 0xba, 0xbe, 0x0d, 0xe1, 0xf1, 0xed,
-    /* b */            0x11, 0xb1, 0xd0, 0xde, 0xc0, 0xd1, 0xf1, 0xed,
-                       0xde, 0xad, 0xbe, 0xa7, 0xca, 0xfe, 0xbe, 0x7a,
-    /* c = a(le) */    0xed, 0xf1, 0xe1, 0x0d, 0xbe, 0xba, 0xfe, 0xca,
-                       0xd0, 0xb1, 0x11, 0x00, 0xed, 0xf1, 0xd1, 0xc0,
-    /* !a */           0x3f, 0x2e, 0x0e, 0x12, 0xff, 0xee, 0x4e, 0x2f,
-                       0x35, 0x01, 0x45, 0x41, 0xf2, 0x1e, 0x0e, 0x12,
-    /* a & b */        0x00, 0x91, 0xd0, 0xcc, 0x00, 0x11, 0xb1, 0xc0,
-                       0xca, 0xac, 0xba, 0xa6, 0x08, 0xe0, 0xb0, 0x68,
-    /* a | b */        0xd1, 0xf1, 0xf1, 0xff, 0xc0, 0xd1, 0xf1, 0xfd,
-                       0xde, 0xff, 0xbe, 0xbf, 0xcf, 0xff, 0xff, 0xff,
-    /* a ^ b */        0xd1, 0x60, 0x21, 0x33, 0xc0, 0xc0, 0x40, 0x3d,
-                       0x14, 0x53, 0x04, 0x19, 0xc7, 0x1f, 0x4f, 0x97,
-    /* a + b */        0xd2, 0x83, 0xc2, 0xcb, 0xc0, 0xe3, 0xa3, 0xbe,
-                       0xa9, 0xac, 0x79, 0x65, 0xd8, 0xe0, 0xb0, 0x67,
-    /* a - b */        0xaf, 0x20, 0x21, 0x0e, 0x3f, 0x3f, 0xbf, 0xe2,
-                       0xec, 0x50, 0xfc, 0x16, 0x42, 0xe3, 0x33, 0x73,
-    /* a << 33 */      0x00, 0x23, 0x63, 0xa1, 0x95, 0xfd, 0x75, 0x7c,
-                       0x1b, 0xc3, 0xe3, 0xda, 0x00, 0x00, 0x00, 0x00,
-    /* a >> 45 */      0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x06, 0x8f,
-                       0x8f, 0x68, 0x00, 0x8d, 0x8e, 0x86, 0x57, 0xf5,
-    /* a <<< 33 */     0x00, 0x23, 0x63, 0xa1, 0x95, 0xfd, 0x75, 0x7c,
-                       0x1b, 0xc3, 0xe3, 0xda, 0x00, 0x00, 0x00, 0x00,
-    /* a >>> 45 */     0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x06, 0x8f,
-                       0x8f, 0x68, 0x00, 0x8d, 0x8e, 0x86, 0x57, 0xf5,
-    /* a * b */        0x84, 0x05, 0x36, 0x41, 0xa6, 0x66, 0x63, 0x6e,
-                       0xce, 0x9f, 0xd3, 0x8e, 0x5a, 0x61, 0x30, 0xf2,
-    /* a / b */        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
-    /* a % b */        0x0f, 0xdf, 0xc9, 0x39, 0x77, 0xde, 0x3e, 0x86,
-                       0x18, 0x35, 0x48, 0x30, 0x1f, 0xee, 0x81, 0x29,
-    /* a ^ b */        0x7c, 0x2f, 0x55, 0x6f, 0x88, 0xbe, 0x1b, 0x8e,
-                       0x49, 0x05, 0xc9, 0x0b, 0x4b, 0x83, 0x83, 0x49,
-    /* (a * b) % c */  0x86, 0x1b, 0xa5, 0x38, 0x59, 0x6f, 0xc4, 0x9e,
-                       0xd3, 0x5b, 0x9d, 0x91, 0x53, 0x54, 0x79, 0x32,
-    /* (a ^ b) % c */  0x80, 0x12, 0xde, 0x12, 0x3b, 0x22, 0x46, 0x5f,
-                       0xf9, 0xf1, 0x93, 0x51, 0xc2, 0x4c, 0x90, 0xc9,
-    /* (a ^ -1) % b */ 0x0d, 0x9e, 0xbe, 0x15, 0xeb, 0x7f, 0xd5, 0x8e,
-                       0x40, 0xef, 0xba, 0x9a, 0xe0, 0x11, 0xa3, 0xcb,
-    /* (b ^ c) % a */  0x71, 0x57, 0xe9, 0xfb, 0xb7, 0x15, 0x7f, 0x01,
-                       0xeb, 0x11, 0x23, 0x7a, 0xac, 0x1c, 0x17, 0x42};
+    ret -= test_mp_not(words, sa);
 
-    size_t size = sizeof(maid_mp_word) * words;
+    ret -= test_mp_a(words, maid_mp_and, sa, sb, false,
+           "c081c0cc0001b0c08aeebabe09a1c0ec01a050dac0d0d001cc01b0800aacbe22");
+    ret -= test_mp_a(words, maid_mp_orr, sa, sb, false,
+           "defdf1ffdebdfbdefeffbabe0fedfbff1bfbd7fecadff1efffbdbff7cbffbeff");
+    ret -= test_mp_a(words, maid_mp_xor, sa, sb, false,
+           "1e7c3133debc4b1e74110000064c3b131a5b87240a0f21ee33bc0f77c15300dd");
 
-    maid_mp_word z[words];
-    maid_mp_word f[words];
-    memset(z, 0x00, size);
-    memset(f, 0xff, size);
+    ret -= test_mp_cmp(words, sb, sa);
 
-    maid_mp_word a[words];
-    maid_mp_word b[words];
-    maid_mp_word c[words];
-    maid_mp_word d[words];
+    ret -= test_mp_a(words, maid_mp_mov, sa, sb, true, sb);
+    ret -= test_mp_a(words, maid_mp_add, sa, sb, false,
+           "9f7fb2cbdebfac9f89ee757c198fbceb1d9c28d98bb0c1f1cbbf7077d6ac7d21");
+    ret -= test_mp_a(words, maid_mp_sub, sa, sb, false,
+           "e224310e2163b7020c0f0000023426ef05c778e3f5f321e9f19c0cd7bf50ffd3");
 
-    /* read/write */
-    mp_test(words, val, a, b, c, d, 0, 1, 2, 0);
-    maid_mp_write(words, a, &(val[2 * 16]), false);
-    maid_mp_read(words, a, &(val[2 * 16]), true);
-    ret -= memcmp(a, c, size) == 0;
+    ret -= test_mp_s(words, maid_mp_shl, sa, 33, true,
+           "002363a195fd757c1bc3e3da2363a1bd81a3e3dbbd5b7d4f95fd7cf400000000");
+    ret -= test_mp_s(words, maid_mp_shr, sa, 45, true,
+           "000000000006068f8f68008d8e8657f5d5f06f0f8f688d8e86f6068f8f6ef56d");
+    ret -= test_mp_s(words, maid_mp_sal, sa, 33, true,
+           "002363a195fd757c1bc3e3da2363a1bd81a3e3dbbd5b7d4f95fd7cf400000000");
+    ret -= test_mp_s(words, maid_mp_sar, sb, 45, false,
+           "fffffffffffef56e06f6f56fd675f77dd5f05d6e57f05f52bfd656f6801f688d");
 
-    mp_test(words, val, a, b, c, d, 0, 3, 0, 0);
-    maid_mp_not(words, a);
-    ret -= memcmp(a, b, size) == 0;
+    char *sc = "0000000000000000000000000000cafe"
+               "0bea57facaded003ed11b1d00badbea7";
 
-    #define MAID_MP_TEST_A(id, r, zn) \
-    mp_test(words, val, a, b, c, d, 0, 1, r, 0); \
-    maid_mp_##id(words, a, b); \
-    ret -= memcmp(a, c, size) == 0; \
-    maid_mp_##id(words, a, NULL); \
-    ret -= memcmp(a, (zn) ? z : c, size) == 0;
+    ret -= test_mp_a(words, maid_mp_mul, sa, sb, false,
+           "0c38d648e0ed7643ad6b5926892d84e50348a8372c6ee86aecbc259473fecd96");
+    ret -= test_mp_a(words, maid_mp_div, sa, sc, false,
+           "000000000000000000000000000000000000f32be2eeb4f644355ea6504049ca");
+    ret -= test_mp_a(words, maid_mp_mod, sa, sc, true,
+           "0000000000000000000000000000c692e50b7de98c6b00f5181bf3dc2ec8afb4");
+    ret -= test_mp_a(words, maid_mp_exp, sc, sa, false,
+           "4e0e63adabf8dc0f6b299b04688b3f0f053bc6ae96423face4bf8e604e95df31");
 
-    MAID_MP_TEST_A(and, 4, false);
-    MAID_MP_TEST_A(orr, 5, false);
-    MAID_MP_TEST_A(xor, 6, false);
+    ret -= test_mp_div2(words, sa, sc,
+           "000000000000000000000000000000000000f32be2eeb4f644355ea6504049ca",
+           "0000000000000000000000000000c692e50b7de98c6b00f5181bf3dc2ec8afb4");
 
-    /* cmp */
-    mp_test(words, val, a, b, c, d, 0, 1, 0, 0);
-    ret -= maid_mp_cmp(words, a, b)    == -1;
-    ret -= maid_mp_cmp(words, b, a)    ==  1;
-    ret -= maid_mp_cmp(words, a, a)    ==  0;
-    ret -= maid_mp_cmp(words, a, NULL) == -1;
-
-    MAID_MP_TEST_A(mov, 1, true);
-    MAID_MP_TEST_A(add, 7, false);
-    MAID_MP_TEST_A(sub, 8, false);
-
-    #define MAID_MP_TEST_S(id, s, r, zn) \
-    mp_test(words, val, a, b, c, d, 0, 0, r, 0); \
-    maid_mp_##id(words, a, s); \
-    ret -= memcmp(a, c, size) == 0; \
-    maid_mp_##id(words, a, 128); \
-    ret -= memcmp(a, (zn) ? z : f, size) == 0;
-
-    MAID_MP_TEST_S(shl, 33, 9,  true)
-    MAID_MP_TEST_S(shr, 45, 10, true)
-    MAID_MP_TEST_S(sal, 33, 11, true)
-    MAID_MP_TEST_S(sar, 45, 12, false)
-
-    #define MAID_MP_TEST_T(id, r, zn, mem) \
-    mp_test(words, val, a, b, c, d, 0, 1, r, 0); \
-    maid_mp_##id(words, a, b); \
-    ret -= memcmp(a, c, size) == 0; \
-    maid_mp_##id(words, a, NULL); \
-    ret -= memcmp(a, (zn) ? z : c, size) == 0; \
-
-    MAID_MP_TEST_T(mul, 13, false, 1);
-    MAID_MP_TEST_T(div, 14, false, 2);
-    MAID_MP_TEST_T(mod, 15, true , 3);
-    MAID_MP_TEST_T(exp, 16, false, 3);
-
-    /* div2 */
-    mp_test(words, val, a, b, c, d, 0, 1, 14, 0);
-    maid_mp_div2(words, a, d, b);
-    ret -= memcmp(a, c, size) == 0;
-    maid_mp_div2(words, a, d, NULL);
-    ret -= memcmp(a, c, size) == 0;
-    mp_test(words, val, a, b, c, d, 0, 1, 15, 0);
-    maid_mp_div2(words, a, d, b);
-    ret -= memcmp(d, c, size) == 0;
-    maid_mp_div2(words, a, d, NULL);
-    ret -= memcmp(d, z, size) == 0;
-
-    #define MAID_MP_TEST_M(id, aa, bb, cc, r, mem, ...) \
-    mp_test(words, val, a, b, c, d, aa, bb, cc, r); \
-    maid_mp_##id(words, a, b, c,##__VA_ARGS__); \
-    ret -= memcmp(a, d, size) == 0; \
-    maid_mp_##id(words, a, NULL, c,##__VA_ARGS__); \
-    ret -= memcmp(a, d, size) == 0; \
-
-    MAID_MP_TEST_M(mulmod, 0, 1, 2, 17, 12);
-    MAID_MP_TEST_M(expmod, 0, 1, 2, 18, 14, false);
-    MAID_MP_TEST_M(expmod, 0, 1, 2, 18, 14, true);
-
-    /* invmod */
-    mp_test(words, val, a, b, c, d, 0, 2, 0, 0);
-    ret -= !maid_mp_invmod(words, a, b);
-    ret -= memcmp(a, d, size) == 0;
-    mp_test(words, val, a, b, c, d, 0, 1, 0, 19);
-    ret -= maid_mp_invmod(words, a, b);
-    ret -= memcmp(a, d, size) == 0;
-
-    MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, 49, false);
-    MAID_MP_TEST_M(expmod2, 1, 2, 0, 20, 49, true);
+    ret -= test_mp_mulmod(words, sa, sb, sc,
+           "0000000000000000000000000000ba47a813183a1a03729a545e69650ea7ec62");
+    ret -= test_mp_expmod(words, maid_mp_expmod, sa, sb, sc,
+           "00000000000000000000000000007960d37277127c408fae6d25702001a96c32");
+    ret -= test_mp_invmod(words, sa, sb, sc,
+           "00000000000000000000000000007823344d5d3621c25936272b9a68c0bcdd99");
+    ret -= test_mp_expmod(words, maid_mp_expmod2, sa, sb, sc,
+           "00000000000000000000000000007960d37277127c408fae6d25702001a96c32");
 
     /* Generators */
     u8 entropy[32] = {0};
     maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
 
-    /* Checks if the amount of set bits is a normal distribution,
-     * and if the constraints (range or primality) are fulfilled */
-    size_t fails = 0;
-    for (u8 y = 0; y < 3; y++)
-    {
-        u8 low = 0, high = 0;
-        size_t set = 0;
-        for (u16 x = 0; x < 100; x++)
-        {
-            switch (y)
-            {
-                case 0:
-                    maid_mp_random(words, a, g, 128);
-                    low = 50;
-                    high = 80;
-                    break;
-                case 1:
-                    maid_mp_mov(words, b, NULL);
-                    b[0] = 1ULL << 16;
-                    maid_mp_mov(words, c, NULL);
-                    c[1] = 1ULL << 32;
+    ret -= test_mp_random(words, g, 2, 7);
+    ret -= test_mp_random2(words, g, sa, sb, 2, 7);
+    ret -= test_mp_prime(words, g);
 
-                    maid_mp_random2(words, a, g, b, c);
-                    if (maid_mp_cmp(words, a, b) > 0 ||
-                        maid_mp_cmp(words, a, c) < 0)
-                        fails++;
-
-                    low = 35;
-                    high = 60;
-                    break;
-                case 2:
-                    maid_mp_prime(words, a, g, 64, 16);
-                    maid_mp_prime(words, b, g, 64, 16);
-
-                    /* c = ab */
-                    maid_mp_mov(words, c, a);
-                    maid_mp_mul(words, c, b);
-
-                    /* b = tot(ab) */
-                    maid_mp_mov(words, d, a);
-                    maid_mp_mov(words, z, NULL);
-                    z[0] = 1;
-                    maid_mp_sub(words, b, z);
-                    maid_mp_sub(words, d, z);
-                    maid_mp_mul(words, b, d);
-
-                    /* 2^tot(ab) % ab = 1 */
-                    z[0] = 2;
-                    maid_mp_expmod(words, z, b, c, false);
-                    maid_mp_mov(words, c, NULL);
-                    c[0] = 1;
-                    if (maid_mp_cmp(words, z, c) != 0)
-                        fails++;
-
-                    low = 20;
-                    high = 45;
-                    break;
-            }
-
-            size_t iset = 0;
-            for (size_t i = 0; i < words; i++)
-                for (u8 j = 0; j < sizeof(maid_mp_word) * 8; j++)
-                    if (a[i] & (1ULL << j))
-                        iset++;
-
-            if (iset <= low && iset >= high)
-                fails++;
-            set += iset;
-        }
-
-        set /= 100;
-        size_t mid = low + ((high - low) / 2);
-        if (set < mid - 1 && set > mid + 1)
-            fails++;
-    }
-    if (!fails)
-        ret -= 1;
+    maid_rng_del(g);
 
     return ret;
 }
 
-/* AES NIST SP 800-38A vectors */
-
-static u8
-aes_test(maid_block *bl, char *key_h,
-         char *input_h, char *output_h, bool decrypt)
+extern u8
+maid_test_aes_ecb(void)
 {
-    u8 ret = 0;
+    /* AES NIST SP 800-38A vectors */
 
-    if (bl)
-    {
-        u8    key[32] = {0};
-        u8  input[16] = {0};
-        u8 output[16] = {0};
-
-        hex_read(key,    key_h);
-        hex_read(input,  input_h);
-        hex_read(output, output_h);
-
-        maid_block_renew(bl, key, NULL);
-        maid_block_ecb(bl, input, decrypt);
-        if (memcmp(input, output, sizeof(output)) == 0)
-            ret = 1;
-    }
-
-    return ret;
-}
-
-static u8
-aes_tests(void)
-{
     u8 ret = 24;
 
     char key128[] = "2b7e151628aed2a6abf7158809cf4f3c";
@@ -496,63 +1176,26 @@ aes_tests(void)
                          "b6ed21b99ca6f4f9f153e7b1beafed1d",
                          "23304b7a39f9f3ff067d8d8f9e24ecc7"};
 
-    u8 zeros[32] = {0};
-    maid_block *aes128 = maid_block_new(maid_aes_128, zeros, zeros);
-    maid_block *aes192 = maid_block_new(maid_aes_192, zeros, zeros);
-    maid_block *aes256 = maid_block_new(maid_aes_256, zeros, zeros);
-
     for (u8 i = 0; i < 4; i++)
     {
-        ret -= aes_test(aes128, key128, block[i], cipher128[i], false);
-        ret -= aes_test(aes128, key128, cipher128[i], block[i], true);
+        ret -= test_ecb(maid_aes_128, key128, block[i], cipher128[i], false);
+        ret -= test_ecb(maid_aes_128, key128, cipher128[i], block[i], true);
 
-        ret -= aes_test(aes192, key192, block[i], cipher192[i], false);
-        ret -= aes_test(aes192, key192, cipher192[i], block[i], true);
+        ret -= test_ecb(maid_aes_192, key192, block[i], cipher192[i], false);
+        ret -= test_ecb(maid_aes_192, key192, cipher192[i], block[i], true);
 
-        ret -= aes_test(aes256, key256, block[i], cipher256[i], false);
-        ret -= aes_test(aes256, key256, cipher256[i], block[i], true);
-    }
-
-    maid_block_del(aes128);
-    maid_block_del(aes192);
-    maid_block_del(aes256);
-
-    return ret;
-}
-
-/* AES-CTR NIST SP 800-38A vectors */
-
-static u8
-aes_ctr_test(maid_block *bl, char *key_h, char *iv_h,
-             char *input_h, char *output_h)
-{
-    u8 ret = 0;
-
-    if (bl)
-    {
-        u8    key[32] = {0};
-        u8     iv[16] = {0};
-        u8  input[64] = {0};
-        u8 output[64] = {0};
-
-        hex_read(key,   key_h);
-        hex_read(iv,    iv_h);
-        hex_read(input, input_h);
-
-        size_t length = hex_read(output, output_h);
-
-        maid_block_renew(bl, key, iv);
-        maid_block_ctr(bl, input, length);
-        if (memcmp(input, output, length) == 0)
-            ret = 1;
+        ret -= test_ecb(maid_aes_256, key256, block[i], cipher256[i], false);
+        ret -= test_ecb(maid_aes_256, key256, cipher256[i], block[i], true);
     }
 
     return ret;
 }
 
-static u8
-aes_ctr_tests(void)
+extern u8
+maid_test_aes_ctr(void)
 {
+    /* AES-CTR NIST SP 800-38A vectors */
+
     u8 ret = 6;
 
     char key128[] = "2b7e151628aed2a6abf7158809cf4f3c";
@@ -575,82 +1218,36 @@ aes_ctr_tests(void)
                        "90cacaf5c52b0930daa23de94ce87017ba2d84988ddfc9c58db67a"
                        "ada613c2dd08457941a6";
 
-    u8 zeros[32] = {0};
-    maid_block *aes128 = maid_block_new(maid_aes_128, zeros, zeros);
-    maid_block *aes192 = maid_block_new(maid_aes_192, zeros, zeros);
-    maid_block *aes256 = maid_block_new(maid_aes_256, zeros, zeros);
+    ret -= test_ctr(maid_aes_128, key128, iv, block, cipher128);
+    ret -= test_ctr(maid_aes_128, key128, iv, cipher128, block);
 
-    ret -= aes_ctr_test(aes128, key128, iv, block, cipher128);
-    ret -= aes_ctr_test(aes128, key128, iv, cipher128, block);
+    ret -= test_ctr(maid_aes_192, key192, iv, block, cipher192);
+    ret -= test_ctr(maid_aes_192, key192, iv, cipher192, block);
 
-    ret -= aes_ctr_test(aes192, key192, iv, block, cipher192);
-    ret -= aes_ctr_test(aes192, key192, iv, cipher192, block);
-
-    ret -= aes_ctr_test(aes256, key256, iv, block, cipher256);
-    ret -= aes_ctr_test(aes256, key256, iv, cipher256, block);
-
-    maid_block_del(aes128);
-    maid_block_del(aes192);
-    maid_block_del(aes256);
+    ret -= test_ctr(maid_aes_256, key256, iv, block, cipher256);
+    ret -= test_ctr(maid_aes_256, key256, iv, cipher256, block);
 
     return ret;
 }
 
-/* AES-GCM GCM Spec vectors */
-
-static u8
-aes_gcm_test(maid_aead *ae, char *key_h, char *nonce_h, char *ad_h,
-             char *input_h, char *output_h, char *tag_h)
+extern u8
+maid_test_aes_gcm(void)
 {
-    u8 ret = 0;
+    /* AES-GCM GCM Spec vectors */
 
-    if (ae)
-    {
-        u8    key[32] = {0};
-        u8  nonce[64] = {0};
-        u8     ad[32] = {0};
-        u8  input[64] = {0};
-        u8 output[64] = {0};
-        u8    tag[16] = {0};
-
-        hex_read(key,   key_h);
-        hex_read(nonce, nonce_h);
-        hex_read(input, input_h);
-        hex_read(tag,   tag_h);
-
-        size_t length  = hex_read(output, output_h);
-        size_t length2 = hex_read(ad,     ad_h);
-
-        maid_aead_renew(ae, key, nonce);
-        maid_aead_update(ae, ad, length2);
-        maid_aead_crypt(ae, input, length, false);
-
-        u8 tag2[16] = {0};
-        maid_aead_digest(ae, tag2);
-
-        if (memcmp(input, output, length)  == 0 &&
-            memcmp(tag2, tag, sizeof(tag)) == 0 )
-            ret = 1;
-    }
-
-    return ret;
-}
-
-static u8
-aes_gcm_tests(void)
-{
     u8 ret = 12;
 
-    char  *key_z = (char *)32;
+    char key_z[] = "00000000000000000000000000000000"
+                   "00000000000000000000000000000000";
     char   key[] = "feffe9928665731c6d6a8f9467308308"
                    "feffe9928665731c6d6a8f9467308308";
 
-    char   *iv_z = (char *)12;
+    char  iv_z[] = "000000000000000000000000";
     char iv_96[] = "cafebabefacedbaddecaf888";
 
     char     ad[] = "feedfacedeadbeeffeedfacedeadbeefabaddad2";
 
-    char  *data_z = (char *)16;
+    char  *data_z = "00000000000000000000000000000000";
     char   data[] = "d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8"
                     "a318a721c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba"
                     "637b391aafd255";
@@ -707,67 +1304,33 @@ aes_gcm_tests(void)
     char **ciphers[] = {cipher128, cipher192, cipher256};
     char    **tags[] = {tag128, tag192, tag256};
 
-    u8 zeros[32] = {0};
-    maid_aead *aes128 = maid_aead_new(maid_aes_gcm_128, zeros, zeros);
-    maid_aead *aes192 = maid_aead_new(maid_aes_gcm_192, zeros, zeros);
-    maid_aead *aes256 = maid_aead_new(maid_aes_gcm_256, zeros, zeros);
-    maid_aead *aeads[] = {aes128, aes192, aes256};
-
+    struct maid_aead_def defs[] = {maid_aes_gcm_128,
+                                   maid_aes_gcm_192,
+                                   maid_aes_gcm_256};
     for (u8 i = 0; i < 3; i++)
     {
-        ret -= aes_gcm_test(aeads[i], key_z, iv_z,  "", "",
-                            "",            tags[i][0]);
-        ret -= aes_gcm_test(aeads[i], key_z, iv_z,  "", data_z,
-                            ciphers[i][0], tags[i][1]);
-        ret -= aes_gcm_test(aeads[i], key,   iv_96, "", data,
-                            ciphers[i][1], tags[i][2]),
-        ret -= aes_gcm_test(aeads[i], key,   iv_96, ad, data_s,
-                            ciphers[i][2], tags[i][3]);
-    }
-
-    maid_aead_del(aes128);
-    maid_aead_del(aes192);
-    maid_aead_del(aes256);
-
-    return ret;
-}
-
-/* Chacha20 RFC8439 vectors */
-
-static u8
-chacha_test(maid_stream *st, char *key_h, char *nonce_h,
-            u32 counter, char *input_h, char *output_h)
-{
-    u8 ret = 0;
-
-    if (st)
-    {
-        u8      key[32] = {0};
-        u8    nonce[16] = {0};
-        u8  input[1024] = {0};
-        u8 output[1024] = {0};
-
-        hex_read(key,   key_h);
-        hex_read(nonce, nonce_h);
-        hex_read(input, input_h);
-
-        size_t length = hex_read(output, output_h);
-
-        maid_stream_renew(st, key, nonce, counter);
-        maid_stream_xor(st, input, length);
-        if (memcmp(input, output, length) == 0)
-            ret = 1;
+        ret -= test_aead(defs[i], key_z, iv_z,  "", "",
+                         "",            tags[i][0], false);
+        ret -= test_aead(defs[i], key_z, iv_z,  "", data_z,
+                         ciphers[i][0], tags[i][1], false);
+        ret -= test_aead(defs[i], key,   iv_96, "", data,
+                         ciphers[i][1], tags[i][2], false),
+        ret -= test_aead(defs[i], key,   iv_96, ad, data_s,
+                         ciphers[i][2], tags[i][3], false);
     }
 
     return ret;
 }
 
-static u8
-chacha_tests(void)
+extern u8
+maid_test_chacha(void)
 {
+    /* Chacha20 RFC8439 vectors */
+
     u8 ret = 11;
 
-    char  *key_z = (char *)32;
+    char key_z[] = "00000000000000000000000000000000"
+                   "00000000000000000000000000000000";
     char key_1[] = "00000000000000000000000000000000"
                    "00000000000000000000000000000001";
     char key_f[] = "00ff0000000000000000000000000000"
@@ -777,12 +1340,15 @@ chacha_tests(void)
     char key_r[] = "1c9240a5eb55d38af333888604f6b5f0"
                    "473917c1402b80099dca5cbc207075c0";
 
-    char  *nonce_z = (char *)12;
+    char nonce_z[] = "000000000000000000000000";
     char nonce_2[] = "000000000000000000000002";
     char nonce_a[] = "000000000000004a00000000";
 
-    char  *data_zs = (char *)32;
-    char  *data_zb = (char *)64;
+    char data_zs[] = "00000000000000000000000000000000000000000000000000000000"
+                     "00000000";
+    char data_zb[] = "00000000000000000000000000000000000000000000000000000000"
+                     "00000000000000000000000000000000000000000000000000000000"
+                     "0000000000000000";
     char data_b1[] = "4c616469657320616e642047656e746c656d656e206f662074686520"
                      "636c617373206f66202739393a204966204920636f756c64206f6666"
                      "657220796f75206f6e6c79206f6e652074697020666f722074686520"
@@ -807,7 +1373,6 @@ chacha_tests(void)
                      "696320636f6d6d756e69636174696f6e73206d61646520617420616e"
                      "792074696d65206f7220706c6163652c207768696368206172652061"
                      "646472657373656420746f";
-
     char *ciphers[] = {"6e2e359a2568f98041ba0728dd0d6981e97e7aec1d4360c20a27af"
                        "ccfd9fae0bf91b65c5524733ab8f593dabcd62b3571639d624e651"
                        "52ab8f530c359f0861d807ca0dbf500d6a6156a38e088a22b65e52"
@@ -862,53 +1427,22 @@ chacha_tests(void)
                       data_b3, data_b2, data_zs, data_zs, data_zs};
     int counters[] = {1, 0, 1, 1, 2, 0, 1, 42, 0, 0, 0};
 
-    u8 zeros[32] = {0};
-    maid_stream *st = maid_stream_new(maid_chacha20, zeros, zeros, 0);
     for (u8 i = 0; i < 11; i++)
-        ret -= chacha_test(st, keys[i], nonces[i], counters[i],
-                           datas[i], ciphers[i]);
-    maid_stream_del(st);
+        ret -= test_stream(maid_chacha20, keys[i], nonces[i], counters[i],
+                                datas[i], ciphers[i]);
 
     return ret;
 }
 
-/* Poly1305 RFC8439 vectors */
-
-static u8
-poly1305_test(maid_mac *m, char *key_h, char *input_h, char *tag_h)
+extern u8
+maid_test_poly1305(void)
 {
-    u8 ret = 0;
+    /* Poly1305 RFC8439 vectors */
 
-    if (m)
-    {
-        u8     key[32] = {0};
-        u8 input[1024] = {0};
-        u8     tag[16] = {0};
-
-        hex_read(key, key_h);
-        hex_read(tag, tag_h);
-
-        size_t length = hex_read(input, input_h);
-
-        maid_mac_renew(m, key);
-        maid_mac_update(m, input, length);
-
-        u8 tag2[16] = {0};
-        maid_mac_digest(m, tag2);
-
-        if (memcmp(tag2, tag, sizeof(tag)) == 0)
-            ret = 1;
-    }
-
-    return ret;
-}
-
-static u8
-poly1305_tests(void)
-{
     u8 ret = 11;
 
-    char *keys[] = {(char *)32,
+    char *keys[] = {"00000000000000000000000000000000"
+                    "00000000000000000000000000000000",
                     "00000000000000000000000000000000"
                     "36e5f6b5c5e06070f0efca96227a863e",
                     "36e5f6b5c5e06070f0efca96227a863e"
@@ -930,7 +1464,11 @@ poly1305_tests(void)
                     "01000000000000000400000000000000"
                     "00000000000000000000000000000000"};
 
-    char *datas[] = {(char *)128,
+    char *datas[] = {"00000000000000000000000000000000000000000000000000000000"
+                     "00000000000000000000000000000000000000000000000000000000"
+                     "00000000000000000000000000000000000000000000000000000000"
+                     "00000000000000000000000000000000000000000000000000000000"
+                     "00000000000000000000000000000000",
                      "416e79207375626d697373696f6e20746f2074686520494554462069"
                      "6e74656e6465642062792074686520436f6e7472696275746f722066"
                      "6f72207075626c69636174696f6e20617320616c6c206f7220706172"
@@ -977,73 +1515,29 @@ poly1305_tests(void)
                      "e33594d7505e43b900000000000000003394d7505e4379cd01000000"
                      "0000000000000000000000000000000000000000"};
 
-    char *tags[] = {(char *)16,
+    char *tags[] = {"00000000000000000000000000000000",
                     "36e5f6b5c5e06070f0efca96227a863e",
                     "f3477e7cd95417af89a6b8794c310cf0",
                     "4541669a7eaaee61e708dc7cbcc5eb62",
                     "03000000000000000000000000000000",
                     "03000000000000000000000000000000",
                     "05000000000000000000000000000000",
-                    (char *)16,
+                    "00000000000000000000000000000000",
                     "faffffffffffffffffffffffffffffff",
                     "14000000000000005500000000000000",
                     "13000000000000000000000000000000"};
 
-    u8 zeros[32] = {0};
-    maid_mac *m = maid_mac_new(maid_poly1305, zeros);
-
     for (u8 i = 0; i < 11; i++)
-        ret -= poly1305_test(m, keys[i], datas[i], tags[i]);
-
-    maid_mac_del(m);
+        ret -= test_mac(maid_poly1305, keys[i], datas[i], tags[i]);
 
     return ret;
 }
 
-/* Chacha20Poly1305 RFC8439 vectors */
-
-static u8
-chacha20poly1305_test(maid_aead *ae, char *key_h, char *nonce_h,
-                      char *ad_h, char *input_h, char *output_h,
-                      char *tag_h, bool decrypt)
+extern u8
+maid_test_chacha20poly1305(void)
 {
-    u8 ret = 0;
+    /* Chacha20Poly1305 RFC8439 vectors */
 
-    if (ae)
-    {
-        u8      key[32] = {0};
-        u8    nonce[12] = {0};
-        u8       ad[16] = {0};
-        u8  input[1024] = {0};
-        u8 output[1024] = {0};
-        u8      tag[16] = {0};
-
-        hex_read(key,    key_h);
-        hex_read(nonce,  nonce_h);
-        hex_read(output, output_h);
-        hex_read(tag,    tag_h);
-
-        size_t length  = hex_read(input, input_h);
-        size_t length2 = hex_read(ad,    ad_h);
-
-        maid_aead_renew(ae, key, nonce);
-        maid_aead_update(ae, ad, length2);
-        maid_aead_crypt(ae, input, length, decrypt);
-
-        u8 tag2[16] = {0};
-        maid_aead_digest(ae, tag2);
-
-        if (memcmp(input, output, length)   == 0 &&
-            memcmp(tag2, tag, sizeof(tag)) == 0 )
-            ret = 1;
-    }
-
-    return ret;
-}
-
-static u8
-chacha20poly1305_tests(void)
-{
     u8 ret = 2;
 
     char   *keys[] = {"808182838485868788898a8b8c8d8e8f"
@@ -1090,47 +1584,18 @@ chacha20poly1305_tests(void)
                     "eead9d67890cbb22392336fea1851f38"};
     bool modes[] = {false, true};
 
-    u8 zeros[32] = {0};
-    maid_aead *ae = maid_aead_new(maid_chacha20poly1305, zeros, zeros);
-
     for (u8 i = 0; i < 2; i++)
-        ret -= chacha20poly1305_test(ae, keys[i], nonces[i], ads[i],
-                                     inputs[i], outputs[i], tags[i], modes[i]);
-
-    maid_aead_del(ae);
+        ret -= test_aead(maid_chacha20poly1305, keys[i], nonces[i],
+                         ads[i], inputs[i], outputs[i], tags[i], modes[i]);
 
     return ret;
 }
 
-/* CTR-DRBG NIST CAVP vectors */
-
-static u8
-ctr_drbg_test(maid_rng *g, char *entropy_h, char *output_h)
+extern u8
+maid_test_ctr_drbg(void)
 {
-    u8 ret = 0;
+    /* CTR-DRBG NIST CAVP vectors */
 
-    if (g)
-    {
-        u8 entropy[48] = {0};
-        u8 output[128] = {0};
-
-        hex_read(entropy, entropy_h);
-        hex_read(output,  output_h);
-
-        u8 input[128] = {0};
-        maid_rng_renew(g, entropy);
-        maid_rng_generate(g, input, sizeof(input));
-
-        if (memcmp(input, output, sizeof(output)) == 0)
-            ret = 1;
-    }
-
-    return ret;
-}
-
-static u8
-ctr_drbg_tests(void)
-{
     u8 ret = 9;
 
     char *entropy128[] = {"ce50f33da5d4c1d3d4004eb35244b7f2"
@@ -1232,72 +1697,50 @@ ctr_drbg_tests(void)
                          "20646c3466bde247c0633153d23194cf"
                          "aca0772d1396209ec9e7506ba23d75dc"};
 
-    u8 zeros[48] = {0};
-    maid_rng *aes128 = maid_rng_new(maid_ctr_drbg_aes_128, zeros);
-    maid_rng *aes192 = maid_rng_new(maid_ctr_drbg_aes_192, zeros);
-    maid_rng *aes256 = maid_rng_new(maid_ctr_drbg_aes_256, zeros);
-
     for (u8 i = 0; i < 3; i++)
     {
-        ret -= ctr_drbg_test(aes128, entropy128[i], output128[i]);
-        ret -= ctr_drbg_test(aes192, entropy192[i], output192[i]);
-        ret -= ctr_drbg_test(aes256, entropy256[i], output256[i]);
-    }
-
-    maid_rng_del(aes128);
-    maid_rng_del(aes192);
-    maid_rng_del(aes256);
-
-    return ret;
-}
-
-/* SHA-2 NIST CSRC examples */
-
-static u8
-sha_test(maid_hash *h, char *input, char *output_h)
-{
-    u8 ret = 0;
-
-    if (h)
-    {
-        u8 output[128] = {0};
-
-        size_t length  = strlen(input);
-        size_t length2 = hex_read(output, output_h);
-
-        u8 output2[128] = {0};
-        maid_hash_renew(h);
-        maid_hash_update(h, (u8*)input, length);
-        maid_hash_digest(h, output2);
-
-        if (memcmp(output, output2, length2) == 0)
-            ret = 1;
+        ret -= test_rng(maid_ctr_drbg_aes_128, entropy128[i], output128[i]);
+        ret -= test_rng(maid_ctr_drbg_aes_192, entropy192[i], output192[i]);
+        ret -= test_rng(maid_ctr_drbg_aes_256, entropy256[i], output256[i]);
     }
 
     return ret;
 }
 
-static u8
-sha_tests(void)
+extern u8
+maid_test_sha1(void)
 {
-    u8 ret = 14;
+    u8 ret = 2;
 
-    maid_hash *sha1       = maid_hash_new(maid_sha1);
-    maid_hash *sha224     = maid_hash_new(maid_sha224);
-    maid_hash *sha256     = maid_hash_new(maid_sha256);
-    maid_hash *sha384     = maid_hash_new(maid_sha384);
-    maid_hash *sha512     = maid_hash_new(maid_sha512);
-    maid_hash *sha512_224 = maid_hash_new(maid_sha512_224);
-    maid_hash *sha512_256 = maid_hash_new(maid_sha512_256);
+    char *input0 = "616263";
+    char *input1 = "6162636462636465636465666465666765666768666768696768696a"
+                   "68696a6b696a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071";
 
-    char *input0 = "abc";
-    char *input1 = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    char *input2 = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmn"
-                   "hijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";
+    char *outputs0 = "a9993e364706816aba3e25717850c26c9cd0d89d";
+    char *outputs1 = "84983e441c3bd26ebaae4aa1f95129e5e54670f1";
 
-    char *outputs0[] = {"a9993e364706816aba3e25717850c26c"
-                        "9cd0d89d",
-                        "23097d223405d8228642a477bda255b3"
+    ret -= test_hash(maid_sha1, input0, outputs0);
+    ret -= test_hash(maid_sha1, input1, outputs1);
+
+    return ret;
+}
+
+extern u8
+maid_test_sha2(void)
+{
+    /* SHA-2 NIST CSRC examples */
+
+    u8 ret = 12;
+
+    char *input0 = "616263";
+    char *input1 = "6162636462636465636465666465666765666768666768696768696a"
+                   "68696a6b696a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071";
+    char *input2 = "61626364656667686263646566676869636465666768696a64656667"
+                   "68696a6b65666768696a6b6c666768696a6b6c6d6768696a6b6c6d6e"
+                   "68696a6b6c6d6e6f696a6b6c6d6e6f706a6b6c6d6e6f70716b6c6d6e"
+                   "6f7071726c6d6e6f707172736d6e6f70717273746e6f707172737475";
+
+    char *outputs0[] = {"23097d223405d8228642a477bda255b3"
                         "2aadbce4bda0b3f7e36c9da7",
                         "ba7816bf8f01cfea414140de5dae2223"
                         "b00361a396177a9cb410ff61f20015ad",
@@ -1312,9 +1755,7 @@ sha_tests(void)
                         "0e37ed265ceee9a43e8924aa",
                         "53048e2681941ef99b2e29b76b4c7dab"
                         "e4c2d0c634fc6d46e0e2f13107e7af23"};
-    char *outputs1[] = {"84983e441c3bd26ebaae4aa1f95129e5"
-                        "e54670f1",
-                        "75388b16512776cc5dba5da1fd890150"
+    char *outputs1[] = {"75388b16512776cc5dba5da1fd890150"
                         "b0c6455cb4f58b1952522525",
                         "248d6a61d20638b8e5c026930c3e6039"
                         "a33ce45964ff2167f6ecedd419db06c1"};
@@ -1330,74 +1771,63 @@ sha_tests(void)
                         "3928e184fb8690f840da3988121d31be"
                         "65cb9d3ef83ee6146feac861e19b563a"};
 
-    maid_hash *hashes256[] = {sha1, sha224, sha256};
-    for (u8 i = 0; i < 3; i++)
+    struct maid_hash_def defs256[] = {maid_sha224, maid_sha256};
+
+    for (u8 i = 0; i < 2; i++)
     {
-        ret -= sha_test(hashes256[i], input0, outputs0[i]);
-        ret -= sha_test(hashes256[i], input1, outputs1[i]);
+        ret -= test_hash(defs256[i], input0, outputs0[i]);
+        ret -= test_hash(defs256[i], input1, outputs1[i]);
     }
 
-    maid_hash *hashes512[] = {sha384, sha512, sha512_224, sha512_256};
+    struct maid_hash_def defs512[] = {maid_sha384,     maid_sha512,
+                                      maid_sha512_224, maid_sha512_256};
+
     for (u8 i = 0; i < 4; i++)
     {
-        ret -= sha_test(hashes512[i], input0, outputs0[i + 3]);
-        ret -= sha_test(hashes512[i], input2, outputs2[i + 0]);
-    }
-
-    maid_hash_del(sha1);
-    maid_hash_del(sha224);
-    maid_hash_del(sha256);
-    maid_hash_del(sha384);
-    maid_hash_del(sha512);
-    maid_hash_del(sha512_224);
-    maid_hash_del(sha512_256);
-
-    return ret;
-}
-
-/* HMAC RFC2202 and RFC4231 test vectors +
- * comparison with other implementations */
-
-static u8
-hmac_test(maid_mac *m, char *key_h, char *input_h, char *tag_h)
-{
-    u8 ret = 0;
-
-    if (m)
-    {
-        u8    key[128] = {0};
-        u8 input[1024] = {0};
-        u8     tag[64] = {0};
-
-        hex_read(key, key_h);
-        hex_read(tag, tag_h);
-
-        size_t length  = hex_read(input, input_h);
-        size_t length2 = hex_read(tag,   tag_h);
-
-        maid_mac_renew(m, key);
-        maid_mac_update(m, input, length);
-
-        u8 tag2[64] = {0};
-        maid_mac_digest(m, tag2);
-
-        if (memcmp(tag2, tag, length2) == 0)
-            ret = 1;
+        ret -= test_hash(defs512[i], input0, outputs0[i + 2]);
+        ret -= test_hash(defs512[i], input2, outputs2[i + 0]);
     }
 
     return ret;
 }
 
-static u8
-hmac_tests(void)
+extern u8
+maid_test_hmac_sha1(void)
 {
-    u8 ret = 7;
+    /* HMAC RFC2202 test vectors */
 
-    char *key = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b";
+    u8 ret = 1;
+
+    char *key = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0000000000000000"
+                "00000000000000000000000000000000000000000000000000000000"
+                "0000000000000000";
     char *data = "4869205468657265";
+    char *tag = "b617318655057264e28bc0b6fb378c8ef146be00";
 
-    char *tags[] = {"b617318655057264e28bc0b6fb378c8e"
-                    "f146be00",
+    ret -= test_mac(maid_hmac_sha1, key, data, tag);
+
+    return ret;
+}
+
+extern u8
+maid_test_hmac_sha2(void)
+{
+    /* HMAC RFC4231 test vectors +
+     * comparison with other implementations */
+
+    u8 ret = 6;
+
+    char *keys[] = {"0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0000000000000000"
+                    "00000000000000000000000000000000000000000000000000000000"
+                    "0000000000000000",
+                    "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0000000000000000"
+                    "00000000000000000000000000000000000000000000000000000000"
+                    "00000000000000000000000000000000000000000000000000000000"
+                    "00000000000000000000000000000000000000000000000000000000"
+                    "00000000000000000000000000000000"};
+    char *data    = "4869205468657265";
+
+    char *tags[] = {
                     "896fb1128abbdf196832107cd49df33f"
                     "47b4b1169912ba4f53684b22",
                     "b0344c61d8db38535ca8afceaf0bf12b"
@@ -1414,83 +1844,22 @@ hmac_tests(void)
                     "9f9126c3d9c3c330d760425ca8a217e3"
                     "1feae31bfe70196ff81642b868402eab"};
 
-    u8 zeros[128] = {0};
-    maid_mac *macs[] = {maid_mac_new(maid_hmac_sha1,       zeros),
-                        maid_mac_new(maid_hmac_sha224,     zeros),
-                        maid_mac_new(maid_hmac_sha256,     zeros),
-                        maid_mac_new(maid_hmac_sha384,     zeros),
-                        maid_mac_new(maid_hmac_sha512,     zeros),
-                        maid_mac_new(maid_hmac_sha512_224, zeros),
-                        maid_mac_new(maid_hmac_sha512_256, zeros)};
-
-    for (u8 i = 0; i < 7; i++)
-        ret -= hmac_test(macs[i], key, data, tags[i]);
-
-    for (u8 i = 0; i < 7; i++)
-        maid_mac_del(macs[i]);
+    ret -= test_mac(maid_hmac_sha224,     keys[0], data, tags[0]);
+    ret -= test_mac(maid_hmac_sha256,     keys[0], data, tags[1]);
+    ret -= test_mac(maid_hmac_sha384,     keys[1], data, tags[2]);
+    ret -= test_mac(maid_hmac_sha512,     keys[1], data, tags[3]);
+    ret -= test_mac(maid_hmac_sha512_224, keys[1], data, tags[4]);
+    ret -= test_mac(maid_hmac_sha512_256, keys[1], data, tags[5]);
 
     return ret;
 }
 
-
-/* RSA Primitives NIST test vectors */
-
-static u8
-rsa_test(maid_pub *pub, maid_pub *prv, char *e_h, char *d_h, char *N_h,
-         char *input_h, char *output_h)
+extern u8
+maid_test_rsa(void)
 {
-    u8 ret = 0;
+    /* RSA Primitives NIST test vectors */
 
-    if (pub && prv)
-    {
-        u8 e8    [128] = {0};
-        u8 d8    [128] = {0};
-        u8 N8    [128] = {0};
-        u8 input [128] = {0};
-        u8 output[128] = {0};
-
-        hex_read(e8,     e_h);
-        hex_read(d8,     d_h);
-        hex_read(N8,     N_h);
-        hex_read(input,  input_h);
-        hex_read(output, output_h);
-
-        size_t words = maid_mp_words(1024);
-        maid_mp_word e[words], d[words], N[words];
-        maid_mp_read(words, e, e8, true);
-        maid_mp_read(words, d, d8, true);
-        maid_mp_read(words, N, N8, true);
-
-        struct maid_rsa_key pub_k = {.exponent = e, .modulo = N};
-        struct maid_rsa_key prv_k = {.exponent = d, .modulo = N};
-        maid_pub_renew(pub, &pub_k);
-        maid_pub_renew(prv, &prv_k);
-
-        u8 tmp[128] = {0};
-        memcpy(tmp, input, sizeof(input));
-        maid_pub_apply(pub, tmp);
-
-        if (memcmp(tmp, output, sizeof(output)) == 0)
-        {
-            maid_pub_apply(prv, tmp);
-            ret = memcmp(tmp, input, sizeof(input)) == 0;
-        }
-    }
-
-    return ret;
-}
-
-static u8
-rsa_tests(void)
-{
     u8 ret = 1;
-
-    u8 zeros[128] = {0};
-    struct maid_rsa_key zkey = {.exponent = (void *)zeros,
-                                .modulo   = (void *)zeros};
-
-    maid_pub *pub = maid_pub_new(maid_rsa_public,  &zkey, 1024);
-    maid_pub *prv = maid_pub_new(maid_rsa_private, &zkey, 1024);
 
     char *e[] =
         {"0000000000000000000000000000000000000000859e499b8a186c8ee6196954"
@@ -1519,52 +1888,16 @@ rsa_tests(void)
          "80f0f8c4e855321ffed89767fc9d4a8a27a5d82ba450b2478c21e11843c2f539"};
 
     for (u8 i = 0; i < 1; i++)
-        ret -= rsa_test(pub, prv, e[i], d[i], n[i], input[i], output[i]);
-
-    maid_pub_del(pub);
-    maid_pub_del(prv);
+        ret -= test_rsa(1024, e[i], d[i], n[i], input[i], output[i]);
 
     return ret;
 }
 
-/* PKCS1 NIST test vectors */
-
-static u8
-pkcs1_test(struct maid_sign_def def, maid_pub *pub, maid_pub *prv,
-           char *input_h, char *output_h)
+extern u8
+maid_test_pkcs1(void)
 {
-    u8 ret = 0;
+    /* PKCS1 NIST test vectors */
 
-    if (pub && prv)
-    {
-        u8 input [256] = {0};
-        u8 output[256] = {0};
-
-        hex_read(input,  input_h);
-        hex_read(output, output_h);
-
-        maid_sign *s = maid_sign_new(def, NULL, NULL, 2048);
-        maid_sign_renew(s, pub, prv);
-
-        u8 tmp[256] = {0};
-        memcpy(tmp, input, sizeof(input));
-        maid_sign_generate(s, tmp);
-
-        if (memcmp(tmp, output, sizeof(output)) == 0)
-        {
-            if (maid_sign_verify(s, tmp))
-                ret = memcmp(tmp, input, sizeof(input)) == 0;
-        }
-
-        maid_sign_del(s);
-    }
-
-    return ret;
-}
-
-static u8
-pkcs1_tests(void)
-{
     u8 ret = 7;
 
     char *e[] = {
@@ -1617,7 +1950,7 @@ pkcs1_tests(void)
          "dd330584adcae17f1458bcb2ab43e3929cbef840e9999bf0eb5601e88ff8758d"
          "b564a756346d65d8c55f1b11b9b092fca7f6b2394ebc3109b3d02ec5a0967ea6"
          "45d127fe0fb9f9fa71637ac6f0b92671809f4aad1278a6cb5e8a7247fe53afdf"};
-    char *n[] = {
+    char *N[] = {
          "e0b14b99cd61cd3db9c2076668841324fa3174f33ce66ffd514394d34178d29a"
          "49493276b6777233e7d46a3e68bc7ca7e899e901d54f6dee0749c3e48ddf6868"
          "5867ee2ae66df88eb563f6db137a9f6b175a112e0eda8368e88e45efe1ce14bc"
@@ -1643,7 +1976,7 @@ pkcs1_tests(void)
          "4e5e4ccadaf160de7f2d69c84009d31e952ac808c89a784be70cf60f42811928"
          "abdec6f896a0fa5fb164f9f4298a5a8831f6684dae31f2e76146d6be14c3ea7d"};
 
-    char *input[] =
+    char *in[] =
         {"07c9e2f4386bc85f2c41728948b82a5591011db7",
          "c34b1a0d795dae5b88559191bb2c1cb75a5fd1d18b5002074560e6ad",
          "077877895a428028f60998b985550820025a2a42c0beab27165c0802d3098150",
@@ -1653,7 +1986,7 @@ pkcs1_tests(void)
          "a652275e1cfd10f276e1c2f51c6d9b13a06399407baf2b3d9bf468eef0d2c4d8",
          "2c0a4d9ce74063da224a7955a045c05bdadf481125f5797fc2e03c59",
          "1ca543685a5698ea6b4f91afeae507e895497e0037c8f074300c96a8af0640b2"};
-    char *output[] =
+    char *out[] =
         {"d0d03ccb3b30b7c9c4d6eeee2ec26d069246e019fb8fa2f3a9b72c9bbe231d93"
          "ce053df805a045e2ef6bd8d08bfb0c36922e5a6f10b947b2607f596b6cbd3c9e"
          "efef56f5396805e8b28b1ca182c78c0b12b9796aa856af69c35504f8acc7afa7"
@@ -1711,115 +2044,28 @@ pkcs1_tests(void)
          "6a3a07c7d204eb0f53ac94a5e3bc69d8c49cf1bfa4ee9c1e4c077c5a18296bef"
          "3a0db41524feee3cc83c2c2642c633436e635f11b43056c8c590f02ba3d2dfae"};
 
-    u8 e8[256] = {0};
-    u8 d8[256] = {0};
-    u8 n8[256] = {0};
-
-    size_t words = maid_mp_words(2048);
-    maid_mp_word ee[words];
-    maid_mp_word dd[words];
-    maid_mp_word nn[words];
-
     struct maid_sign_def defs[] =
         {maid_pkcs1_v1_5_sha1,
          maid_pkcs1_v1_5_sha224,     maid_pkcs1_v1_5_sha256,
          maid_pkcs1_v1_5_sha384,     maid_pkcs1_v1_5_sha512,
          maid_pkcs1_v1_5_sha512_224, maid_pkcs1_v1_5_sha512_256};
 
-    struct maid_rsa_key pub_key = {.exponent = ee, .modulo = nn};
-    struct maid_rsa_key prv_key = {.exponent = dd, .modulo = nn};
-
-    hex_read(e8, e[0]);
-    hex_read(d8, d[0]);
-    hex_read(n8, n[0]);
-
-    maid_mp_read(words, ee, e8, true);
-    maid_mp_read(words, dd, d8, true);
-    maid_mp_read(words, nn, n8, true);
-
-    maid_pub *pub = maid_pub_new(maid_rsa_public,  &pub_key, 2048);
-    maid_pub *prv = maid_pub_new(maid_rsa_private, &prv_key, 2048);
-
     for (u8 i = 0; i < 1; i++)
-        ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
-
-    hex_read(e8, e[1]);
-    hex_read(d8, d[1]);
-    hex_read(n8, n[1]);
-
-    maid_mp_read(words, ee, e8, true);
-    maid_mp_read(words, dd, d8, true);
-    maid_mp_read(words, nn, n8, true);
-
-    maid_pub_renew(pub, &pub_key);
-    maid_pub_renew(prv, &prv_key);
-
+        ret -= test_pkcs1(defs[i], 2048, e[0], d[0], N[0], in[i], out[i]);
     for (u8 i = 1; i < 5; i++)
-        ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
-
-    hex_read(e8, e[2]);
-    hex_read(d8, d[2]);
-    hex_read(n8, n[2]);
-
-    maid_mp_read(words, ee, e8, true);
-    maid_mp_read(words, dd, d8, true);
-    maid_mp_read(words, nn, n8, true);
-
-    maid_pub_renew(pub, &pub_key);
-    maid_pub_renew(prv, &prv_key);
+        ret -= test_pkcs1(defs[i], 2048, e[1], d[1], N[1], in[i], out[i]);
     for (u8 i = 5; i < 7; i++)
-        ret -= pkcs1_test(defs[i], pub, prv, input[i], output[i]);
-
-    maid_pub_del(pub);
-    maid_pub_del(prv);
+        ret -= test_pkcs1(defs[i], 2048, e[2], d[2], N[2], in[i], out[i]);
 
     return ret;
 }
 
-/* KAS FFC NIST test vectors */
-
-static u8
-dh_test(maid_kex *x, struct maid_dh_group *g, char *prv_h,
-        char *pub_h, char *pub2_h, char *secret_h)
+extern u8
+maid_test_dh(void)
 {
-    u8 ret = 0;
+    /* KAS FFC NIST test vectors */
 
-    if (x && g)
-    {
-        u8 prv   [256] = {0};
-        u8 pub   [256] = {0};
-        u8 pub2  [256] = {0};
-        u8 secret[256] = {0};
-
-        hex_read(prv,    prv_h);
-        hex_read(pub,    pub_h);
-        hex_read(pub2,   pub2_h);
-        hex_read(secret, secret_h);
-
-        maid_kex_renew(x, g);
-
-        u8 tmp[256] = {0};
-        maid_kex_gpub(x, prv, tmp);
-        if (memcmp(tmp, pub, sizeof(tmp)) == 0)
-        {
-            maid_kex_gsec(x, prv, pub2, tmp);
-            ret = memcmp(tmp, secret, sizeof(tmp)) == 0;
-        }
-    }
-
-    return ret;
-}
-
-static u8
-dh_tests(void)
-{
     u8 ret = 1;
-
-    u8 zeros[256] = {0};
-    struct maid_dh_group zgroup = {.generator = (void *)zeros,
-                                   .modulo    = (void *)zeros};
-
-    maid_kex *x = maid_kex_new(maid_dh, &zgroup, 2048);
 
     char *g[] =
         {"4a1af3a492e9ee746e57d58c2c5b41415ed45519dcd93291f7fdc257ff0314db"
@@ -1839,22 +2085,6 @@ dh_tests(void)
          "72ff263b6b6c6f73def29029e06132c412740952ecf31ba64598acf91c658e3a"
          "91844b238ab23cc9faeaf138ced805e0fa44681febd957b84a975b88c5f1bbb0"
          "49c3917cd313b947bb918fe52607aba9c5d03d954126929d1367f27e1188dc2d"};
-
-    u8 g8[256] = {0};
-    u8 p8[256] = {0};
-
-    hex_read(g8, g[0]);
-    hex_read(p8, p[0]);
-
-    size_t words = maid_mp_words(2048);
-    maid_mp_word gg[words];
-    maid_mp_word pp[words];
-
-    maid_mp_read(words, gg, g8, true);
-    maid_mp_read(words, pp, p8, true);
-
-    struct maid_dh_group group = {.generator = gg, .modulo = pp};
-
     char *prv[] =
         {"0000000000000000000000000000000000000000000000000000000000000000"
          "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1893,19 +2123,17 @@ dh_tests(void)
          "434705649d687885cc2477aa4c088d47339548926b9f7a17138267f3e45589db"};
 
     for (u8 i = 0; i < 1; i++)
-        ret -= dh_test(x, &group, prv[i], pub[i], pub2[i], secret[i]);
-
-    maid_kex_del(x);
+        ret -= test_dh(2048, g[i], p[i], prv[i], pub[i], pub2[i], secret[i]);
 
     return ret;
 }
 
-/* PEM encoding RFC 7468 examples, and OpenSSL generated keys */
-
-static u8
-serial_tests(void)
+extern u8
+maid_test_pem(void)
 {
-    u8 ret = 10;
+    /* PEM encoding RFC 7468 examples */
+
+    u8 ret = 1;
 
     const char *full =
         "This is a test\n"
@@ -1929,119 +2157,42 @@ serial_tests(void)
         "H0M6xpM2q+53wmsN/eYLdgtjgBd3DBmHtPilCkiFICXyaA8z9LkJ\n"
         "-----END PRIVATE KEY-----\n";
 
-    enum maid_pem_t pem_type = MAID_PEM_PUBLIC;
-    u8 pem_data[] =
-        {0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d,
-         0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22, 0x03, 0x62,
-         0x00, 0x04, 0x9f, 0x52, 0xe5, 0xc0, 0xb3, 0x7f, 0x28, 0x16, 0x10,
-         0x45, 0x51, 0xfa, 0x1d, 0xf2, 0x0c, 0x4f, 0x37, 0xc4, 0xa8, 0x93,
-         0x95, 0xce, 0xd2, 0xde, 0x90, 0xb7, 0x21, 0xa7, 0x68, 0x62, 0xef,
-         0xc7, 0x02, 0x68, 0xc6, 0x3c, 0xd4, 0x50, 0x65, 0x62, 0xcf, 0x09,
-         0xf6, 0x5e, 0xe4, 0xad, 0xcf, 0x8c, 0xe1, 0xa0, 0x5e, 0x08, 0x66,
-         0x05, 0x8d, 0xb6, 0xbe, 0x86, 0x25, 0xed, 0xb4, 0x95, 0x8f, 0x2f,
-         0xbc, 0x9d, 0x94, 0x4f, 0xb9, 0x50, 0x6e, 0x14, 0x36, 0x49, 0xf7,
-         0x12, 0x8b, 0x3c, 0x12, 0x26, 0x41, 0xca, 0x2f, 0x43, 0x56, 0xcc,
-         0x9f, 0xcb, 0xd7, 0x9e, 0x8e, 0x1f, 0xbc, 0x01, 0x78, 0x29};
-    const char *pem_export =
+    enum maid_pem_t type[] = {MAID_PEM_PUBLIC, MAID_PEM_PRIVATE};
+    char *data[] = {
+        "3076301006072a8648ce3d020106052b81040022036200049f52e5c0b37f281610"
+        "4551fa1df20c4f37c4a89395ced2de90b721a76862efc70268c63cd4506562cf09"
+        "f65ee4adcf8ce1a05e0866058db6be8625edb4958f2fbc9d944fb9506e143649f7"
+        "128b3c122641ca2f4356cc9fcbd79e8e1fbc017829",
+        "308184020100301006072a8648ce3d020106052b8104000a046d306b0201010420"
+        "55c07f50d3f16a547dcc36008d021f8e88d40e242e1a7489ac5104cd93d3ffdda1"
+        "44034200049ced426d82717f69ba9633ad13dd734913306fe5ecfd4ddc0a1f433a"
+        "c69336abee77c26b0dfde60b760b638017770c1987b4f8a50a48852025f2680f33"
+        "f4b909"};
+    char *export[] = {
         "-----BEGIN PUBLIC KEY-----\n"
         "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEn1LlwLN/KBYQRVH6HfIMTzfEqJOVztLe\n"
         "kLchp2hi78cCaMY81FBlYs8J9l7krc+M4aBeCGYFjba+hiXttJWPL7ydlE+5UG4U\n"
         "Nkn3Eos8EiZByi9DVsyfy9eejh+8AXgp\n"
-        "-----END PUBLIC KEY-----\n";
-
-    enum maid_pem_t pem2_type = MAID_PEM_PRIVATE;
-    u8 pem2_data[] =
-        {0x30, 0x81, 0x84, 0x02, 0x01, 0x00, 0x30, 0x10, 0x06, 0x07, 0x2a,
-         0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b, 0x81, 0x04,
-         0x00, 0x0a, 0x04, 0x6d, 0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20,
-         0x55, 0xc0, 0x7f, 0x50, 0xd3, 0xf1, 0x6a, 0x54, 0x7d, 0xcc, 0x36,
-         0x00, 0x8d, 0x02, 0x1f, 0x8e, 0x88, 0xd4, 0x0e, 0x24, 0x2e, 0x1a,
-         0x74, 0x89, 0xac, 0x51, 0x04, 0xcd, 0x93, 0xd3, 0xff, 0xdd, 0xa1,
-         0x44, 0x03, 0x42, 0x00, 0x04, 0x9c, 0xed, 0x42, 0x6d, 0x82, 0x71,
-         0x7f, 0x69, 0xba, 0x96, 0x33, 0xad, 0x13, 0xdd, 0x73, 0x49, 0x13,
-         0x30, 0x6f, 0xe5, 0xec, 0xfd, 0x4d, 0xdc, 0x0a, 0x1f, 0x43, 0x3a,
-         0xc6, 0x93, 0x36, 0xab, 0xee, 0x77, 0xc2, 0x6b, 0x0d, 0xfd, 0xe6,
-         0x0b, 0x76, 0x0b, 0x63, 0x80, 0x17, 0x77, 0x0c, 0x19, 0x87, 0xb4,
-         0xf8, 0xa5, 0x0a, 0x48, 0x85, 0x20, 0x25, 0xf2, 0x68, 0x0f, 0x33,
-         0xf4, 0xb9, 0x09};
-    const char *pem2_export =
+        "-----END PUBLIC KEY-----\n",
         "-----BEGIN PRIVATE KEY-----\n"
         "MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgVcB/UNPxalR9zDYAjQIf\n"
         "jojUDiQuGnSJrFEEzZPT/92hRANCAASc7UJtgnF/abqWM60T3XNJEzBv5ez9TdwK\n"
         "H0M6xpM2q+53wmsN/eYLdgtjgBd3DBmHtPilCkiFICXyaA8z9LkJ\n"
-        "-----END PRIVATE KEY-----\n";
+        "-----END PRIVATE KEY-----\n"};
 
-    u8            types[] = {pem_type, pem2_type};
-    u8           *datas[] = {pem_data, pem2_data};
-    size_t        sizes[] = {sizeof(pem_data), sizeof(pem2_data)};
-    const char *exports[] = {pem_export, pem2_export};
+    ret -= test_pem(full, 2, type, data, export);
 
-    const char *current = full;
-    const char *endptr = NULL;
+    return ret;
+}
 
-    int i = 0;
-    do
-    {
-        struct maid_pem *p = maid_pem_import(current, &endptr);
+extern u8
+maid_test_serial_rsa(void)
+{
+    /* Comparison with OpenSSL */
 
-        if (p)
-        {
-            if (i < 2)
-            {
-                u8 type = types[i];
-                u8 *data = datas[i];
-                size_t size = sizes[i];
-                const char *export = exports[i];
+    u8 ret = 2;
 
-                ret -= p->type == type;
-                ret -= memcmp(p->data, data, size) == 0;
-                ret -= p->size == size;
-
-                char *s_export = maid_pem_export(p);
-                if (s_export)
-                    ret -= strcmp(s_export, export) == 0;
-                free(s_export);
-            }
-        }
-        else
-            break;
-
-        maid_pem_free(p);
-        current = endptr;
-        i++;
-    } while (endptr && *endptr != '\0');
-
-    /* Tests with actual keys */
-
-    const u8 hash[256 / 8] =
-        {0x35, 0x5c, 0xd8, 0x22, 0x9d, 0x6d, 0x67, 0xa9, 0xfd, 0x82, 0xff, 0x31,
-         0xa7, 0x7d, 0x56, 0x36, 0x83, 0x1a, 0x2f, 0xd8, 0xfc, 0x00, 0x7e, 0x46,
-         0x48, 0x74, 0x88, 0xe5, 0x21, 0x3e, 0x5d, 0x7a};
-    const u8 sign[2048 / 8] =
-        {0x2d, 0x43, 0x2e, 0x7d, 0x7a, 0x18, 0x7f, 0x8e, 0x2f, 0x3a, 0xd3, 0x70,
-         0x6c, 0xfb, 0x71, 0x1d, 0xf4, 0x7b, 0xa7, 0x77, 0xdb, 0xcb, 0xa7, 0xcc,
-         0x3b, 0x9b, 0xc5, 0x01, 0xf0, 0xa5, 0xad, 0x65, 0x09, 0x28, 0xec, 0xb7,
-         0x42, 0x2e, 0xbf, 0xc2, 0x74, 0x95, 0x3d, 0xa5, 0xda, 0xd5, 0x8f, 0xac,
-         0xc9, 0xcd, 0xe6, 0x58, 0x9f, 0x00, 0xf0, 0x93, 0x60, 0x39, 0xa4, 0x76,
-         0x97, 0x27, 0xd9, 0x17, 0x6e, 0xd8, 0x3d, 0xf2, 0x26, 0x68, 0x67, 0x82,
-         0xe2, 0x7b, 0x2e, 0xcc, 0x6e, 0x34, 0x78, 0x9b, 0xdb, 0xe8, 0x42, 0xd8,
-         0x29, 0xf3, 0x22, 0xf4, 0x96, 0xab, 0xff, 0x3a, 0x4d, 0x4b, 0xb1, 0xcd,
-         0x0a, 0xa6, 0xed, 0x3f, 0x58, 0xfd, 0x5c, 0x60, 0xc1, 0x7b, 0xb7, 0xc2,
-         0xfb, 0x0c, 0x25, 0x0a, 0x25, 0x30, 0xb0, 0x06, 0xf2, 0x5c, 0x3c, 0x02,
-         0xcc, 0x04, 0x04, 0x2b, 0x88, 0xde, 0x79, 0xe1, 0x0c, 0x2f, 0xbc, 0x77,
-         0xc7, 0xa3, 0x6b, 0xd9, 0x0c, 0xb0, 0x04, 0x30, 0x06, 0xd4, 0xf7, 0x3b,
-         0x36, 0x53, 0x4e, 0x9d, 0x6f, 0x34, 0x5f, 0xba, 0xe1, 0xc5, 0x6b, 0x17,
-         0xda, 0xf0, 0x44, 0x23, 0x88, 0x2e, 0x8e, 0x95, 0x64, 0x5e, 0x36, 0xfa,
-         0x3b, 0x73, 0xc4, 0xe4, 0x33, 0xd6, 0x00, 0xa4, 0x6d, 0x76, 0xf0, 0x77,
-         0x13, 0x43, 0xb1, 0x77, 0x9d, 0xe4, 0x0e, 0x21, 0x68, 0xde, 0x54, 0xe6,
-         0xe5, 0xea, 0x68, 0x3b, 0xae, 0xe1, 0x6b, 0xc4, 0x4f, 0x71, 0x95, 0x35,
-         0xb9, 0xcb, 0xad, 0x36, 0x7d, 0x47, 0xb6, 0xc5, 0x8f, 0xb6, 0x1f, 0xf0,
-         0x1b, 0xc9, 0x65, 0x8e, 0x7f, 0x0e, 0xfe, 0xe0, 0x5b, 0xc3, 0x0a, 0xb1,
-         0x76, 0xbb, 0x85, 0xaf, 0x96, 0xba, 0x7d, 0x66, 0xc7, 0x13, 0xa5, 0x2c,
-         0x05, 0xdd, 0xdd, 0x0a, 0xd3, 0x6d, 0xf7, 0x98, 0x43, 0x7e, 0xd4, 0x2f,
-         0xef, 0x5f, 0xd7, 0x5d};
-
-    const char *public =
+    char *public =
         "-----BEGIN RSA PUBLIC KEY-----\n"
         "MIIBCQKCAQBDstz7BoLRNCLY+m7zJGkapVzGW3624kNmqshbeir6os6tIlUN6Zgi\n"
         "sfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9qcdFtpbiN7EyJq0q5m/jqvm3uf8Rj/r8w\n"
@@ -2050,7 +2201,7 @@ serial_tests(void)
         "sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNUMrfEKbzfYofCK3tq7El1s7jYIHvY1Jer\n"
         "wBpO+zHwGozbijidbsOTblc900sl/lplAgMBAAE=\n"
         "-----END RSA PUBLIC KEY-----\n";
-    const char *private =
+    char *private =
         "-----BEGIN RSA PRIVATE KEY-----\n"
         "MIIEoQIBAAKCAQBDstz7BoLRNCLY+m7zJGkapVzGW3624kNmqshbeir6os6tIlUN\n"
         "6Zgisfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9qcdFtpbiN7EyJq0q5m/jqvm3uf8Rj\n"
@@ -2078,7 +2229,8 @@ serial_tests(void)
         "lhfpeyBI62N6MbduGuPbbaawLtm0nEYICfoAvJUzSDx8li3AdqWO9WFjVQv5jRri\n"
         "x2zTFULnmnGm1ZPBlE6xhgqaVEUU8qRR8IqYmLNq6xq/I3R5Ug==\n"
         "-----END RSA PRIVATE KEY-----\n";
-    const char *public2 =
+
+    char *public2 =
         "-----BEGIN PUBLIC KEY-----\n"
         "MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQBDstz7BoLRNCLY+m7zJGka\n"
         "pVzGW3624kNmqshbeir6os6tIlUN6Zgisfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9q\n"
@@ -2088,7 +2240,7 @@ serial_tests(void)
         "MrfEKbzfYofCK3tq7El1s7jYIHvY1JerwBpO+zHwGozbijidbsOTblc900sl/lpl\n"
         "AgMBAAE=\n"
         "-----END PUBLIC KEY-----\n";
-    const char *private2 =
+    char *private2 =
         "-----BEGIN PRIVATE KEY-----\n"
         "MIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAEOy3PsGgtE0Itj6\n"
         "bvMkaRqlXMZbfrbiQ2aqyFt6Kvqizq0iVQ3pmCKx9zlkQ3+MgtrtrI7DPvKpniND\n"
@@ -2118,189 +2270,26 @@ serial_tests(void)
         "pFHwipiYs2rrGr8jdHlS\n"
         "-----END PRIVATE KEY-----\n";
 
-    const char *pubs[] = {public,  public2};
-    const char *prvs[] = {private, private2};
+    char *hash =
+        "355cd8229d6d67a9fd82ff31a77d5636831a2fd8fc007e46487488e5213e5d7a";
+    char *sign =
+        "2d432e7d7a187f8e2f3ad3706cfb711df47ba777dbcba7cc3b9bc501f0a5ad65"
+        "0928ecb7422ebfc274953da5dad58facc9cde6589f00f0936039a4769727d917"
+        "6ed83df226686782e27b2ecc6e34789bdbe842d829f322f496abff3a4d4bb1cd"
+        "0aa6ed3f58fd5c60c17bb7c2fb0c250a2530b006f25c3c02cc04042b88de79e1"
+        "0c2fbc77c7a36bd90cb0043006d4f73b36534e9d6f345fbae1c56b17daf04423"
+        "882e8e95645e36fa3b73c4e433d600a46d76f0771343b1779de40e2168de54e6"
+        "e5ea683baee16bc44f719535b9cbad367d47b6c58fb61ff01bc9658e7f0efee0"
+        "5bc30ab176bb85af96ba7d66c713a52c05dddd0ad36df798437ed42fef5fd75d";
 
-    enum maid_serial pub_t[] = {MAID_SERIAL_RSA_PUBLIC,
-                                MAID_SERIAL_PKCS8_RSA_PUBLIC};
-    enum maid_serial prv_t[] = {MAID_SERIAL_RSA_PRIVATE,
-                                MAID_SERIAL_PKCS8_RSA_PRIVATE};
-
-    for (u8 i = 0; i < 2; i++)
-    {
-        const char *endptr = NULL;
-        struct maid_pem *p  = maid_pem_import(pubs[i], &endptr);
-        struct maid_pem *p2 = maid_pem_import(prvs[i], &endptr);
-
-        u8 buffer[2048 / 8] = {0};
-        maid_pub *pub = NULL, *prv = NULL;
-        maid_sign *s = NULL;
-        if (p && p2)
-        {
-            size_t bits = 0;
-            maid_mp_word *data[8] = {NULL};
-
-            enum maid_serial type = maid_serial_import(p, &bits, data);
-            if (type == pub_t[i])
-            {
-                struct maid_rsa_key k = {.modulo   = data[0],
-                                         .exponent = data[1]};
-                pub = maid_pub_new(maid_rsa_public, &k, bits);
-
-                if (pub)
-                {
-                    struct maid_pem *p3 = maid_serial_export(pub_t[i],
-                                                             bits, data);
-                    char *public3 = (p3) ? maid_pem_export(p3) : NULL;
-                    if (!public3 || strcmp(pubs[i], public3) != 0)
-                        pub = maid_pub_del(pub);
-                }
-            }
-
-            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
-                free(data[i]);
-
-            type = maid_serial_import(p2, &bits, data);
-            if (type == prv_t[i])
-            {
-                struct maid_rsa_key k = {.modulo   = data[0],
-                                         .exponent = data[2]};
-                prv = maid_pub_new(maid_rsa_private, &k, bits);
-
-                if (prv)
-                {
-                    struct maid_pem *p3 = maid_serial_export(prv_t[i],
-                                                             bits, data);
-                    char *private3 = (p3) ? maid_pem_export(p3) : NULL;
-                    if (!private3 || strcmp(prvs[i], private3) != 0)
-                        prv = maid_pub_del(prv);
-                }
-            }
-
-            for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
-                free(data[i]);
-        }
-        if (pub && prv)
-            s = maid_sign_new(maid_pkcs1_v1_5_sha256, pub, prv, 2048);
-        if (s)
-        {
-            memcpy(buffer, hash, sizeof(hash));
-            maid_sign_generate(s, buffer);
-            if (memcmp(buffer, sign, sizeof(sign)) == 0 &&
-                maid_sign_verify(s, buffer))
-                ret -= memcmp(buffer, hash, sizeof(hash)) == 0;
-        }
-
-        maid_pem_free(p);
-        maid_pem_free(p2);
-        maid_pub_del(pub);
-        maid_pub_del(prv);
-        maid_sign_del(s);
-    }
+    ret -= test_serial_rsa(2048, public,  private,  hash, sign, false);
+    ret -= test_serial_rsa(2048, public2, private2, hash, sign, true);
 
     return ret;
 }
 
-/* Testing generated keys with signatures */
-
-static u8
-keygen_tests(void)
+extern u8
+maid_test_keygen_rsa(void)
 {
-    u8 ret = 1;
-
-    u8 entropy[32] = {0};
-    maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
-    if (g)
-    {
-        maid_mp_word *params[8];
-        size_t words = maid_keygen_rsa(2048, params, g);
-        if (words)
-        {
-            struct maid_rsa_key k1 = {.exponent = params[1],
-                                      .modulo   = params[0]};
-            struct maid_rsa_key k2 = {.exponent = params[2],
-                                      .modulo   = params[0]};
-
-            maid_pub  *pub = maid_pub_new(maid_rsa_public,  &k1, 2048);
-            maid_pub  *prv = maid_pub_new(maid_rsa_private, &k2, 2048);
-            maid_sign *s   = maid_sign_new(maid_pkcs1_v1_5_sha256,
-                                           pub, prv, 2048);
-
-            if (pub && prv && s)
-            {
-                u8 hash[2048 / 8] = {0};
-                for (size_t i = 0; i < 256 / 8; i++)
-                    hash[i] = 0xFF;
-
-                maid_sign_generate(s, hash);
-                if (maid_sign_verify(s, hash))
-                {
-                    ret--;
-                    for (size_t i = 0; i < 256 / 8; i++)
-                    {
-                        if (hash[i] != 0xFF)
-                        {
-                            ret++;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            maid_sign_del(s);
-            maid_pub_del(pub);
-            maid_pub_del(prv);
-        }
-    }
-
-    return ret;
-}
-
-extern int
-main(void)
-{
-    u16 ret = 0;
-
-    #define TEST(name) \
-        printf("%s(): ", #name); \
-        u16 name##_fails = name(); \
-        if (!name##_fails) \
-            printf("success\n"); \
-        else \
-            printf("failed %u %s\n", name##_fails, \
-                   (name##_fails == 1) ? "test" : "tests"); \
-        ret += name##_fails;
-
-    /* Utilities */
-
-    TEST(mem_tests)
-    TEST(mp_tests)
-
-    /* Symmetric cryptography */
-
-    TEST(aes_tests)
-    TEST(aes_ctr_tests)
-    TEST(aes_gcm_tests)
-
-    TEST(chacha_tests)
-    TEST(poly1305_tests)
-    TEST(chacha20poly1305_tests)
-
-    TEST(ctr_drbg_tests)
-    TEST(sha_tests)
-
-    TEST(hmac_tests)
-
-    /* Asymmetric cryptography */
-
-    TEST(rsa_tests)
-    TEST(pkcs1_tests)
-    TEST(dh_tests)
-
-    /* Interfaces */
-
-    TEST(serial_tests)
-    TEST(keygen_tests)
-
-    return (ret == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return 1 - test_keygen_rsa(2048);
 }

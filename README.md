@@ -22,7 +22,7 @@ or experts bribed in the process of making it
 Files are forged in `build`
 ```sh
 make
-make test
+build/maid test
 ```
 
 ### Binding the System

@@ -37,6 +37,7 @@
 #include <maid/kex.h>
 #include <maid/serial.h>
 #include <maid/keygen.h>
+#include <maid/test.h>
 
 /* Filter functions */
 
@@ -1564,6 +1565,67 @@ encode_decode(int argc, char *argv[], bool decode)
     return ret;
 }
 
+static bool
+test(int argc, char *argv[])
+{
+    bool ret = false;
+
+    (void)argv;
+    if (argc == 1)
+    {
+        u32 fails = 0;
+
+        #define TEST(name) \
+            printf("%s(): ", #name); \
+            u16 name##_fails = name(); \
+            if (!name##_fails) \
+                printf("success\n"); \
+            else \
+                printf("failed %u %s\n", name##_fails, \
+                       (name##_fails == 1) ? "test" : "tests"); \
+            fails += name##_fails;
+
+        /* Utilities */
+
+        TEST(maid_test_mem)
+        TEST(maid_test_mp)
+
+        /* Symmetric cryptography */
+
+        TEST(maid_test_aes_ecb)
+        TEST(maid_test_aes_ctr)
+        TEST(maid_test_aes_gcm)
+        TEST(maid_test_chacha)
+        TEST(maid_test_poly1305)
+        TEST(maid_test_chacha20poly1305)
+        TEST(maid_test_ctr_drbg)
+        TEST(maid_test_sha1)
+        TEST(maid_test_sha2)
+        TEST(maid_test_hmac_sha1)
+        TEST(maid_test_hmac_sha2)
+
+        /* Asymmetric cryptography */
+
+        TEST(maid_test_rsa)
+        TEST(maid_test_pkcs1)
+        TEST(maid_test_dh)
+
+        /* Interfaces */
+
+        TEST(maid_test_pem)
+        TEST(maid_test_serial_rsa)
+        TEST(maid_test_keygen_rsa)
+
+        #undef TEST
+
+        ret = (fails == 0);
+    }
+    else
+        ret = usage("test");
+
+    return ret;
+}
+
 extern int
 main(int argc, char *argv[])
 {
@@ -1604,6 +1666,8 @@ main(int argc, char *argv[])
             ret = encode_decode(argc, argv, false);
         else if (strcmp(argv[0], "decode") == 0)
             ret = encode_decode(argc, argv, true);
+        else if (strcmp(argv[0], "test") == 0)
+            ret = test(argc, argv);
         else
             ret = usage(NULL);
     }
