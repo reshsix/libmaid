@@ -24,11 +24,17 @@ sudo make install
 sudo ldconfig
 ```
 
+### $${\color{GoldenRod}Warnings}$$
+- AES is currently implemented using LUT, so it might be
+vulnerable to cache-timing attacks
+- RSA and ECC are currently implemented without a cswap, so they might be
+vulnerable to branch-prediction attacks
+
 ### $${\color{GoldenRod}Usage}$$
 The library can be linked with -lmaid, and a command-line tool `maid` is
 available
 
-## $${\color{BrickRed}Instructions}$$
+## $${\color{BrickRed}Reference}$$
 | Category                             | Algorithms                |
 | ------------------------------------:|---------------------------|
 | [Type aliases](docs/types.md)        | ------------------------- |
@@ -43,6 +49,7 @@ available
 | [Hash functions](docs/hash.md)       | SHA-1, SHA-2, BLAKE2      |
 |                                      |                           |
 | [Public-key primitives](docs/pub.md) | RSA                       |
+| [Elliptic curves](docs/ecc.md)       | Ed25519                   |
 | [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |
 | [Key exchange](docs/kex.md)          | Diffie-Hellman            |
 |                                      |                           |

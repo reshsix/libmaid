@@ -33,15 +33,6 @@ static const size_t maid_mp_bits  = sizeof(maid_mp_word) * 8;
 static const size_t maid_mp_bytes = sizeof(maid_mp_word) * 1;
 static const maid_mp_word maid_mp_max = -1;
 
-/* Allocates stack memory for temporary variables */
-
-#define ALLOC_MP(name, length) \
-    maid_mp_word name[words * length]; \
-    maid_mp_mov(words * length, name, NULL);
-
-#define CLEAR_MP(name) \
-    maid_mem_clear(name, sizeof(name));
-
 extern size_t
 maid_mp_words(size_t bits)
 {
@@ -349,8 +340,8 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
 {
     if (words && a)
     {
-        ALLOC_MP(tmp,  1)
-        ALLOC_MP(tmp2, 1)
+        MAID_ALLOC_MP(tmp,  1)
+        MAID_ALLOC_MP(tmp2, 1)
 
         /* Halving optimizes mulmod, no need to consider odd word length */
         size_t words2 = words;
@@ -361,20 +352,20 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
         #if defined(__SIZEOF_INT128__)
         unsigned __int128 results[words];
         #else
-        ALLOC_MP(x, 1)
-        ALLOC_MP(y, 1)
-        ALLOC_MP(z, 1)
-        ALLOC_MP(w, 1)
+        MAID_ALLOC_MP(x, 1)
+        MAID_ALLOC_MP(y, 1)
+        MAID_ALLOC_MP(z, 1)
+        MAID_ALLOC_MP(w, 1)
 
-        ALLOC_MP(xz, 1)
-        ALLOC_MP(xw, 1)
-        ALLOC_MP(yz, 1)
-        ALLOC_MP(yw, 1)
+        MAID_ALLOC_MP(xz, 1)
+        MAID_ALLOC_MP(xw, 1)
+        MAID_ALLOC_MP(yz, 1)
+        MAID_ALLOC_MP(yw, 1)
 
-        ALLOC_MP(org,  1)
+        MAID_ALLOC_MP(org,  1)
         #endif
-        ALLOC_MP(low,  1)
-        ALLOC_MP(high, 1)
+        MAID_ALLOC_MP(low,  1)
+        MAID_ALLOC_MP(high, 1)
 
         /* Initializes values */
         maid_mp_mov(words, tmp, a);
@@ -451,33 +442,37 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
                 tmp2[idx]     = low[j];
                 tmp2[idx + 1] = high[j];
 
-                for (size_t k = idx + 0; k < (idx + 3 + j) && k < words2; k++)
+                volatile u8 carry = 0;
+                for (size_t k = idx; k < (idx + 3 + j) && k < words2; k++)
+                {
                     a[k] += tmp2[k];
-                for (size_t k = idx + 1; k < (idx + 3 + j) && k < words2; k++)
-                    a[k] += (a[k - 1] < tmp2[k - 1]);
+                    a[k] += carry;
+                    carry = (carry) ? (a[k] <= tmp2[k]) : (a[k] < tmp2[k]);
+                }
+                carry = 0;
             }
         }
 
-        CLEAR_MP(tmp);
-        CLEAR_MP(tmp2);
+        MAID_CLEAR_MP(tmp);
+        MAID_CLEAR_MP(tmp2);
 
         #if defined(__SIZEOF_INT128__)
         maid_mem_clear(results, sizeof(results));
         #else
-        CLEAR_MP(x);
-        CLEAR_MP(y);
-        CLEAR_MP(z);
-        CLEAR_MP(w);
+        MAID_CLEAR_MP(x);
+        MAID_CLEAR_MP(y);
+        MAID_CLEAR_MP(z);
+        MAID_CLEAR_MP(w);
 
-        CLEAR_MP(xz);
-        CLEAR_MP(xw);
-        CLEAR_MP(yz);
-        CLEAR_MP(yw);
+        MAID_CLEAR_MP(xz);
+        MAID_CLEAR_MP(xw);
+        MAID_CLEAR_MP(yz);
+        MAID_CLEAR_MP(yw);
 
-        CLEAR_MP(org);
+        MAID_CLEAR_MP(org);
         #endif
-        CLEAR_MP(low);
-        CLEAR_MP(high);
+        MAID_CLEAR_MP(low);
+        MAID_CLEAR_MP(high);
     }
 }
 
@@ -500,15 +495,15 @@ maid_mp_mul_karat_halve(size_t words, maid_mp_word *a, const maid_mp_word *b)
         one[0] = 1;
         b = (b) ? b : (const maid_mp_word *) one;
 
-        ALLOC_MP(ac,    1)
-        ALLOC_MP(bd,    1)
-        ALLOC_MP(ab,    1)
-        ALLOC_MP(cd,    1)
-        ALLOC_MP(abcd0, 1)
-        ALLOC_MP(abcd1, 1)
-        ALLOC_MP(abcd2, 1)
-        ALLOC_MP(abcd3, 1)
-        ALLOC_MP(tmp,   1)
+        MAID_ALLOC_MP(ac,    1)
+        MAID_ALLOC_MP(bd,    1)
+        MAID_ALLOC_MP(ab,    1)
+        MAID_ALLOC_MP(cd,    1)
+        MAID_ALLOC_MP(abcd0, 1)
+        MAID_ALLOC_MP(abcd1, 1)
+        MAID_ALLOC_MP(abcd2, 1)
+        MAID_ALLOC_MP(abcd3, 1)
+        MAID_ALLOC_MP(tmp,   1)
 
         size_t half    = words / 2;
         size_t quarter = words / 4;
@@ -556,15 +551,15 @@ maid_mp_mul_karat_halve(size_t words, maid_mp_word *a, const maid_mp_word *b)
         maid_mp_shl(words, ac, maid_mp_bits * half);
         maid_mp_add(words, a, ac);
 
-        CLEAR_MP(ac)
-        CLEAR_MP(bd)
-        CLEAR_MP(ab)
-        CLEAR_MP(cd)
-        CLEAR_MP(abcd0)
-        CLEAR_MP(abcd1)
-        CLEAR_MP(abcd2)
-        CLEAR_MP(abcd3)
-        CLEAR_MP(tmp)
+        MAID_CLEAR_MP(ac)
+        MAID_CLEAR_MP(bd)
+        MAID_CLEAR_MP(ab)
+        MAID_CLEAR_MP(cd)
+        MAID_CLEAR_MP(abcd0)
+        MAID_CLEAR_MP(abcd1)
+        MAID_CLEAR_MP(abcd2)
+        MAID_CLEAR_MP(abcd3)
+        MAID_CLEAR_MP(tmp)
 
         one[0] = 0;
     }
@@ -581,8 +576,8 @@ maid_mp_div(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        ALLOC_MP(tmp,  1)
-        ALLOC_MP(tmp2, 1)
+        MAID_ALLOC_MP(tmp,  1)
+        MAID_ALLOC_MP(tmp2, 1)
 
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
@@ -634,8 +629,8 @@ maid_mp_div(size_t words, maid_mp_word *a, const maid_mp_word *b)
             sub = false;
         }
 
-        CLEAR_MP(tmp)
-        CLEAR_MP(tmp2)
+        MAID_CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp2)
     }
 }
 
@@ -644,14 +639,14 @@ maid_mp_mod(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        ALLOC_MP(tmp, 1)
+        MAID_ALLOC_MP(tmp, 1)
 
         maid_mp_mov(words, tmp, a);
         maid_mp_div(words, tmp, b);
         maid_mp_mul(words, tmp, b);
         maid_mp_sub(words, a, tmp);
 
-        CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp)
     }
 }
 
@@ -660,8 +655,8 @@ maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        ALLOC_MP(tmp,  1)
-        ALLOC_MP(tmp2, 1)
+        MAID_ALLOC_MP(tmp,  1)
+        MAID_ALLOC_MP(tmp2, 1)
 
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
@@ -705,8 +700,8 @@ maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
         msb = 0;
         bit = false;
 
-        CLEAR_MP(tmp)
-        CLEAR_MP(tmp2)
+        MAID_CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp2)
     }
 }
 
@@ -716,7 +711,7 @@ maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
 {
     if (words && a && rem)
     {
-        ALLOC_MP(tmp, 1)
+        MAID_ALLOC_MP(tmp, 1)
 
         maid_mp_mov(words, rem, a);
         maid_mp_div(words, a,   b);
@@ -725,7 +720,7 @@ maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
         maid_mp_mul(words, tmp, b);
         maid_mp_sub(words, rem, tmp);
 
-        CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp)
     }
 }
 
@@ -735,9 +730,9 @@ maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 {
     if (words && a && mod)
     {
-        ALLOC_MP(a2,   2)
-        ALLOC_MP(b2,   2)
-        ALLOC_MP(mod2, 2)
+        MAID_ALLOC_MP(a2,   2)
+        MAID_ALLOC_MP(b2,   2)
+        MAID_ALLOC_MP(mod2, 2)
 
         maid_mp_mov(words, a2,   a);
         maid_mp_mov(words, b2,   b);
@@ -752,9 +747,9 @@ maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         maid_mp_mod(words + 1, a2, mod2);
         maid_mp_mov(words, a, a2);
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b2)
-        CLEAR_MP(mod2)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b2)
+        MAID_CLEAR_MP(mod2)
     }
 }
 
@@ -764,8 +759,8 @@ maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 {
     if (words && a && mod)
     {
-        ALLOC_MP(buf,  1)
-        ALLOC_MP(buf2, 1)
+        MAID_ALLOC_MP(buf,  1)
+        MAID_ALLOC_MP(buf2, 1)
 
         maid_mp_mov(words, buf, b);
         maid_mp_mod(words, buf, mod);
@@ -774,8 +769,8 @@ maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 
         maid_mp_addmod(words, a, buf2, mod);
 
-        CLEAR_MP(buf)
-        CLEAR_MP(buf2)
+        MAID_CLEAR_MP(buf)
+        MAID_CLEAR_MP(buf2)
     }
 }
 
@@ -785,9 +780,9 @@ maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 {
     if (words && a && mod)
     {
-        ALLOC_MP(a2,   2)
-        ALLOC_MP(b2,   2)
-        ALLOC_MP(mod2, 2)
+        MAID_ALLOC_MP(a2,   2)
+        MAID_ALLOC_MP(b2,   2)
+        MAID_ALLOC_MP(mod2, 2)
 
         maid_mp_mov(words, a2,   a);
         maid_mp_mov(words, b2,   b);
@@ -805,9 +800,9 @@ maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         maid_mp_mod(words * 2, a2, mod2);
         maid_mp_mov(words, a, a2);
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b2)
-        CLEAR_MP(mod2)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b2)
+        MAID_CLEAR_MP(mod2)
     }
 }
 
@@ -817,8 +812,8 @@ maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 {
     if (words && a && mod)
     {
-        ALLOC_MP(tmp,  1)
-        ALLOC_MP(tmp2, 1)
+        MAID_ALLOC_MP(tmp,  1)
+        MAID_ALLOC_MP(tmp2, 1)
 
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
@@ -862,8 +857,8 @@ maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         msb = 0;
         bit = false;
 
-        CLEAR_MP(tmp)
-        CLEAR_MP(tmp2)
+        MAID_CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp2)
     }
 }
 
@@ -877,15 +872,15 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
          * Very rounded up to avoid skipping a last step */
         const size_t steps = ((((words * maid_mp_bits) + 2) * 145)/ 100) + 1;
 
-        ALLOC_MP(a2,  2)
-        ALLOC_MP(b2,  2)
-        ALLOC_MP(u,   2)
-        ALLOC_MP(v,   2)
-        ALLOC_MP(s,   2)
-        ALLOC_MP(t,   2)
-        ALLOC_MP(oa,  2)
-        ALLOC_MP(ob,  2)
-        ALLOC_MP(tmp, 2)
+        MAID_ALLOC_MP(a2,  2)
+        MAID_ALLOC_MP(b2,  2)
+        MAID_ALLOC_MP(u,   2)
+        MAID_ALLOC_MP(v,   2)
+        MAID_ALLOC_MP(s,   2)
+        MAID_ALLOC_MP(t,   2)
+        MAID_ALLOC_MP(oa,  2)
+        MAID_ALLOC_MP(ob,  2)
+        MAID_ALLOC_MP(tmp, 2)
 
         volatile size_t r = 0;
         for (size_t i = 0; i < steps; i++)
@@ -986,15 +981,15 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
 
         r = 0;
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b2)
-        CLEAR_MP(u)
-        CLEAR_MP(v)
-        CLEAR_MP(s)
-        CLEAR_MP(t)
-        CLEAR_MP(oa)
-        CLEAR_MP(ob)
-        CLEAR_MP(tmp)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b2)
+        MAID_CLEAR_MP(u)
+        MAID_CLEAR_MP(v)
+        MAID_CLEAR_MP(s)
+        MAID_CLEAR_MP(t)
+        MAID_CLEAR_MP(oa)
+        MAID_CLEAR_MP(ob)
+        MAID_CLEAR_MP(tmp)
     }
 }
 
@@ -1008,9 +1003,9 @@ maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
         volatile bool xs = false;
         volatile bool ys = false;
 
-        ALLOC_MP(a2,  1)
-        ALLOC_MP(b,   1)
-        ALLOC_MP(gcd, 1)
+        MAID_ALLOC_MP(a2,  1)
+        MAID_ALLOC_MP(b,   1)
+        MAID_ALLOC_MP(gcd, 1)
 
         maid_mp_mov(words, a2, a);
         maid_mp_mov(words, b, mod);
@@ -1028,9 +1023,9 @@ maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
         xs = false;
         ys = false;
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b)
-        CLEAR_MP(gcd)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b)
+        MAID_CLEAR_MP(gcd)
     }
 
     return ret;
@@ -1042,11 +1037,11 @@ maid_mp_mont_mulmod(size_t words, maid_mp_word *ma, const maid_mp_word *mb,
 {
     if (words && ma && mod)
     {
-        ALLOC_MP(a2,    3)
-        ALLOC_MP(b2,    2)
-        ALLOC_MP(mod2,  2)
-        ALLOC_MP(imod2, 2)
-        ALLOC_MP(acc,   3)
+        MAID_ALLOC_MP(a2,    3)
+        MAID_ALLOC_MP(b2,    2)
+        MAID_ALLOC_MP(mod2,  2)
+        MAID_ALLOC_MP(imod2, 2)
+        MAID_ALLOC_MP(acc,   3)
 
         maid_mp_mov(words, a2,   ma);
         maid_mp_mov(words, b2,   mb);
@@ -1077,11 +1072,11 @@ maid_mp_mont_mulmod(size_t words, maid_mp_word *ma, const maid_mp_word *mb,
 
         maid_mp_mov(words, ma, acc);
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b2)
-        CLEAR_MP(mod2)
-        CLEAR_MP(imod2)
-        CLEAR_MP(acc)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b2)
+        MAID_CLEAR_MP(mod2)
+        MAID_CLEAR_MP(imod2)
+        MAID_CLEAR_MP(acc)
     }
 }
 
@@ -1090,9 +1085,9 @@ maid_mp_mont_in(size_t words, maid_mp_word *a, const maid_mp_word *mod)
 {
     if (words && a && mod)
     {
-        ALLOC_MP(a2,    2)
-        ALLOC_MP(mod2,  2)
-        ALLOC_MP(rmod,  2)
+        MAID_ALLOC_MP(a2,    2)
+        MAID_ALLOC_MP(mod2,  2)
+        MAID_ALLOC_MP(rmod,  2)
 
         maid_mp_mov(words * 2, rmod, NULL);
         rmod[words] = 0x1;
@@ -1105,9 +1100,9 @@ maid_mp_mont_in(size_t words, maid_mp_word *a, const maid_mp_word *mod)
         maid_mp_mulmod(words * 2, a2, rmod, mod2);
         maid_mp_mov(words, a, a2);
 
-        CLEAR_MP(a2)
-        CLEAR_MP(mod2)
-        CLEAR_MP(rmod)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(mod2)
+        MAID_CLEAR_MP(rmod)
     }
 }
 
@@ -1124,10 +1119,10 @@ maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
 {
     if (words && a && mod)
     {
-        ALLOC_MP(org,  1)
-        ALLOC_MP(imod, 2)
-        ALLOC_MP(acc,  2)
-        ALLOC_MP(one,  2)
+        MAID_ALLOC_MP(org,  1)
+        MAID_ALLOC_MP(imod, 2)
+        MAID_ALLOC_MP(acc,  2)
+        MAID_ALLOC_MP(one,  2)
 
         maid_mp_word *rmod = acc;
         maid_mp_mov(words * 2, rmod, NULL);
@@ -1187,10 +1182,10 @@ maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
 
         maid_mp_mont_out(words, a, mod, imod);
 
-        CLEAR_MP(org)
-        CLEAR_MP(imod)
-        CLEAR_MP(acc)
-        CLEAR_MP(one)
+        MAID_CLEAR_MP(org)
+        MAID_CLEAR_MP(imod)
+        MAID_CLEAR_MP(acc)
+        MAID_CLEAR_MP(one)
     }
 }
 
@@ -1221,8 +1216,8 @@ maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
 {
     if (words && a && g)
     {
-        ALLOC_MP(a2, 2)
-        ALLOC_MP(b2, 2)
+        MAID_ALLOC_MP(a2, 2)
+        MAID_ALLOC_MP(b2, 2)
 
         maid_mp_random(words, a, g, words * maid_mp_bits);
 
@@ -1235,8 +1230,8 @@ maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
         maid_mp_mov(words, a, &(a2[words]));
         maid_mp_add(words, a, low);
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b2)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b2)
     }
 }
 
@@ -1249,10 +1244,10 @@ maid_mp_fastgcd1(size_t words, const maid_mp_word *a, const maid_mp_word *b)
 
     if (words && a && b)
     {
-        ALLOC_MP(a2,   1)
-        ALLOC_MP(b2,   1)
-        ALLOC_MP(zero, 1)
-        ALLOC_MP(or,   1)
+        MAID_ALLOC_MP(a2,   1)
+        MAID_ALLOC_MP(b2,   1)
+        MAID_ALLOC_MP(zero, 1)
+        MAID_ALLOC_MP(or,   1)
 
         maid_mp_mov(words, a2, a);
         maid_mp_mov(words, b2, b);
@@ -1302,10 +1297,10 @@ maid_mp_fastgcd1(size_t words, const maid_mp_word *a, const maid_mp_word *b)
             k = 0;
         }
 
-        CLEAR_MP(a2)
-        CLEAR_MP(b2)
-        CLEAR_MP(zero)
-        CLEAR_MP(or)
+        MAID_CLEAR_MP(a2)
+        MAID_CLEAR_MP(b2)
+        MAID_CLEAR_MP(zero)
+        MAID_CLEAR_MP(or)
     }
 
     return ret;
@@ -1328,14 +1323,14 @@ maid_mp_sprp(size_t words, const maid_mp_word *a, maid_rng *g, size_t rounds)
             finished = true;
 
         /* Checks if it's 1 (non-prime) or 2 (prime) */
-        ALLOC_MP(check, 1)
+        MAID_ALLOC_MP(check, 1)
         check[0] = (ret) ? 0x01 : 0x02;
         if (maid_mp_cmp(words, a, check) == 0)
         {
             ret = !ret;
             finished = true;
         }
-        CLEAR_MP(check)
+        MAID_CLEAR_MP(check)
 
         /* Does a trial division test with small primes */
         if (!finished)
@@ -1360,7 +1355,7 @@ maid_mp_sprp(size_t words, const maid_mp_word *a, maid_rng *g, size_t rounds)
                  0x9e, 0x51, 0x7f, 0xde, 0xd6, 0x58, 0x59, 0x1a,
                  0xb7, 0x50, 0x2b, 0xd4, 0x18, 0x49, 0x46, 0x2f};
 
-            ALLOC_MP(p, 1)
+            MAID_ALLOC_MP(p, 1)
             maid_mp_mov(words, p, NULL);
             p[0] = 741;
 
@@ -1372,9 +1367,9 @@ maid_mp_sprp(size_t words, const maid_mp_word *a, maid_rng *g, size_t rounds)
 
                 size_t org = words;
                 words = sp_words;
-                ALLOC_MP(p2, 1)
-                ALLOC_MP(a2, 1)
-                ALLOC_MP(one, 1)
+                MAID_ALLOC_MP(p2, 1)
+                MAID_ALLOC_MP(a2, 1)
+                MAID_ALLOC_MP(one, 1)
 
                 maid_mp_read(words, p2, sp, true);
                 maid_mp_mov(words, a2, NULL);
@@ -1388,24 +1383,24 @@ maid_mp_sprp(size_t words, const maid_mp_word *a, maid_rng *g, size_t rounds)
                     finished = true;
                 }
 
-                CLEAR_MP(p2)
-                CLEAR_MP(a2)
-                CLEAR_MP(one)
+                MAID_CLEAR_MP(p2)
+                MAID_CLEAR_MP(a2)
+                MAID_CLEAR_MP(one)
                 words = org;
             }
 
-            CLEAR_MP(p)
+            MAID_CLEAR_MP(p)
         }
 
         /* Does a probabilistic Miller-Rabin test */
         if (!finished)
         {
-            ALLOC_MP(m,    1)
-            ALLOC_MP(one,  1)
-            ALLOC_MP(low,  1)
-            ALLOC_MP(high, 1)
-            ALLOC_MP(b,    1)
-            ALLOC_MP(b2  , 1)
+            MAID_ALLOC_MP(m,    1)
+            MAID_ALLOC_MP(one,  1)
+            MAID_ALLOC_MP(low,  1)
+            MAID_ALLOC_MP(high, 1)
+            MAID_ALLOC_MP(b,    1)
+            MAID_ALLOC_MP(b2  , 1)
 
             maid_mp_mov(words, m, a);
             maid_mp_mov(words, one, NULL);
@@ -1469,12 +1464,12 @@ maid_mp_sprp(size_t words, const maid_mp_word *a, maid_rng *g, size_t rounds)
             }
             k = 0;
 
-            CLEAR_MP(m)
-            CLEAR_MP(one)
-            CLEAR_MP(low)
-            CLEAR_MP(high)
-            CLEAR_MP(b)
-            CLEAR_MP(b2)
+            MAID_CLEAR_MP(m)
+            MAID_CLEAR_MP(one)
+            MAID_CLEAR_MP(low)
+            MAID_CLEAR_MP(high)
+            MAID_CLEAR_MP(b)
+            MAID_CLEAR_MP(b2)
         }
 
         finished = false;

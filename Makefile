@@ -22,7 +22,7 @@ CFLAGS += --std=c99 -Iinclude -Wall -Wextra
 TARGETS = build/libmaid.a build/libmaid.so build/maid
 all: CFLAGS += -march=native -O3 -DNDEBUG=1
 all: $(TARGETS)
-debug: CFLAGS += -Og -pg -ggdb3
+debug: CFLAGS += -Og -ggdb3
 debug: $(TARGETS)
 clean:
 	rm -rf build
@@ -50,10 +50,11 @@ OBJS = crypto/aes.o crypto/chacha.o \
        crypto/drbg.o crypto/sha.o crypto/blake2.o \
 	   crypto/pbkdf2.o \
 	   crypto/rsa.o crypto/pkcs1.o crypto/dh.o \
+	   crypto/ed25519.o \
        mem.o mp.o \
 	   block.o stream.o mac.o aead.o \
 	   rng.o hash.o \
-	   pub.o sign.o kex.o \
+	   pub.o ecc.o sign.o kex.o \
 	   serial.o keygen.o \
 	   pass.o test.o
 OBJS := $(addprefix build/, $(OBJS))

@@ -29,6 +29,7 @@
 #include <maid/hash.h>
 
 #include <maid/pub.h>
+#include <maid/ecc.h>
 #include <maid/sign.h>
 #include <maid/kex.h>
 
@@ -713,6 +714,79 @@ test_rsa(size_t bits, char *e, char *d, char *N, char *input, char *output)
 
     maid_pub_del(pub);
     maid_pub_del(prv);
+
+    return ret;
+}
+
+static bool
+test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
+         char *doub, char *trip, char *scalar, char *mul)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, sm, sb, scalar)
+    TEST_IMPORT(bb, base)
+    TEST_IMPORT(ib, inf)
+    TEST_IMPORT(mb, mul)
+    TEST_IMPORT(db, doub)
+    TEST_IMPORT(rb, trip)
+    TEST_EMPTY(tb, base)
+
+    if (ret)
+    {
+        maid_ecc *c = maid_ecc_new(def);
+        maid_ecc_point *r0 = maid_ecc_alloc(c);
+        maid_ecc_point *r1 = maid_ecc_alloc(c);
+        maid_ecc_point *r2 = maid_ecc_alloc(c);
+        if (c && r0 && r1 && r2)
+        {
+            maid_ecc_base(c, r0);
+            maid_ecc_copy(c, r1, NULL);
+            maid_ecc_copy(c, r2, r0);
+
+            ret = maid_ecc_encode(c, tb, r2);
+            ret &= maid_mem_cmp(tb, bb, sizeof(tb));
+            ret &= maid_ecc_encode(c, tb, r1);
+            ret &= maid_mem_cmp(tb, ib, sizeof(tb));
+            ret &= maid_ecc_decode(c, bb, r1);
+            ret &= maid_ecc_encode(c, tb, r1);
+            ret &= maid_mem_cmp(tb, bb, sizeof(tb));
+
+            if (ret && maid_ecc_decode(c, bb, r0))
+            {
+                maid_ecc_dbl(c, r0);
+                ret = maid_ecc_encode(c, tb, r0) &&
+                      maid_mem_cmp(tb, db, sizeof(tb));
+            }
+
+            if (ret && maid_ecc_decode(c, bb, r1))
+            {
+                maid_ecc_add(c, r0, r1);
+                ret = maid_ecc_encode(c, tb, r0) &&
+                      maid_mem_cmp(tb, rb, sizeof(tb));
+            }
+
+            if (ret && maid_ecc_decode(c, bb, r0))
+            {
+                maid_ecc_mul(c, r0, sm, false);
+                ret = maid_ecc_encode(c, tb, r0) &&
+                      maid_mem_cmp(tb, mb, sizeof(tb));
+            }
+
+            if (ret && maid_ecc_decode(c, bb, r2))
+            {
+                maid_ecc_mul(c, r2, sm, true);
+                ret = maid_ecc_encode(c, tb, r2) &&
+                      maid_mem_cmp(tb, mb, sizeof(tb));
+            }
+        }
+        else
+            ret = false;
+        maid_ecc_free(c, r0);
+        maid_ecc_free(c, r1);
+        maid_ecc_free(c, r2);
+        maid_ecc_del(c);
+    }
 
     return ret;
 }
@@ -1891,6 +1965,24 @@ maid_test_rsa(void)
         ret -= test_rsa(1024, e[i], d[i], n[i], input[i], output[i]);
 
     return ret;
+}
+
+extern u8
+maid_test_edwards25519(void)
+{
+    return 1 - test_ecc(maid_edwards25519, maid_mp_words(256),
+                        "58666666666666666666666666666666"
+                        "66666666666666666666666666666666",
+                        "01000000000000000000000000000000"
+                        "00000000000000000000000000000000",
+                        "c9a3f86aae465f0e56513864510f3997"
+                        "561fa2c9e85ea21dc2292309f3cd6022",
+                        "d4b4f5784868c3020403246717ec169f"
+                        "f79e26608ea126a1ab69ee77d1b16712",
+                        "4fe94d9006f020a5a3c080d96827fffd"
+                        "3c010ac0f12e7a42cb33284f86837c30",
+                        "d75a980182b10ab7d54bfed3c964073a"
+                        "0ee172f3daa62325af021a68f707511a");
 }
 
 extern u8

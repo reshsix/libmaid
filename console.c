@@ -33,6 +33,7 @@
 #include <maid/aead.h>
 #include <maid/hash.h>
 #include <maid/pub.h>
+#include <maid/ecc.h>
 #include <maid/sign.h>
 #include <maid/kex.h>
 #include <maid/serial.h>
@@ -1607,6 +1608,7 @@ test(int argc, char *argv[])
         /* Asymmetric cryptography */
 
         TEST(maid_test_rsa)
+        TEST(maid_test_edwards25519)
         TEST(maid_test_pkcs1)
         TEST(maid_test_dh)
 

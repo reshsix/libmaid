@@ -20,6 +20,17 @@
 
 #include <maid/types.h>
 
+/* Internal macros */
+
+#define MAID_ALLOC_MP(name, length) \
+    maid_mp_word name[words * length]; \
+    maid_mp_mov(words * length, name, NULL);
+
+#define MAID_CLEAR_MP(name) \
+    maid_mem_clear(name, sizeof(name));
+
+/* External functions */
+
 typedef u64 maid_mp_word;
 
 size_t maid_mp_words(size_t bits);
