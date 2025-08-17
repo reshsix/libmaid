@@ -1423,8 +1423,25 @@ info(int argc, char *argv[])
                                   params[7], true);
                     ret = true;
                 }
+                else if (t == MAID_SERIAL_ED25519_PUBLIC)
+                {
+                    fprintf(output, "Ed25519 Public Key\n\n");
+                    maid_mp_debug(output, words, "X", params[0], false);
+                    maid_mp_debug(output, words, "Y", params[1], false);
+                    ret = true;
+                }
+                else if (t == MAID_SERIAL_ED25519_PRIVATE)
+                {
+                    fprintf(output, "Ed25519 Private Key\n\n");
+                    maid_mp_debug(output, words, "Scalar", params[0], false);
+                    ret = true;
+                }
                 else
+                {
                     fprintf(stderr, "Unknown format\n");
+                    ret = false;
+                    break;
+                }
 
                 for (size_t i = 0; i < 8; i++)
                 {

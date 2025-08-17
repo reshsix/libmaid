@@ -49,7 +49,7 @@ available
 | [Hash functions](docs/hash.md)       | SHA-1, SHA-2, BLAKE2      |
 |                                      |                           |
 | [Public-key primitives](docs/pub.md) | RSA                       |
-| [Elliptic curves](docs/ecc.md)       | Ed25519                   |
+| [Elliptic curves](docs/ecc.md)       | Edwards25519              |
 | [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |
 | [Key exchange](docs/kex.md)          | Diffie-Hellman            |
 |                                      |                           |

@@ -18,8 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mp.h>
 #include <maid/mem.h>
 #include <maid/pub.h>
+#include <maid/ecc.h>
 
 #include <maid/serial.h>
 
@@ -378,7 +380,7 @@ maid_asn1_null(const u8 *buffer, size_t size)
 }
 
 static size_t
-maid_asn1_bit_string(u8 **output, const u8 *buffer, size_t size)
+maid_asn1_bitstring(u8 **output, const u8 *buffer, size_t size)
 {
     size_t ret = 0;
 
@@ -517,10 +519,14 @@ maid_pkcs8(struct maid_pem *p, size_t *bits,
 {
     enum maid_serial ret = MAID_SERIAL_UNKNOWN;
 
+    u8 *oid = NULL;
+    size_t oid_s = 0;
+
+    u8 *current = NULL;
+    size_t remain = p->size;
     if (maid_asn1_check(0x30, p->data, p->size))
     {
-        size_t remain = p->size;
-        u8 *current = maid_asn1_enter(p->data, &remain);
+        current = maid_asn1_enter(p->data, &remain);
 
         /* Only version 0 supported (on private key) */
         if (!private || (maid_asn1_check(0x02, current, remain) &&
@@ -532,56 +538,87 @@ maid_pkcs8(struct maid_pem *p, size_t *bits,
             if (maid_asn1_check(0x30, current, remain))
             {
                 current = maid_asn1_enter(current, &remain);
+                oid_s = maid_asn1_oid(&oid, current, remain);
+            }
+        }
+    }
 
-                u8 *oid = NULL;
-                size_t oid_s = maid_asn1_oid(&oid, current, remain);
-                if (oid_s != 0)
+    if (oid && oid_s)
+    {
+        current = maid_asn1_advance(current, &remain);
+        struct maid_pem p2 = {.type = MAID_PEM_UNKNOWN};
+
+        const u8 rsa_oid[] = {0x2a, 0x86, 0x48, 0x86,
+                              0xf7, 0x0d, 0x01, 0x01, 0x01};
+        const u8 ed25519_oid[] = {0x2b, 0x65, 0x70};
+        if (oid_s == 9 && memcmp(oid, rsa_oid, oid_s) == 0)
+        {
+            if (maid_asn1_null(current, remain))
+            {
+                current = maid_asn1_advance(current, &remain);
+
+                if (!private)
                 {
-                    current = maid_asn1_advance(current, &remain);
-
-                    struct maid_pem p2 = {.type = MAID_PEM_UNKNOWN};
-
-                    const u8 rsa_oid[] = {0x2A, 0x86, 0x48, 0x86,
-                                          0xF7, 0x0D, 0x01, 0x01, 0x01};
-                    if (oid_s == 9 && memcmp(oid, rsa_oid, oid_s) == 0)
+                    p2.size = maid_asn1_bitstring(&(p2.data), current, remain);
+                    if (p2.size)
                     {
-                        if (maid_asn1_null(current, remain))
-                        {
-                            current = maid_asn1_advance(current, &remain);
-
-                            if (!private)
-                            {
-                                p2.size = maid_asn1_bit_string
-                                              (&(p2.data), current, remain);
-                                if (p2.size)
-                                {
-                                    current = maid_asn1_enter(current,
-                                                              &remain);
-                                    if (p2.size + 1 == remain)
-                                        p2.type = MAID_PEM_PUBLIC_RSA;
-                                }
-                            }
-                            else
-                            {
-                                p2.size = maid_asn1_octet_string
-                                               (&(p2.data), current, remain);
-                                if (p2.size)
-                                {
-                                    current = maid_asn1_enter(current,
-                                                              &remain);
-                                    if (p2.size == remain)
-                                        p2.type = MAID_PEM_PRIVATE_RSA;
-                                }
-                            }
-                        }
+                        current = maid_asn1_enter(current, &remain);
+                        if (p2.size + 1 == remain)
+                            p2.type = MAID_PEM_PUBLIC_RSA;
                     }
+                }
+                else
+                {
+                    p2.size = maid_asn1_octet_string
+                                   (&(p2.data), current, remain);
+                    if (p2.size)
+                    {
+                        current = maid_asn1_enter(current, &remain);
+                        if (p2.size == remain)
+                            p2.type = MAID_PEM_PRIVATE_RSA;
+                    }
+                }
+            }
 
-                    if (p2.type != MAID_PEM_UNKNOWN)
-                        ret = maid_serial_import(&p2, bits, output);
+            if (p2.type != MAID_PEM_UNKNOWN)
+                ret = maid_serial_import(&p2, bits, output);
 
-                    if (ret != MAID_SERIAL_UNKNOWN)
-                        ret = (!private) ? MAID_SERIAL_PKCS8_RSA_PUBLIC  :
-                                           MAID_SERIAL_PKCS8_RSA_PRIVATE ;
+            if (ret != MAID_SERIAL_UNKNOWN)
+                ret = (!private) ? MAID_SERIAL_PKCS8_RSA_PUBLIC  :
+                                   MAID_SERIAL_PKCS8_RSA_PRIVATE ;
+        }
+        else if (oid_s == 3 && memcmp(oid, ed25519_oid, oid_s) == 0)
+        {
+            u8 *buf = NULL;
+            if (!private && maid_asn1_bitstring(&buf, current, remain) == 32)
+            {
+                maid_ecc *c = maid_ecc_new(maid_edwards25519);
+                maid_ecc_point *p = maid_ecc_alloc(c);
+
+                if (c && p && maid_ecc_decode(c, buf, p) &&
+                              maid_ecc_info(c, p, output) != 0)
+                {
+                    ret = MAID_SERIAL_ED25519_PUBLIC;
+                    *bits = 256;
+                }
+
+                maid_ecc_free(c, p);
+                maid_ecc_del(c);
+            }
+            else if (private &&
+                     maid_asn1_octet_string(&buf, current, remain) == 34 &&
+                     (current = maid_asn1_enter(current, &remain)) &&
+                     maid_asn1_octet_string(&buf, current, remain) == 32)
+            {
+                size_t words = maid_mp_words(256);
+
+                output[0] = calloc(sizeof(maid_mp_word), words);
+                if (output[0])
+                {
+                    maid_mp_read(words, output[0], buf, false);
+
+                    ret = MAID_SERIAL_ED25519_PRIVATE;
+                    *bits = 256;
                 }
             }
         }

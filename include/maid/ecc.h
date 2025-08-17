@@ -37,6 +37,7 @@ struct maid_ecc_def
     void (*base)(void *, maid_ecc_point *);
     void (*copy)(void *, maid_ecc_point *, const maid_ecc_point *);
 
+    size_t (*info)(void *, const maid_ecc_point *, maid_mp_word **);
     bool (*encode)(void *, u8 *, const maid_ecc_point *);
     bool (*decode)(void *, const u8 *, maid_ecc_point *);
 
@@ -58,6 +59,7 @@ maid_ecc_point *maid_ecc_free(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_base(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_copy(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 
+size_t maid_ecc_info(maid_ecc *c, const maid_ecc_point *p, maid_mp_word **s);
 bool maid_ecc_encode(maid_ecc *c, u8 *buffer, const maid_ecc_point *p);
 bool maid_ecc_decode(maid_ecc *c, const u8 *buffer, maid_ecc_point *p);
 

@@ -185,6 +185,37 @@ edwards25519_copy(void *ctx, struct maid_ecc_point *p,
     }
 }
 
+static size_t
+edwards25519_info(void *ctx, const struct maid_ecc_point *p, maid_mp_word **s)
+{
+    size_t ret = 0;
+
+    struct edwards25519 *c = ctx;
+    size_t words = c->words;
+
+    for (size_t i = 0; i < 4; i++)
+        s[i] = calloc(words, sizeof(maid_mp_word));
+
+    if (s[0] && s[1] && s[2] && s[3])
+    {
+        maid_mp_mov(words, s[0], p->x);
+        maid_mp_mov(words, s[1], p->y);
+        maid_mp_mov(words, s[2], p->z);
+        maid_mp_mov(words, s[3], p->t);
+        ret = words;
+    }
+    else
+    {
+        for (size_t i = 0; i < 4; i++)
+        {
+            free(s[i]);
+            s[i] = NULL;
+        }
+    }
+
+    return ret;
+}
+
 static bool
 edwards25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 {
@@ -500,6 +531,7 @@ const struct maid_ecc_def maid_edwards25519 =
     .new    = edwards25519_new,    .del    = edwards25519_del,
     .alloc  = edwards25519_alloc,  .free   = edwards25519_free,
     .base   = edwards25519_base,   .copy   = edwards25519_copy,
+    .info   = edwards25519_info,
     .encode = edwards25519_encode, .decode = edwards25519_decode,
     .dbl    = edwards25519_dbl,    .add    = edwards25519_add,
     .bits   = 256
