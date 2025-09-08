@@ -3,7 +3,6 @@
     <img src="poster.png" width="333">
 </div>
 
-$${For\ those\ who\ keep\ the\ ember\ through\ the\ storm}$$
 $${Version:\ 1.4\ alpha}$$
 
 ## $${\color{BrickRed}Instructions}$$
@@ -47,13 +46,13 @@ available
 | [AEADs](docs/aead.md)                | AES-GCM, Chacha20Poly1305 |
 | [CSPRNGs](docs/rng.md)               | CTR-DRBG-AES              |
 | [Hash functions](docs/hash.md)       | SHA-1, SHA-2, BLAKE2      |
-|                                      |                           |
-| [Public-key primitives](docs/pub.md) | RSA                       |
-| [Elliptic curves](docs/ecc.md)       | Edwards25519              |
-| [Digital signatures](docs/sign.md)   | PKCS#1 (v1.5)             |
-| [Key exchange](docs/kex.md)          | Diffie-Hellman            |
-|                                      |                           |
-| [Serialization](docs/serial.md)      | PEM, PKCS#1, PKCS#8       |
-| [Key generation](docs/keygen.md)     | RSA                       |
-|                                      |                           |
 | [Password hashing](docs/pass.md)     | PBKDF2                    |
+|                                      |                           |
+| [RSA algorithm](docs/rsa.md)         | PKCS#1 (v1.5)             |
+| [Elliptic curves](docs/ecc.md)       | Edwards25519              |
+| [PEM format](docs/pem.md)            | PEM                       |
+| [ASN1 format](docs/asn1.md)          | ASN.1                     |
+| [SPKI structure](docs/spki.md)       | SPKI                      |
+| [PKCS8 structure](docs/pkcs8.md)     | PKCS#8                    |
+| [Digital signatures](docs/sign.md)   | RSA PKCS#1 (v1.5)         |
+| [Key exchange](docs/kex.md)          | Diffie-Hellman            |

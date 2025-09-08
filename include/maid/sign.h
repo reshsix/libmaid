@@ -20,29 +20,26 @@
 
 #include <maid/types.h>
 
-#include <maid/pub.h>
-
 /* Internal interface */
 
 struct maid_sign_def
 {
-    void * (*new)(u8, maid_pub *, maid_pub *, size_t);
+    void * (*new)(u8, void *, void *);
     void * (*del)(void *);
-    void (*renew)(void *, maid_pub *, maid_pub *);
-    void (*generate)(void *, u8 *);
-    bool (*verify)(void *, u8 *);
+    bool (*size)(void *, size_t *, size_t *);
+    bool (*generate)(void *, const u8 *, u8 *);
+    bool (*verify)(void *, const u8 *, const u8 *);
     u8 version;
 };
 
 /* External interface */
 
 typedef struct maid_sign maid_sign;
-maid_sign *maid_sign_new(struct maid_sign_def def, maid_pub *public,
-                         maid_pub *private, size_t bits);
-void maid_sign_renew(maid_sign *s, maid_pub *public, maid_pub *private);
+maid_sign *maid_sign_new(struct maid_sign_def def, void *pub, void *priv);
 maid_sign *maid_sign_del(maid_sign *s);
-void maid_sign_generate(maid_sign *s, u8 *buffer);
-bool maid_sign_verify(maid_sign *s, u8 *buffer);
+bool maid_sign_size(maid_sign *s, size_t *hash_s, size_t *sign_s);
+bool maid_sign_generate(maid_sign *s, const u8 *hash, u8 *sign);
+bool maid_sign_verify(maid_sign *s, const u8 *hash, const u8 *sign);
 
 /* External algorithms */
 

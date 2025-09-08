@@ -15,32 +15,21 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_TEST_H
-#define MAID_TEST_H
+#ifndef MAID_SPKI_H
+#define MAID_SPKI_H
 
 #include <maid/types.h>
 
-u8 maid_test_mem(void);
-u8 maid_test_mp(void);
+enum maid_spki
+{
+    MAID_SPKI_UNKNOWN,
+    MAID_SPKI_RSA,
+    MAID_SPKI_ED25519,
+};
 
-u8 maid_test_aes_ecb(void);
-u8 maid_test_aes_ctr(void);
-u8 maid_test_aes_gcm(void);
-u8 maid_test_chacha(void);
-u8 maid_test_poly1305(void);
-u8 maid_test_chacha20poly1305(void);
-u8 maid_test_ctr_drbg(void);
-u8 maid_test_sha1(void);
-u8 maid_test_sha2(void);
-u8 maid_test_hmac_sha1(void);
-u8 maid_test_hmac_sha2(void);
-
-u8 maid_test_rsa(void);
-u8 maid_test_edwards25519(void);
-u8 maid_test_pem(void);
-u8 maid_test_spki(void);
-u8 maid_test_pkcs8(void);
-u8 maid_test_pkcs1_v1_5(void);
-u8 maid_test_dh(void);
+enum maid_spki maid_spki_import(const u8 *data, size_t size,
+                                u8 **stream, size_t *length);
+bool maid_spki_export(enum maid_spki type, const u8 *data, size_t size,
+                                           u8 **stream, size_t *length);
 
 #endif

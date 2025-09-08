@@ -28,13 +28,14 @@
 #include <maid/rng.h>
 #include <maid/hash.h>
 
-#include <maid/pub.h>
+#include <maid/rsa.h>
 #include <maid/ecc.h>
+#include <maid/pem.h>
+#include <maid/asn1.h>
+#include <maid/spki.h>
+#include <maid/pkcs8.h>
 #include <maid/sign.h>
 #include <maid/kex.h>
-
-#include <maid/serial.h>
-#include <maid/keygen.h>
 
 /* Test macros */
 
@@ -670,50 +671,72 @@ test_rng(struct maid_rng_def def, char *entropy, char *output)
 }
 
 static bool
-test_rsa(size_t bits, char *e, char *d, char *N, char *input, char *output)
+test_rsa(char *public, char *private, char *input, char *output)
 {
     bool ret = true;
 
-    u8 zeros[bits / 8];
-    maid_mem_clear(zeros, sizeof(zeros));
+    TEST_IMPORT(pub_b, public);
+    TEST_IMPORT(prv_b, private);
 
-    struct maid_rsa_key zkey = {.exponent = (void *)zeros,
-                                .modulo   = (void *)zeros};
-    maid_pub *pub = maid_pub_new(maid_rsa_public,  &zkey, bits);
-    maid_pub *prv = maid_pub_new(maid_rsa_private, &zkey, bits);
-
-    if (pub && prv)
+    if (ret)
     {
-        size_t words = maid_mp_words(bits);
-        TEST_IMPORT_MP(words, em, eb, e)
-        TEST_IMPORT_MP(words, dm, db, d)
-        TEST_IMPORT_MP(words, Nm, Nb, N)
-        TEST_IMPORT(ib, input)
-        TEST_IMPORT(ob, output)
-        TEST_IMPORT(bb, input)
-
-        if (ret)
+        maid_rsa_public  *k  = maid_rsa_new(pub_b,   sizeof(pub_b));
+        maid_rsa_private *k2 = maid_rsa_new2(prv_b, sizeof(prv_b));
+        if (k && k2)
         {
-            struct maid_rsa_key pub_k = {.exponent = em, .modulo = Nm};
-            struct maid_rsa_key prv_k = {.exponent = dm, .modulo = Nm};
-            maid_pub_renew(pub, &pub_k);
-            maid_pub_renew(prv, &prv_k);
+            size_t size = 0;
+            u8 *kk = NULL;
+            u8 *kk2 = NULL;
 
-            maid_pub_apply(pub, bb);
-            ret = maid_mem_cmp(bb, ob, sizeof(ob));
-        }
+            ret &= (bool)(kk  = maid_rsa_export(k,  &size));
+            ret &= (size == sizeof(pub_b)) && (memcmp(kk, pub_b, size) == 0);
+            ret &= (bool)(kk2 = maid_rsa_export2(k2, &size));
+            ret &= (size == sizeof(prv_b)) && (memcmp(kk2, prv_b, size) == 0);
 
-        if (ret)
-        {
-            maid_pub_apply(prv, bb);
-            ret = maid_mem_cmp(bb, ib, sizeof(ib));
+            size_t words = maid_rsa_size(k);
+            size_t words2 = maid_rsa_size2(k2);
+            ret &= (words  != 0);
+            ret &= (words2 != 0);
+            ret &= (words == words2);
+
+            if (ret)
+            {
+                TEST_IMPORT_MP(words, im,  ib,  input)
+                TEST_IMPORT_MP(words, im2, ib2, input)
+                TEST_IMPORT_MP(words, om,  ob, output)
+
+                ret &= maid_rsa_decrypt(k2, im);
+                ret &= maid_mp_cmp(words, im, om) == 0;
+                ret &= maid_rsa_encrypt(k, om);
+                ret &= maid_mp_cmp(words, im2, om) == 0;
+            }
         }
+        else
+            ret = false;
+
+        maid_rsa_del(k);
+        maid_rsa_del2(k2);
+    }
+
+    return ret;
+}
+
+static bool
+test_rsa2(void)
+{
+    bool ret = true;
+
+    u8 entropy[32] = {0};
+    maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
+    if (g)
+    {
+        maid_rsa_private *k = maid_rsa_keygen(512, 65537, g);
+        maid_rsa_public *k2 = maid_rsa_pubgen(k);
+        ret = (k && k2 && maid_rsa_pair(k2, k));
     }
     else
         ret = false;
-
-    maid_pub_del(pub);
-    maid_pub_del(prv);
+    free(g);
 
     return ret;
 }
@@ -792,52 +815,145 @@ test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
 }
 
 static bool
-test_pkcs1(struct maid_sign_def def, size_t bits,
-           char *e, char *d, char *N, char *input, char *output)
+test_pem(const char *input, size_t items,
+         enum maid_pem_t *type, char **data, char **export)
 {
     bool ret = true;
 
-    size_t words = maid_mp_words(bits);
-    TEST_IMPORT_MP(words, em, eb, e)
-    TEST_IMPORT_MP(words, dm, db, d)
-    TEST_IMPORT_MP(words, Nm, Nb, N)
+    const char *current = input;
+    const char *endptr = NULL;
+    size_t i = 0;
+    do
+    {
+        struct maid_pem *p = maid_pem_import(current, &endptr);
+
+        if (p && i < items)
+        {
+            TEST_IMPORT(db, data[i]);
+            ret = p->type == type[i] &&
+                  maid_mem_cmp(p->data, db, sizeof(db)) &&
+                  p->size == sizeof(db);
+
+            if (ret)
+            {
+                char *str = maid_pem_export(p);
+                if (str)
+                    ret = (strcmp(str, export[i]) == 0);
+                free(str);
+            }
+        }
+        else
+        {
+            ret = false;
+            break;
+        }
+
+        maid_pem_free(p);
+
+        current = endptr;
+        i++;
+    } while (endptr && *endptr != '\0');
+
+    return ret;
+}
+
+static bool
+test_spki(enum maid_spki type, char *input, char *output)
+{
+    bool ret = true;
 
     TEST_IMPORT(ib, input)
     TEST_IMPORT(ob, output)
 
     if (ret)
     {
-        u8 bb[words * sizeof(maid_mp_word)];
-        maid_mem_clear(bb, sizeof(bb));
-        memcpy(bb, ib, sizeof(ib));
+        u8 *stream = NULL;
+        size_t length = 0;
 
-        struct maid_rsa_key key1 = {.exponent = em, .modulo = Nm};
-        struct maid_rsa_key key2 = {.exponent = dm, .modulo = Nm};
+        ret &= (type == maid_spki_import(ib, sizeof(ib), &stream, &length));
+        ret &= (length == sizeof(ob));
+        ret &= maid_mem_cmp(stream, ob, sizeof(ob));
 
-        maid_pub *pub = maid_pub_new(maid_rsa_public,  &key1, bits);
-        maid_pub *prv = maid_pub_new(maid_rsa_private, &key2, bits);
-        maid_sign *s = maid_sign_new(def, NULL, NULL, bits);
-
-        if (pub && prv && s)
-        {
-            maid_sign_renew(s, pub, prv);
-            maid_sign_generate(s, bb);
-
-            ret = maid_mem_cmp(bb, ob, sizeof(ob)) &&
-                  maid_sign_verify(s, bb)          &&
-                  maid_mem_cmp(bb, ib, sizeof(ib));
-        }
-        else
-            ret = false;
-
-        maid_pub_del(pub);
-        maid_pub_del(prv);
-        maid_sign_del(s);
+        ret &= (maid_spki_export(type, ob, sizeof(ob), &stream, &length));
+        ret &= (length == sizeof(ib));
+        ret &= maid_mem_cmp(stream, ib, sizeof(ib));
+        free(stream);
     }
 
     return ret;
 }
 
+static bool
+test_pkcs8(enum maid_pkcs8 type, char *input, char *output)
+{
+    bool ret = true;
+
+    TEST_IMPORT(ib, input)
+    TEST_IMPORT(ob, output)
+
+    if (ret)
+    {
+        u8 *stream = NULL;
+        size_t length = 0;
+
+        ret &= (type == maid_pkcs8_import(ib, sizeof(ib), &stream, &length));
+        ret &= (length == sizeof(ob));
+        ret &= maid_mem_cmp(stream, ob, sizeof(ob));
+
+        ret &= (maid_pkcs8_export(type, ob, sizeof(ob), &stream, &length));
+        ret &= (length == sizeof(ib));
+        ret &= maid_mem_cmp(stream, ib, sizeof(ib));
+        free(stream);
+    }
+
+    return ret;
+}
+
+static bool
+test_pkcs1_v1_5(struct maid_sign_def def,
+                char *public, char *private, char *input, char *output)
+{
+    bool ret = true;
+
+    TEST_IMPORT(pub_b, public)
+    TEST_IMPORT(prv_b, private)
+    TEST_IMPORT(ib,    input)
+    TEST_IMPORT(ob,    output)
+
+    if (ret)
+    {
+        maid_rsa_public  *pub = maid_rsa_new(pub_b, sizeof(pub_b));
+        maid_rsa_private *prv = maid_rsa_new2(prv_b, sizeof(prv_b));
+
+        maid_sign *s = maid_sign_new(def, pub, prv);
+
+        if (pub && prv && s)
+        {
+            size_t hash_s = 0;
+            size_t sign_s = 0;
+            ret = (maid_sign_size(s, &hash_s, &sign_s) &&
+                   hash_s && hash_s == sizeof(ib) &&
+                   sign_s && sign_s == sizeof(ob));
+
+            if (ret)
+            {
+                u8 sign[sign_s];
+                ret = maid_sign_generate(s, ib, sign)    &&
+                      maid_mem_cmp(sign, ob, sizeof(ob)) &&
+                      maid_sign_verify(s, ib, sign) &&
+                     !maid_sign_verify(s, ob, sign);
+            }
+        }
+        else
+            ret = false;
+
+        maid_rsa_del(pub);
+        maid_rsa_del2(prv);
+        maid_sign_del(s);
+    }
+
+    return ret;
+}
 
 static bool
 test_dh(size_t bits, char *g, char *p,
@@ -882,207 +998,6 @@ test_dh(size_t bits, char *g, char *p,
         ret = false;
 
     maid_kex_del(x);
-
-    return ret;
-}
-
-static bool
-test_pem(const char *input, size_t items,
-         enum maid_pem_t *type, char **data, char **export)
-{
-    bool ret = true;
-
-    const char *current = input;
-    const char *endptr = NULL;
-    size_t i = 0;
-    do
-    {
-        struct maid_pem *p = maid_pem_import(current, &endptr);
-
-        if (p && i < items)
-        {
-            TEST_IMPORT(db, data[i]);
-            ret = p->type == type[i] &&
-                  maid_mem_cmp(p->data, db, sizeof(db)) &&
-                  p->size == sizeof(db);
-
-            if (ret)
-            {
-                char *str = maid_pem_export(p);
-                if (str)
-                    ret = (strcmp(str, export[i]) == 0);
-                free(str);
-            }
-        }
-        else
-        {
-            ret = false;
-            break;
-        }
-
-        maid_pem_free(p);
-
-        current = endptr;
-        i++;
-    } while (endptr && *endptr != '\0');
-
-    return ret;
-}
-
-static maid_pub *
-test_serial_rsa_pub(enum maid_serial type, const char *input)
-{
-    maid_pub *ret = NULL;
-
-    const char *endptr = NULL;
-    struct maid_pem *p = maid_pem_import(input, &endptr);
-    if (p)
-    {
-        size_t bits = 0;
-        maid_mp_word *data[8] = {NULL};
-
-        enum maid_serial type2 = maid_serial_import(p, &bits, data);
-        if (type == type2)
-        {
-            switch (type)
-            {
-                case MAID_SERIAL_RSA_PUBLIC:
-                case MAID_SERIAL_PKCS8_RSA_PUBLIC:;
-                    struct maid_rsa_key k1 = {.modulo   = data[0],
-                                              .exponent = data[1]};
-                    ret = maid_pub_new(maid_rsa_public, &k1, bits);
-
-                    break;
-
-                case MAID_SERIAL_RSA_PRIVATE:
-                case MAID_SERIAL_PKCS8_RSA_PRIVATE:;
-                    struct maid_rsa_key k2 = {.modulo   = data[0],
-                                              .exponent = data[2]};
-                    ret = maid_pub_new(maid_rsa_private, &k2, bits);
-                    break;
-
-                default:
-                    break;
-            }
-        }
-
-        if (ret)
-        {
-            struct maid_pem *p2 = maid_serial_export(type, bits, data);
-            char *export = (p2) ? maid_pem_export(p2) : NULL;
-
-            if (!export || strcmp(input, export) != 0)
-                ret = maid_pub_del(ret);
-
-            free(export);
-            maid_pem_free(p2);
-        }
-
-        for (size_t i = 0; i < sizeof(data) / sizeof(maid_mp_word *); i++)
-            free(data[i]);
-    }
-    maid_pem_free(p);
-
-    return ret;
-}
-
-static bool
-test_serial_rsa(size_t bits, char *public, char *private,
-                char *hash, char *sign, bool pkcs8)
-{
-    bool ret = true;
-
-    TEST_IMPORT(hb, hash)
-    TEST_IMPORT(sb, sign)
-
-    if (ret)
-    {
-        enum maid_serial types[] = {MAID_SERIAL_RSA_PUBLIC,
-                                    MAID_SERIAL_RSA_PRIVATE,
-                                    MAID_SERIAL_PKCS8_RSA_PUBLIC,
-                                    MAID_SERIAL_PKCS8_RSA_PRIVATE};
-
-        maid_pub *pub = test_serial_rsa_pub(types[(pkcs8 << 1) + 0], public);
-        maid_pub *prv = test_serial_rsa_pub(types[(pkcs8 << 1) + 1], private);
-        maid_sign *s  = maid_sign_new(maid_pkcs1_v1_5_sha256, pub, prv, bits);
-
-        if (pub && prv && s)
-        {
-            u8 bb[bits / 8];
-            memcpy(bb, hb, sizeof(hb));
-
-            maid_sign_generate(s, bb);
-            ret = maid_mem_cmp(bb, sb, sizeof(sb)) &&
-                  maid_sign_verify(s, bb)          &&
-                  maid_mem_cmp(bb, hb, sizeof(hb));
-        }
-        else
-            ret = false;
-
-        maid_pub_del(pub);
-        maid_pub_del(prv);
-        maid_sign_del(s);
-    }
-
-    return ret;
-}
-
-static bool
-test_keygen_rsa(size_t bits)
-{
-    bool ret = true;
-
-    u8 entropy[32] = {0};
-    maid_rng *g = maid_rng_new(maid_ctr_drbg_aes_128, entropy);
-    if (g)
-    {
-        maid_mp_word *params[8];
-        size_t words = maid_keygen_rsa(bits, params, g);
-        if (words)
-        {
-            struct maid_rsa_key k1 = {.exponent = params[1],
-                                      .modulo   = params[0]};
-            struct maid_rsa_key k2 = {.exponent = params[2],
-                                      .modulo   = params[0]};
-
-            maid_pub  *pub = maid_pub_new(maid_rsa_public,  &k1, bits);
-            maid_pub  *prv = maid_pub_new(maid_rsa_private, &k2, bits);
-            maid_sign *s   = maid_sign_new(maid_pkcs1_v1_5_sha256,
-                                           pub, prv, bits);
-            if (pub && prv && s)
-            {
-                u8 hash[bits / 8];
-                memset(hash, 0xFF, 256 / 8);
-
-                maid_sign_generate(s, hash);
-                ret = maid_sign_verify(s, hash);
-
-                if (ret)
-                {
-                    for (size_t i = 0; i < (256 / 8); i++)
-                    {
-                        if (hash[i] != 0xFF)
-                        {
-                            ret = false;
-                            break;
-                        }
-                    }
-                }
-            }
-            else
-                ret = false;
-
-            maid_pub_del(pub);
-            maid_pub_del(prv);
-            maid_sign_del(s);
-        }
-
-        for (size_t i = 0; i < sizeof(params) / sizeof(maid_mp_word *); i++)
-            free(params[i]);
-    }
-    else
-        ret = false;
-    maid_rng_del(g);
 
     return ret;
 }
@@ -1931,38 +1846,81 @@ maid_test_hmac_sha2(void)
 extern u8
 maid_test_rsa(void)
 {
-    /* RSA Primitives NIST test vectors */
+    /* Comparison with OpenSSL + sanity check */
 
-    u8 ret = 1;
+    u8 ret = 2;
 
-    char *e[] =
-        {"0000000000000000000000000000000000000000859e499b8a186c8ee6196954"
-         "170eb8068593f0d764150a6d2e5d3fea7d9d0d33ac553eecd5c3f27a310115d2"
-         "83e49377820195c8e67781b6f112a625b14b747fa4cc13d06eba0917246c775f"
-         "5c732865701ae9349ea8729cde0bbade38204e63359a46e672a8d0a2fd530069"};
-    char *d[] =
-        {"27b7119a09edb827c13418c820b522a1ee08de0e4bb28106db6bb91498a3b361"
-         "ab293af83fefcdd8a6bd2134ca4afacf64a0e33c014f48f47530f8847cc9185c"
-         "bedec0d9238c8f1d5498f71c7c0cff48dc213421742e34350ca94007753cc0e5"
-         "a783264cf49ff644ffea94253cfe86859acd2a2276ca4e7215f8ebaa2f188f51"};
-    char *n[] =
-        {"d0b750c8554b64c7a9d34d068e020fb52fea1b39c47971a359f0eec5da0437ea"
-         "3fc94597d8dbff5444f6ce5a3293ac89b1eebb3f712b3ad6a06386e6401985e1"
-         "9898715b1ea32ac03456fe1796d31ed4af389f4f675c23c421a125491e740fda"
-         "c4322ec2d46ec945ddc349227b492191c9049145fb2f8c2998c486a840eac4d3"};
-    char *input[] =
-        {"5c7bce723cf4da053e503147242c60678c67e8c22467f0336b6d5c31f14088cb"
-         "3d6cefb648db132cb32e95092f3d9bcd1cab51e68bd3a892ab359cdff556785a"
-         "e06708633d39a0618f9d6d70f6bdeb6b777e7dd9acc41f19560c71a68479c8a0"
-         "7b14fb9a4c765fd292ae56dd2f2143b62649cc70fb604fdc5cc1ade6e29de235"};
-    char *output[] =
-        {"6cf87c6a65925df6719eef5f1262edc6f8a0a0a0d21c535c64580745d9a268a9"
-         "5b50ff3be24ba8b649ca47c3a760b71ddc3903f36aa1d98e87c53b3370be784b"
-         "ffcb5bc180dea2acc15bb12e681c889b89b8f3de78050019dcdbb68c051b04b8"
-         "80f0f8c4e855321ffed89767fc9d4a8a27a5d82ba450b2478c21e11843c2f539"};
+    char *public =
+        "308201090282010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7eb6e243"
+        "66aac85b7a2afaa2cead22550de99822b1f73964437f8c82daedac8ec33ef2a9"
+        "9e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee7fc463febf30"
+        "299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f8c31941534257299"
+        "d206911a4a8a6163e26f82737e126b3e682567e6627429e48104e25af999c8a8"
+        "6e6e30f1399c8d7a608dc427de103644519914288594a69c495a86cf43b12e7f"
+        "b0a002eb31d1f889b9ad451b45ee15e871204f48c9ecd35432b7c429bcdf6287"
+        "c22b7b6aec4975b3b8d8207bd8d497abc01a4efb31f01a8cdb8a389d6ec3936e"
+        "573dd34b25fe5a650203010001";
+    char *private =
+        "308204a10201000282010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7e"
+        "b6e24366aac85b7a2afaa2cead22550de99822b1f73964437f8c82daedac8ec3"
+        "3ef2a99e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee7fc463"
+        "febf30299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f8c31941534"
+        "257299d206911a4a8a6163e26f82737e126b3e682567e6627429e48104e25af9"
+        "99c8a86e6e30f1399c8d7a608dc427de103644519914288594a69c495a86cf43"
+        "b12e7fb0a002eb31d1f889b9ad451b45ee15e871204f48c9ecd35432b7c429bc"
+        "df6287c22b7b6aec4975b3b8d8207bd8d497abc01a4efb31f01a8cdb8a389d6e"
+        "c3936e573dd34b25fe5a6502030100010282010033bad2fcc5e6e430f087d825"
+        "3b8990fe996920f0fd0c862c76a0fd64591fca50e998866973ae11604198e5b3"
+        "e597eb287a5daec39011e39f14856147df35802c1838ad8e3a4dc8485bd215d1"
+        "6a8b73e47b6009256a3b58a056cc0c72bf5ea6cb5a9075da6fff3a1a3099c159"
+        "69ea78ee4a5400118bbd29aabc3fe454b0acb8e9a275387ba927bb4512001b51"
+        "f8525b87b5b4dbddd5f90e2b8416b796b791387737bb140f89fb6739face7857"
+        "5c0fb9175757a02411d033c32f6ab9a869a7d8eed90be34dcada047d5d93b232"
+        "15ea34827c9b2749860ea7ae4a3fc1aa349505fd1cde16ab3caea5b2782fff75"
+        "e77230fd5dbcfb9df777310b2778bfb52cb778810281805c9e59874192f39cf9"
+        "77f915cb9df43c55d5ea4d740d39175ee5270745e39a20edc70c4f0cc81b31d6"
+        "435bac25f97b6a726a5916d8923b3dd67ac50a00a87547bc7ccb446bd0f36480"
+        "bff4c38c2bb2412cc556cf92426a53f2adba28cbfacd96e9d0c4f067466443e6"
+        "b5913eab24d16b400b2ebbeedc37bf374b7eb81de2feb102818100bb1ef08afa"
+        "0e0f59f5b0b54213f79cc181fe33d1ae5e802fcee5cd9d857774848fe9cc457d"
+        "1cca5ddfae7d7e72671240b6a010c9b2839912f2c93068a4ce18b2fc3eb75be8"
+        "317beaea4edf23437a77f708c7e7e789aa4d941f15d1520b3570f69b76745a08"
+        "b7f96df9575eb1b471a8cf699c7f54740c536160e3e88ec17f0bf50281801565"
+        "cc1f508a07d85b565968acab28730c0da8dd0e13c3fddf41a7dba94ce51df871"
+        "4529ba353cfb2d9a50429c5f6020fea00d4716efe9d9e68464a363f5876af464"
+        "0c7e193ea40cb32626014b9008d5bfe733a02f154305740aa8f8a5efa2b1dc01"
+        "0c8ed1fd544acfb161060e7a2a1bd227033c0dfa38b2e7ae7c6f43105f710281"
+        "81009cd53cc52efa33d1b1842f17b8069442f802284a793c4972489601752255"
+        "51ba7da87686536b9b0d7d1a11a2b69e3f05304c0e660f120f6d7b423729addf"
+        "f381a8bba4110b16d686b965ebcdf193a712cd3047e59f53b6fc0be5cc705866"
+        "ad4c74569f048b442f7206473d5df220455dba65e9aece293a8566a0fedd0fbe"
+        "bd350281802d6b6e6718bbd8ea3ed0a15c30d724282368b719121a4414b57282"
+        "32ba628294cfb20c21ae5fa8c50b5e529617e97b2048eb637a31b76e1ae3db6d"
+        "a6b02ed9b49c460809fa00bc9533483c7c962dc076a58ef56163550bf98d1ae2"
+        "c76cd31542e79a71a6d593c1944eb1860a9a544514f2a451f08a9898b36aeb1a"
+        "bf23747952";
 
-    for (u8 i = 0; i < 1; i++)
-        ret -= test_rsa(1024, e[i], d[i], n[i], input[i], output[i]);
+    char *input =
+        "0001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "ffffffffffffffffffffffff003031300d060960864801650304020105000420"
+        "355cd8229d6d67a9fd82ff31a77d5636831a2fd8fc007e46487488e5213e5d7a";
+    char *output =
+        "2d432e7d7a187f8e2f3ad3706cfb711df47ba777dbcba7cc3b9bc501f0a5ad65"
+        "0928ecb7422ebfc274953da5dad58facc9cde6589f00f0936039a4769727d917"
+        "6ed83df226686782e27b2ecc6e34789bdbe842d829f322f496abff3a4d4bb1cd"
+        "0aa6ed3f58fd5c60c17bb7c2fb0c250a2530b006f25c3c02cc04042b88de79e1"
+        "0c2fbc77c7a36bd90cb0043006d4f73b36534e9d6f345fbae1c56b17daf04423"
+        "882e8e95645e36fa3b73c4e433d600a46d76f0771343b1779de40e2168de54e6"
+        "e5ea683baee16bc44f719535b9cbad367d47b6c58fb61ff01bc9658e7f0efee0"
+        "5bc30ab176bb85af96ba7d66c713a52c05dddd0ad36df798437ed42fef5fd75d";
+
+    ret -= test_rsa(public, private, input, output);
+    ret -= test_rsa2();
 
     return ret;
 }
@@ -1986,155 +1944,328 @@ maid_test_edwards25519(void)
 }
 
 extern u8
-maid_test_pkcs1(void)
+maid_test_pem(void)
 {
-    /* PKCS1 NIST test vectors */
+    /* PEM encoding RFC 7468 examples */
+
+    u8 ret = 1;
+
+    const char *full =
+        "This is a test\n"
+        "This is a test\n"
+        "This is a test\n"
+        "This is a test\n"
+        "This is a test\n"
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEn1LlwLN/KBYQRVH6HfIMTzfEqJOVztLe\n"
+        "kLchp2hi78cCaMY81FBlYs8J9l7krc+M4aBeCGYFjba+hiXttJWPL7ydlE+5UG4U\n"
+        "Nkn3Eos8EiZByi9DVsyfy9eejh+8AXgp\n"
+        "-----END PUBLIC KEY-----\n"
+        "This is a test\n"
+        "This is a test\n"
+        "This is a test\n"
+        "This is a test\n"
+        "This is a test\n"
+        "-----BEGIN PRIVATE KEY-----\n"
+        "MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgVcB/UNPxalR9zDYAjQIf\n"
+        "jojUDiQuGnSJrFEEzZPT/92hRANCAASc7UJtgnF/abqWM60T3XNJEzBv5ez9TdwK\n"
+        "H0M6xpM2q+53wmsN/eYLdgtjgBd3DBmHtPilCkiFICXyaA8z9LkJ\n"
+        "-----END PRIVATE KEY-----\n";
+
+    enum maid_pem_t type[] = {MAID_PEM_PUBLIC, MAID_PEM_PRIVATE};
+    char *data[] = {
+        "3076301006072a8648ce3d020106052b81040022036200049f52e5c0b37f281610"
+        "4551fa1df20c4f37c4a89395ced2de90b721a76862efc70268c63cd4506562cf09"
+        "f65ee4adcf8ce1a05e0866058db6be8625edb4958f2fbc9d944fb9506e143649f7"
+        "128b3c122641ca2f4356cc9fcbd79e8e1fbc017829",
+        "308184020100301006072a8648ce3d020106052b8104000a046d306b0201010420"
+        "55c07f50d3f16a547dcc36008d021f8e88d40e242e1a7489ac5104cd93d3ffdda1"
+        "44034200049ced426d82717f69ba9633ad13dd734913306fe5ecfd4ddc0a1f433a"
+        "c69336abee77c26b0dfde60b760b638017770c1987b4f8a50a48852025f2680f33"
+        "f4b909"};
+    char *export[] = {
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEn1LlwLN/KBYQRVH6HfIMTzfEqJOVztLe\n"
+        "kLchp2hi78cCaMY81FBlYs8J9l7krc+M4aBeCGYFjba+hiXttJWPL7ydlE+5UG4U\n"
+        "Nkn3Eos8EiZByi9DVsyfy9eejh+8AXgp\n"
+        "-----END PUBLIC KEY-----\n",
+        "-----BEGIN PRIVATE KEY-----\n"
+        "MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgVcB/UNPxalR9zDYAjQIf\n"
+        "jojUDiQuGnSJrFEEzZPT/92hRANCAASc7UJtgnF/abqWM60T3XNJEzBv5ez9TdwK\n"
+        "H0M6xpM2q+53wmsN/eYLdgtjgBd3DBmHtPilCkiFICXyaA8z9LkJ\n"
+        "-----END PRIVATE KEY-----\n"};
+
+    ret -= test_pem(full, 2, type, data, export);
+
+    return ret;
+}
+
+extern u8
+maid_test_spki(void)
+{
+    /* Comparison with OpenSSL */
+
+    u8 ret = 2;
+
+    enum maid_spki type[] = {MAID_SPKI_RSA, MAID_SPKI_ED25519};
+    char *input[] =
+        {"30820121300d06092a864886f70d01010105000382010e00308201090282"
+         "010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7eb6e24366aac85b"
+         "7a2afaa2cead22550de99822b1f73964437f8c82daedac8ec33ef2a99e23"
+         "43012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee7fc463febf30"
+         "299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f8c3194153425"
+         "7299d206911a4a8a6163e26f82737e126b3e682567e6627429e48104e25a"
+         "f999c8a86e6e30f1399c8d7a608dc427de103644519914288594a69c495a"
+         "86cf43b12e7fb0a002eb31d1f889b9ad451b45ee15e871204f48c9ecd354"
+         "32b7c429bcdf6287c22b7b6aec4975b3b8d8207bd8d497abc01a4efb31f0"
+         "1a8cdb8a389d6ec3936e573dd34b25fe5a650203010001",
+         "302a300506032b657003210001b395a89ac5e4bfdbab4a7b5f0e9d078066"
+         "f42b8e5b5b3fa59361d924d53ae8"};
+    char *output[] =
+        {"308201090282010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7eb6"
+         "e24366aac85b7a2afaa2cead22550de99822b1f73964437f8c82daedac8e"
+         "c33ef2a99e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee"
+         "7fc463febf30299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f"
+         "8c31941534257299d206911a4a8a6163e26f82737e126b3e682567e66274"
+         "29e48104e25af999c8a86e6e30f1399c8d7a608dc427de10364451991428"
+         "8594a69c495a86cf43b12e7fb0a002eb31d1f889b9ad451b45ee15e87120"
+         "4f48c9ecd35432b7c429bcdf6287c22b7b6aec4975b3b8d8207bd8d497ab"
+         "c01a4efb31f01a8cdb8a389d6ec3936e573dd34b25fe5a650203010001",
+         "01b395a89ac5e4bfdbab4a7b5f0e9d078066f42b8e5b5b3fa59361d924d5"
+         "3ae8"};
+
+    for (u8 i = 0; i < 2; i++)
+        ret -= test_spki(type[i], input[i], output[i]);
+
+    return ret;
+}
+
+extern u8
+maid_test_pkcs8(void)
+{
+    /* Comparison with OpenSSL */
+
+    u8 ret = 2;
+
+    enum maid_pkcs8 type[] = {MAID_PKCS8_RSA, MAID_PKCS8_ED25519};
+    char *input[] =
+        {"308204bb020100300d06092a864886f70d0101010500048204a5308204a1"
+         "0201000282010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7eb6e2"
+         "4366aac85b7a2afaa2cead22550de99822b1f73964437f8c82daedac8ec3"
+         "3ef2a99e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee7f"
+         "c463febf30299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f8c"
+         "31941534257299d206911a4a8a6163e26f82737e126b3e682567e6627429"
+         "e48104e25af999c8a86e6e30f1399c8d7a608dc427de1036445199142885"
+         "94a69c495a86cf43b12e7fb0a002eb31d1f889b9ad451b45ee15e871204f"
+         "48c9ecd35432b7c429bcdf6287c22b7b6aec4975b3b8d8207bd8d497abc0"
+         "1a4efb31f01a8cdb8a389d6ec3936e573dd34b25fe5a6502030100010282"
+         "010033bad2fcc5e6e430f087d8253b8990fe996920f0fd0c862c76a0fd64"
+         "591fca50e998866973ae11604198e5b3e597eb287a5daec39011e39f1485"
+         "6147df35802c1838ad8e3a4dc8485bd215d16a8b73e47b6009256a3b58a0"
+         "56cc0c72bf5ea6cb5a9075da6fff3a1a3099c15969ea78ee4a5400118bbd"
+         "29aabc3fe454b0acb8e9a275387ba927bb4512001b51f8525b87b5b4dbdd"
+         "d5f90e2b8416b796b791387737bb140f89fb6739face78575c0fb9175757"
+         "a02411d033c32f6ab9a869a7d8eed90be34dcada047d5d93b23215ea3482"
+         "7c9b2749860ea7ae4a3fc1aa349505fd1cde16ab3caea5b2782fff75e772"
+         "30fd5dbcfb9df777310b2778bfb52cb778810281805c9e59874192f39cf9"
+         "77f915cb9df43c55d5ea4d740d39175ee5270745e39a20edc70c4f0cc81b"
+         "31d6435bac25f97b6a726a5916d8923b3dd67ac50a00a87547bc7ccb446b"
+         "d0f36480bff4c38c2bb2412cc556cf92426a53f2adba28cbfacd96e9d0c4"
+         "f067466443e6b5913eab24d16b400b2ebbeedc37bf374b7eb81de2feb102"
+         "818100bb1ef08afa0e0f59f5b0b54213f79cc181fe33d1ae5e802fcee5cd"
+         "9d857774848fe9cc457d1cca5ddfae7d7e72671240b6a010c9b2839912f2"
+         "c93068a4ce18b2fc3eb75be8317beaea4edf23437a77f708c7e7e789aa4d"
+         "941f15d1520b3570f69b76745a08b7f96df9575eb1b471a8cf699c7f5474"
+         "0c536160e3e88ec17f0bf50281801565cc1f508a07d85b565968acab2873"
+         "0c0da8dd0e13c3fddf41a7dba94ce51df8714529ba353cfb2d9a50429c5f"
+         "6020fea00d4716efe9d9e68464a363f5876af4640c7e193ea40cb3262601"
+         "4b9008d5bfe733a02f154305740aa8f8a5efa2b1dc010c8ed1fd544acfb1"
+         "61060e7a2a1bd227033c0dfa38b2e7ae7c6f43105f71028181009cd53cc5"
+         "2efa33d1b1842f17b8069442f802284a793c497248960175225551ba7da8"
+         "7686536b9b0d7d1a11a2b69e3f05304c0e660f120f6d7b423729addff381"
+         "a8bba4110b16d686b965ebcdf193a712cd3047e59f53b6fc0be5cc705866"
+         "ad4c74569f048b442f7206473d5df220455dba65e9aece293a8566a0fedd"
+         "0fbebd350281802d6b6e6718bbd8ea3ed0a15c30d724282368b719121a44"
+         "14b5728232ba628294cfb20c21ae5fa8c50b5e529617e97b2048eb637a31"
+         "b76e1ae3db6da6b02ed9b49c460809fa00bc9533483c7c962dc076a58ef5"
+         "6163550bf98d1ae2c76cd31542e79a71a6d593c1944eb1860a9a544514f2"
+         "a451f08a9898b36aeb1abf23747952",
+         "302e020100300506032b65700422042057901fc2ff66f6ab2fdbb74d6ddc"
+         "68c3bde29c9fa5be88893501355ddb1ccafd"};
+    char *output[] =
+        {"308204a10201000282010043b2dcfb0682d13422d8fa6ef324691aa55cc6"
+         "5b7eb6e24366aac85b7a2afaa2cead22550de99822b1f73964437f8c82da"
+         "edac8ec33ef2a99e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8ea"
+         "be6dee7fc463febf30299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e"
+         "536c1f8c31941534257299d206911a4a8a6163e26f82737e126b3e682567"
+         "e6627429e48104e25af999c8a86e6e30f1399c8d7a608dc427de10364451"
+         "9914288594a69c495a86cf43b12e7fb0a002eb31d1f889b9ad451b45ee15"
+         "e871204f48c9ecd35432b7c429bcdf6287c22b7b6aec4975b3b8d8207bd8"
+         "d497abc01a4efb31f01a8cdb8a389d6ec3936e573dd34b25fe5a65020301"
+         "00010282010033bad2fcc5e6e430f087d8253b8990fe996920f0fd0c862c"
+         "76a0fd64591fca50e998866973ae11604198e5b3e597eb287a5daec39011"
+         "e39f14856147df35802c1838ad8e3a4dc8485bd215d16a8b73e47b600925"
+         "6a3b58a056cc0c72bf5ea6cb5a9075da6fff3a1a3099c15969ea78ee4a54"
+         "00118bbd29aabc3fe454b0acb8e9a275387ba927bb4512001b51f8525b87"
+         "b5b4dbddd5f90e2b8416b796b791387737bb140f89fb6739face78575c0f"
+         "b9175757a02411d033c32f6ab9a869a7d8eed90be34dcada047d5d93b232"
+         "15ea34827c9b2749860ea7ae4a3fc1aa349505fd1cde16ab3caea5b2782f"
+         "ff75e77230fd5dbcfb9df777310b2778bfb52cb778810281805c9e598741"
+         "92f39cf977f915cb9df43c55d5ea4d740d39175ee5270745e39a20edc70c"
+         "4f0cc81b31d6435bac25f97b6a726a5916d8923b3dd67ac50a00a87547bc"
+         "7ccb446bd0f36480bff4c38c2bb2412cc556cf92426a53f2adba28cbfacd"
+         "96e9d0c4f067466443e6b5913eab24d16b400b2ebbeedc37bf374b7eb81d"
+         "e2feb102818100bb1ef08afa0e0f59f5b0b54213f79cc181fe33d1ae5e80"
+         "2fcee5cd9d857774848fe9cc457d1cca5ddfae7d7e72671240b6a010c9b2"
+         "839912f2c93068a4ce18b2fc3eb75be8317beaea4edf23437a77f708c7e7"
+         "e789aa4d941f15d1520b3570f69b76745a08b7f96df9575eb1b471a8cf69"
+         "9c7f54740c536160e3e88ec17f0bf50281801565cc1f508a07d85b565968"
+         "acab28730c0da8dd0e13c3fddf41a7dba94ce51df8714529ba353cfb2d9a"
+         "50429c5f6020fea00d4716efe9d9e68464a363f5876af4640c7e193ea40c"
+         "b32626014b9008d5bfe733a02f154305740aa8f8a5efa2b1dc010c8ed1fd"
+         "544acfb161060e7a2a1bd227033c0dfa38b2e7ae7c6f43105f7102818100"
+         "9cd53cc52efa33d1b1842f17b8069442f802284a793c4972489601752255"
+         "51ba7da87686536b9b0d7d1a11a2b69e3f05304c0e660f120f6d7b423729"
+         "addff381a8bba4110b16d686b965ebcdf193a712cd3047e59f53b6fc0be5"
+         "cc705866ad4c74569f048b442f7206473d5df220455dba65e9aece293a85"
+         "66a0fedd0fbebd350281802d6b6e6718bbd8ea3ed0a15c30d724282368b7"
+         "19121a4414b5728232ba628294cfb20c21ae5fa8c50b5e529617e97b2048"
+         "eb637a31b76e1ae3db6da6b02ed9b49c460809fa00bc9533483c7c962dc0"
+         "76a58ef56163550bf98d1ae2c76cd31542e79a71a6d593c1944eb1860a9a"
+         "544514f2a451f08a9898b36aeb1abf23747952",
+         "042057901fc2ff66f6ab2fdbb74d6ddc68c3bde29c9fa5be88893501355d"
+         "db1ccafd"};
+
+    for (u8 i = 0; i < 2; i++)
+        ret -= test_pkcs8(type[i], input[i], output[i]);
+
+    return ret;
+}
+
+extern u8
+maid_test_pkcs1_v1_5(void)
+{
+    /* Comparison with OpenSSL */
 
     u8 ret = 7;
 
-    char *e[] = {
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000010001",
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000260445",
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000101957"};
-    char *d[] = {
-         "1dbca92e4245c2d57bfba76210cc06029b502753b7c821a32b799fbd33c98b49"
-         "db10226b1eac0143c8574ef652833b96374d034ef84daa5559c693f3f028d497"
-         "16b82e87a3f682f25424563bd9409dcf9d08110500f73f74076f28e75e0199b1"
-         "f29fa2f70b9a31190dec54e872a740e7a1b1e38c3d11bca8267deb842cef4262"
-         "237ac875725068f32563b478aca8d6a99f34cb8876b97145b2e8529ec8adea83"
-         "ead4ec63e3ff2d17a2ffefb05c902ca7a92168378c89f75c928fc4f0707e4348"
-         "7a4f47df70cae87e24272c136d3e98cf59066d41a3d038857d073d8b4d2c27b8"
-         "f0ea6bfa50d263091a4a18c63f446bc9a61e8c4a688347b2435ec8e72eddaea7",
-         "0997634c477c1a039d44c810b2aaa3c7862b0b88d3708272e1e15f66fc938970"
-         "9f8a11f3ea6a5af7effa2d01c189c50f0d5bcbe3fa272e56cfc4a4e1d388a9dc"
-         "d65df8628902556c8b6bb6a641709b5a35dd2622c73d4640bfa1359d0e76e1f2"
-         "19f8e33eb9bd0b59ec198eb2fccaae0346bd8b401e12e3c67cb629569c185a2e"
-         "0f35a2f741644c1cca5ebb139d77a89a2953fc5e30048c0e619f07c8d21d1e56"
-         "b8af07193d0fdf3f49cd49f2ef3138b5138862f1470bd2d16e34a2b9e7777a6c"
-         "8c8d4cb94b4e8b5d616cd5393753e7b0f31cc7da559ba8e98d888914e334773b"
-         "af498ad88d9631eb5fe32e53a4145bf0ba548bf2b0a50c63f67b14e398a34b0d",
-         "057076fbab758efba2945f16d3456c21df4b7cfe1a8a762af8389e42e0b648f4"
-         "d452d8bdffdf2097f75bc661efe939dd99c170c1672c9a0f21ad450347333fdc"
-         "52f350d02ca1e6516cdbee38d3eb56b15f3f062b0d4f0901ed9a05a566917c5c"
-         "108b20e0da091b8ca9da43b7b066d8c28d849068f6eb803d8e84ff243172c258"
-         "cd7bd18858d2648dd7a55a2cb4db3feaf3171846e3e2c883f50a192be5ab4c79"
-         "dd330584adcae17f1458bcb2ab43e3929cbef840e9999bf0eb5601e88ff8758d"
-         "b564a756346d65d8c55f1b11b9b092fca7f6b2394ebc3109b3d02ec5a0967ea6"
-         "45d127fe0fb9f9fa71637ac6f0b92671809f4aad1278a6cb5e8a7247fe53afdf"};
-    char *N[] = {
-         "e0b14b99cd61cd3db9c2076668841324fa3174f33ce66ffd514394d34178d29a"
-         "49493276b6777233e7d46a3e68bc7ca7e899e901d54f6dee0749c3e48ddf6868"
-         "5867ee2ae66df88eb563f6db137a9f6b175a112e0eda8368e88e45efe1ce14bc"
-         "6016d52639627066af1872c72f60b9161c1d237eeb34b0f841b3f0896f9fe0e1"
-         "6b0f74352d101292cc464a7e7861bbeb86f6df6151cb265417c66c565ed8974b"
-         "d8fc984d5ddfd4eb91a3d5234ce1b5467f3ade375f802ec07293f1236efa3068"
-         "bc91b158551c875c5dc0a9d6fa321bf9421f08deac910e35c1c28549ee8eed83"
-         "30cf70595ff70b94b49907e27698a9d911f7ac0706afcb1a4a39feb38b0a8049",
-         "cea80475324c1dc8347827818da58bac069d3419c614a6ea1ac6a3b510dcd72c"
-         "c516954905e9fef908d45e13006adf27d467a7d83c111d1a5df15ef293771aef"
-         "b920032a5bb989f8e4f5e1b05093d3f130f984c07a772a3683f4dc6fb28a9681"
-         "5b32123ccdd13954f19d5b8b24a103e771a34c328755c65ed64e1924ffd04d30"
-         "b2142cc262f6e0048fef6dbc652f21479ea1c4b1d66d28f4d46ef7185e390cbf"
-         "a2e02380582f3188bb94ebbf05d31487a09aff01fcbb4cd4bfd1f0a833b38c11"
-         "813c84360bb53c7d4481031c40bad8713bb6b835cb08098ed15ba31ee4ba728a"
-         "8c8e10f7294e1b4163b7aee57277bfd881a6f9d43e02c6925aa3a043fb7fb78d",
-         "d39a426f8b81cd954f3df5512d6fcdb796457c172b6d510247e45ebecd1e0f7e"
-         "8aa3253a61293a7b70094b70d65d73828719ef6aaabbb24e083b943be775b0bf"
-         "3b5a0dc8388433de78e0c113ef7763f767ddd1542bcbdd9845919886ce20e289"
-         "22754af2a733204bce9b5bd50140e18e5ba91e4800b50ef30ecd48b4ecded67a"
-         "2f7be8bf7d7f14378a8c9ba0e6103d02f1685a334e46713033c89908da2e9f8b"
-         "f72cb2a529281d4dc66799cc2a63c872b6bd5ffc1fa9ada236e7f8d5796dd972"
-         "4e5e4ccadaf160de7f2d69c84009d31e952ac808c89a784be70cf60f42811928"
-         "abdec6f896a0fa5fb164f9f4298a5a8831f6684dae31f2e76146d6be14c3ea7d"};
+    char *public =
+        "308201090282010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7eb6e243"
+        "66aac85b7a2afaa2cead22550de99822b1f73964437f8c82daedac8ec33ef2a9"
+        "9e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee7fc463febf30"
+        "299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f8c31941534257299"
+        "d206911a4a8a6163e26f82737e126b3e682567e6627429e48104e25af999c8a8"
+        "6e6e30f1399c8d7a608dc427de103644519914288594a69c495a86cf43b12e7f"
+        "b0a002eb31d1f889b9ad451b45ee15e871204f48c9ecd35432b7c429bcdf6287"
+        "c22b7b6aec4975b3b8d8207bd8d497abc01a4efb31f01a8cdb8a389d6ec3936e"
+        "573dd34b25fe5a650203010001";
+    char *private =
+        "308204a10201000282010043b2dcfb0682d13422d8fa6ef324691aa55cc65b7e"
+        "b6e24366aac85b7a2afaa2cead22550de99822b1f73964437f8c82daedac8ec3"
+        "3ef2a99e2343012da30f6a71d16da5b88dec4c89ab4ab99bf8eabe6dee7fc463"
+        "febf30299d2667d5a380fc94f6a5aa358fe4cfaf4a833b4e536c1f8c31941534"
+        "257299d206911a4a8a6163e26f82737e126b3e682567e6627429e48104e25af9"
+        "99c8a86e6e30f1399c8d7a608dc427de103644519914288594a69c495a86cf43"
+        "b12e7fb0a002eb31d1f889b9ad451b45ee15e871204f48c9ecd35432b7c429bc"
+        "df6287c22b7b6aec4975b3b8d8207bd8d497abc01a4efb31f01a8cdb8a389d6e"
+        "c3936e573dd34b25fe5a6502030100010282010033bad2fcc5e6e430f087d825"
+        "3b8990fe996920f0fd0c862c76a0fd64591fca50e998866973ae11604198e5b3"
+        "e597eb287a5daec39011e39f14856147df35802c1838ad8e3a4dc8485bd215d1"
+        "6a8b73e47b6009256a3b58a056cc0c72bf5ea6cb5a9075da6fff3a1a3099c159"
+        "69ea78ee4a5400118bbd29aabc3fe454b0acb8e9a275387ba927bb4512001b51"
+        "f8525b87b5b4dbddd5f90e2b8416b796b791387737bb140f89fb6739face7857"
+        "5c0fb9175757a02411d033c32f6ab9a869a7d8eed90be34dcada047d5d93b232"
+        "15ea34827c9b2749860ea7ae4a3fc1aa349505fd1cde16ab3caea5b2782fff75"
+        "e77230fd5dbcfb9df777310b2778bfb52cb778810281805c9e59874192f39cf9"
+        "77f915cb9df43c55d5ea4d740d39175ee5270745e39a20edc70c4f0cc81b31d6"
+        "435bac25f97b6a726a5916d8923b3dd67ac50a00a87547bc7ccb446bd0f36480"
+        "bff4c38c2bb2412cc556cf92426a53f2adba28cbfacd96e9d0c4f067466443e6"
+        "b5913eab24d16b400b2ebbeedc37bf374b7eb81de2feb102818100bb1ef08afa"
+        "0e0f59f5b0b54213f79cc181fe33d1ae5e802fcee5cd9d857774848fe9cc457d"
+        "1cca5ddfae7d7e72671240b6a010c9b2839912f2c93068a4ce18b2fc3eb75be8"
+        "317beaea4edf23437a77f708c7e7e789aa4d941f15d1520b3570f69b76745a08"
+        "b7f96df9575eb1b471a8cf699c7f54740c536160e3e88ec17f0bf50281801565"
+        "cc1f508a07d85b565968acab28730c0da8dd0e13c3fddf41a7dba94ce51df871"
+        "4529ba353cfb2d9a50429c5f6020fea00d4716efe9d9e68464a363f5876af464"
+        "0c7e193ea40cb32626014b9008d5bfe733a02f154305740aa8f8a5efa2b1dc01"
+        "0c8ed1fd544acfb161060e7a2a1bd227033c0dfa38b2e7ae7c6f43105f710281"
+        "81009cd53cc52efa33d1b1842f17b8069442f802284a793c4972489601752255"
+        "51ba7da87686536b9b0d7d1a11a2b69e3f05304c0e660f120f6d7b423729addf"
+        "f381a8bba4110b16d686b965ebcdf193a712cd3047e59f53b6fc0be5cc705866"
+        "ad4c74569f048b442f7206473d5df220455dba65e9aece293a8566a0fedd0fbe"
+        "bd350281802d6b6e6718bbd8ea3ed0a15c30d724282368b719121a4414b57282"
+        "32ba628294cfb20c21ae5fa8c50b5e529617e97b2048eb637a31b76e1ae3db6d"
+        "a6b02ed9b49c460809fa00bc9533483c7c962dc076a58ef56163550bf98d1ae2"
+        "c76cd31542e79a71a6d593c1944eb1860a9a544514f2a451f08a9898b36aeb1a"
+        "bf23747952";
 
     char *in[] =
-        {"07c9e2f4386bc85f2c41728948b82a5591011db7",
-         "c34b1a0d795dae5b88559191bb2c1cb75a5fd1d18b5002074560e6ad",
-         "077877895a428028f60998b985550820025a2a42c0beab27165c0802d3098150",
-         "8e5d03e53c9084db4e808148b55658d3a689ca4084dfc41bdf37bac5f8e11e83"
-         "ab7eb6053bcb26be9b51ba03cac2b945",
-         "68e7e5132d2d5985fc0c12f787ed3933fa96bfc4dd0e5fefd33336836d2eff85"
-         "a652275e1cfd10f276e1c2f51c6d9b13a06399407baf2b3d9bf468eef0d2c4d8",
-         "2c0a4d9ce74063da224a7955a045c05bdadf481125f5797fc2e03c59",
-         "1ca543685a5698ea6b4f91afeae507e895497e0037c8f074300c96a8af0640b2"};
+        {"4e48c4228f01db757fda98686fa5aef95aec63cc",
+         "89e22066badb9d5262fb51d981cd4e9b2ac5865d8c5238df9dbc1ad1",
+         "dd101d8844273c7a5befef11512d673c0ac400fa34667c1c217c6b29c3732879",
+         "576d7898741ac32308d74569e22fbce8fc85f4b814f7440de90b6d057268201f"
+         "f77ed79741161d48dd33b8f2ad0886e2",
+         "c3829c88ea2a4f8a21d48e929a75196516c906fa05cacb6cb8d2c254a2fa63de"
+         "5b8b2bd4444480799bbbed199574e09b4a541cb548f01d3cb46a147f64446487",
+         "e1bb41e7664ba644f50d6c6e5a2ea6a267ab471fd71fe3f54088c3d9",
+         "7697b103b1f31832eec478e2d0f3b90a64d245182c8069d5d21ebf0c960aeb76"};
     char *out[] =
-        {"d0d03ccb3b30b7c9c4d6eeee2ec26d069246e019fb8fa2f3a9b72c9bbe231d93"
-         "ce053df805a045e2ef6bd8d08bfb0c36922e5a6f10b947b2607f596b6cbd3c9e"
-         "efef56f5396805e8b28b1ca182c78c0b12b9796aa856af69c35504f8acc7afa7"
-         "4bc0f77a1d61da94944057a9ee72d2f0a96cbaa2f64676f5318b71e56f519d0d"
-         "a1ce8f42db0ebe5045fcc726e39fb0032f2287918f9190f3fb3d4de542030441"
-         "f6736c6205a2bcd2450eb411085311c7320baa4268fd2fd8bcc8ebfddbb60740"
-         "cff0b3b00f618777ebcfb3468f309d923c957c8170727a5458ac2c9070f93cfc"
-         "37d31cf9f1a35d0cc3abf25af8dc9e1590ce59ab39d01cf0c154ab8d0635c5e9",
-         "27da4104eace1991e08bd8e7cfccd97ec48b896a0e156ce7bdc23fd570aaa9a0"
-         "0ed015101f0c6261c7371ceca327a73c3cecfcf6b2d9ed920c9698046e25c89a"
-         "db2360887d99983bf632f9e6eb0e5df60715902b9aeaa74bf5027aa246510891"
-         "c74ae366a16f397e2c8ccdc8bd56aa10e0d01585e69f8c4856e76b53acfd3d78"
-         "2b8171529008fa5eff030f46956704a3f5d9167348f37021fc277c6c0a8f93b8"
-         "a23cfbf918990f982a56d0ed2aa08161560755adc0ce2c3e2ab2929f79bfc0b2"
-         "4ff3e0ff352e6445d8a617f1785d66c32295bb365d61cfb107e9993bbd93421f"
-         "2d344a86e4127827fa0d0b2535f9b1d547de12ba2868acdecf2cb5f92a6a159a",
-         "6b8be97d9e518a2ede746ff4a7d91a84a1fc665b52f154a927650db6e7348c69"
-         "f8c8881f7bcf9b1a6d3366eed30c3aed4e93c203c43f5528a45de791895747ad"
-         "e9c5fa5eee81427edee02082147aa311712a6ad5fb1732e93b3d6cd23ffd46a0"
-         "b3caf62a8b69957cc68ae39f9993c1a779599cdda949bdaababb77f248fcfeaa"
-         "44059be5459fb9b899278e929528ee130facd53372ecbc42f3e8de2998425860"
-         "406440f248d817432de687112e504d734028e6c5620fa282ca07647006cf0a2f"
-         "f83e19a916554cc61810c2e855305db4e5cf893a6a96767365794556ff033359"
-         "084d7e38a8456e68e21155b76151314a29875feee09557161cbc654541e89e42",
-         "3974900bec3fcb081f0e5a299adf30d087aabaa633911410e87a4979bbe3fa80"
-         "c3abcf221686399a49bc2f1e5ac40c35df1700e4b9cb7c805a896646573f4a57"
-         "0a9704d2a2e6baee4b43d916906884ad3cf283529ea265e8fcb5cc1bdf7b7dee"
-         "85941e4b4fb25c1fc7b951fb129ab393cb069be271c1d954da3c43674309f1d2"
-         "12826fabb8e812de2d53d12597de040d32cb28c9f813159cb18c1b51f7a874cb"
-         "f229cc222caeb98e35ec5e4bf5c5e22cc8528631f15117e8c2be6eac91f4070e"
-         "ecdd07ecc6db6c46eaa65f472f2006988efef0b51c538c6e04d7519c8e3da4b1"
-         "72b1e2761089ed3ad1197992ef37c168dc881c8b5f8bbfee919f7c7afd25b8fc",
-         "148af61ed5ea8a87a08b3f403929bf8031db4fd3999b64409ba489f97a3ee520"
-         "8ea4202d2ec18734f615003a51f77441085be6ac0f11810ffa2dad58f0e186d5"
-         "520ac2b8a5d3966e8d2abb8074e13b50a4e7de83be10a66fdc7ca18118c5774f"
-         "781212de9efebc6376fcdddc65a3b1b8f1ab31492fe478259ce719b3db587498"
-         "d879a01dec96e8eabeb07ff7073f3f3eb446084955ca26329a791315a2c259d2"
-         "25e26b2154b2047b21faba68115bfd962e5e24ec52d7c5d231e3044cbcd8c880"
-         "4855703cbaa622b15b6ef78c7421a367166f1b02576c87360593da75b7189efa"
-         "fd1082bd59f6857f1701f646c24d70c95273c49d5b11e6afe258821b55c1680c",
-         "bb2969df7eac0f17e07992c00c8b561d1c21482f042a4fc95b739aace629a12f"
-         "6086e399bff9aa71268203c1656ddfc890570bf49dc75d8a7bc510413135ef93"
-         "1473b0ba77af4e5691970466bc2a5ef811b4eb94269173bb365ed28688c0078a"
-         "11e0776ed7f539717209536079dc7af515386698c1e539dcf0b3c08e584e3bef"
-         "987702aa02e5ab329725026dcf3fe64193a4e27451e5e77713908f07c742af0a"
-         "2583a04c1f1a0ac4e9af5878a9c8e53ac1eba469ceef836f3f6eb9ee2625feaf"
-         "933905c308c21aa75a76cde1d8bc41cf77beeed6919dd75d3834b3135a781cce"
-         "01a04b468f339bbd21c74a323793c8f439e6df0f3dd4226e5ba8c712b29f7acc",
-         "802fed875ef06dd2fad2ef123f14b360c0ed51eada42b4db56d8e62627a85a18"
-         "fc15eacd2467d76e84efd1245e4e62ff9dd7c5dbcfb3c83d9cad6e0be064a3cb"
-         "0100f3ffcd4c4025d654174a91a0b13767f5f8352305e61d54cfc61b9b801c57"
-         "e1287e759ea1599b68bfcbba043d776e3f1e75887a1cc5d1ab878418bc15a356"
-         "b479e6b4d12b7d49de850b2976b8113135c0df094ee476a5d6ba3b2a3a03ecf1"
-         "f6e97f1e0c3ad17245221449a1e0b69b9441d97f596cffdbd93041b11757d19d"
-         "6a3a07c7d204eb0f53ac94a5e3bc69d8c49cf1bfa4ee9c1e4c077c5a18296bef"
-         "3a0db41524feee3cc83c2c2642c633436e635f11b43056c8c590f02ba3d2dfae"};
+        {"3c55e44519d78b0d46c0db23ef74834199216fdba052cf3abfa2faea4f2c7180"
+         "2c17e2ce7e7a601b2fad8c592cb9f318934d86a16472f5a499892b4c34530c92"
+         "f6cb91b1ceaf4328aebd0acb403f2b18f8336a632cbc2f5b4588f6dc26ef9563"
+         "c2fd7cd249f26aeb4307a082dd3e6ab686840ab9e94617d477909fe440006b82"
+         "8a69b18e27c43eb64f52fdffc129e91978f3278e9e8a2abe91226e41b3f3205f"
+         "7eccef90515b2e0c3f9c784207d3ffdbfadcf26217f9482ebd64f0e7deb3c0dd"
+         "2ea63f33d6ec71db0eb251fdabe3f6f373f3a35348d509a11983d5cb9b902d89"
+         "346f3365f90fc42023ed5ed0da42eebf6a2d2b57dce3548d0ce7187337f8b8fe",
+         "2b65e24beb4a97605e6402c961d13d4d7d7d7e1b3154a8362188c6c7b7f1dafc"
+         "c544e7728b448978a7e74340404fd78a0767951921bed34e49e4ddc2488ce423"
+         "fbd0f5e3c0159848644f3cb94d398460cff6318895422d65460128fd1c8c7ded"
+         "8ab77ff4ef4caf0689b1775ddac471e5a1eb95358769c70ba0e2f6154e8fc250"
+         "c57cda4f05fa262291dbdf4cce267e2b23838f22898d490ec24f757be074d151"
+         "83f7497e45480172c0bd78b2dc3a4c4b7547adf8a9a3691f28d508d1196d02fb"
+         "cbf53c06df1ba01d036fbde8329a58edcc349801188446ebeeff2535b501680f"
+         "2015bb202c734ad072093e07c3892c6353cf7eabf1f929d8e6be59e0ea56d041",
+         "0777838b7db1ed1ff6cf76ed9d07fcb572907c698a09482db93f2302c77d53bf"
+         "f6580a4795a33d49ce12989fc6b559edd34a09a0001a7adc2dcbdfa3b1c02266"
+         "71295bb84cf82b46b63d7174d03f4c855ad0e92dc18bea095482d482f9c2cd9c"
+         "6f4d0aedac2e8fff52bd1a6a1d786eb59ab0b51e3e9a8fa5358d32df7869fa63"
+         "4ffbc754fcb8f2da0bb3dc8bf4e9dc80129743e29f4f4b9069dd5bdd47467719"
+         "b462fea4b5cc1561200cb98b71b5a7a1b2008b37a563d5a0dafe509e85621bc0"
+         "ad911b0bfbccff43c64b44c08a265a9af628f900a28ce97af881ed16682d238d"
+         "c28b2af4b40d99649675865a989be5f5409226aed974fe295a0ff91db3de434a",
+         "3d4923fbad7ff08d7844720bcec485e3ff18404803659817f2a9394f51f4eb59"
+         "936401eb14b8caca307434c617f9bced6c6dba5e4bd0403c0768df6d8769f364"
+         "587462ad6045887029dc7f4917b0fd56fc0a84aa02758b8f87f042cf18c89410"
+         "0e8b2d1ceeba4505d5101455faa1102137f7eb5ea6fdfc47b7b61f9c9c9c76e6"
+         "7f718aa9076045114e0cd28ff9a5ebe3ab15f6fd0a5e9149f14ef4a917a2a810"
+         "11d9b72dc661b7365c6b588f5a9ce7f8f25893c2c65ef1fdbf6f45738af71083"
+         "9701092e6a42c4c2e61ae1b2c5fc564a213834ccdfa1e8e46c69e590a0fec79e"
+         "fc48367e7d70219f6a4d4edeb1f87470d49a81ab55c4432673bb08eb891cb5e3",
+         "18809837a151abb49efe6b6eb9289c4e25d3ee5882632f404b65667e4a769ae2"
+         "2b31f7309b8f0216d24bdab441cd18d61b24304508c2259bd37b387975f0dbb5"
+         "3f041cdcbe80d727ef736b7a1354643cd486f5b23923a168bf9fa228d517deba"
+         "c347acf3d785ef7144ff31cb425ec66e087a881690ff3859655f90d5bc5945ef"
+         "365f6f760617b5a0cadf5e8f713548922dcd6f06427b39020205b268033d8092"
+         "03625ed9ab42dafeaf5a04724dbdc8a98a7594e45d30bf195039800e27cfbf7c"
+         "570935e987e348be2e597f6b56acfb7a9574022324503a8903d2739ef48c5a28"
+         "197729297ab8277ca9370c8cb94d3683f14b97ba21f2f37ce821d12b01ddd10c",
+         "37c101445c12de124cbce3729f09563220d6593f8ac3786d63da727de86c3004"
+         "27c1af3f0548c40d01ae5f1a4bdaea5f5dd5d3b9f56a2641e6fb3b256708587a"
+         "efdb6aae02538d33e9ef2b53c08c33559b33afd064e8b7982fedcf4bf34ccd6f"
+         "e061817b400290468461bb9d292058ce82cdc41896caa9f54a2e27d309191556"
+         "ef4188b58c8e9ab060db8caaebe0e32ff67c8db109e1e08d0c11d89ec22eed14"
+         "3a0645baef3fcd80276f7b74e6dcab0f64a94de8b5d98f7c8ee3b3d38cea104e"
+         "cfc224f504e80113ffac8350bd958c848a03795d3d680f2a0f007f242f71a058"
+         "25fd44ab14a276c2255754cf985ed4e118e2ef64678a8df72ab53cc9804e2f55",
+         "1b2be423e78681631cc23dc428d254dd8fefa5acbb773db1c08c16add6e32b6a"
+         "c081a278a2fc92649f17c512fb95dd82a00d171c3a709690e4bf1585b4a54799"
+         "3569ef6b92f5486af968a23a9892ab67e5989e7285ab5f16b2cdcde13173821c"
+         "fb71f0d73affcefb254d790cf565b3328dbe7c66c25eea24878cc89a26021e91"
+         "1ea8f757a1eb0e5514f7366004ff8a259c7d2a720e6339c7f7cc853007a19410"
+         "c41dd0777e844af64a7c03edcab6150410578521fe1e81a50253ec6cff4386c4"
+         "ae03e16cdd0a6135a7014b562e5ad3f21beee1cddc4237589ddc716a0925c8ec"
+         "db9514049ef444c859b1891551b4974d81746606c55715bf4430647b2563e286"};
 
     struct maid_sign_def defs[] =
         {maid_pkcs1_v1_5_sha1,
@@ -2142,12 +2273,8 @@ maid_test_pkcs1(void)
          maid_pkcs1_v1_5_sha384,     maid_pkcs1_v1_5_sha512,
          maid_pkcs1_v1_5_sha512_224, maid_pkcs1_v1_5_sha512_256};
 
-    for (u8 i = 0; i < 1; i++)
-        ret -= test_pkcs1(defs[i], 2048, e[0], d[0], N[0], in[i], out[i]);
-    for (u8 i = 1; i < 5; i++)
-        ret -= test_pkcs1(defs[i], 2048, e[1], d[1], N[1], in[i], out[i]);
-    for (u8 i = 5; i < 7; i++)
-        ret -= test_pkcs1(defs[i], 2048, e[2], d[2], N[2], in[i], out[i]);
+    for (u8 i = 0; i < 7; i++)
+        ret -= test_pkcs1_v1_5(defs[i], public, private, in[i], out[i]);
 
     return ret;
 }
@@ -2218,170 +2345,4 @@ maid_test_dh(void)
         ret -= test_dh(2048, g[i], p[i], prv[i], pub[i], pub2[i], secret[i]);
 
     return ret;
-}
-
-extern u8
-maid_test_pem(void)
-{
-    /* PEM encoding RFC 7468 examples */
-
-    u8 ret = 1;
-
-    const char *full =
-        "This is a test\n"
-        "This is a test\n"
-        "This is a test\n"
-        "This is a test\n"
-        "This is a test\n"
-        "-----BEGIN PUBLIC KEY-----\n"
-        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEn1LlwLN/KBYQRVH6HfIMTzfEqJOVztLe\n"
-        "kLchp2hi78cCaMY81FBlYs8J9l7krc+M4aBeCGYFjba+hiXttJWPL7ydlE+5UG4U\n"
-        "Nkn3Eos8EiZByi9DVsyfy9eejh+8AXgp\n"
-        "-----END PUBLIC KEY-----\n"
-        "This is a test\n"
-        "This is a test\n"
-        "This is a test\n"
-        "This is a test\n"
-        "This is a test\n"
-        "-----BEGIN PRIVATE KEY-----\n"
-        "MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgVcB/UNPxalR9zDYAjQIf\n"
-        "jojUDiQuGnSJrFEEzZPT/92hRANCAASc7UJtgnF/abqWM60T3XNJEzBv5ez9TdwK\n"
-        "H0M6xpM2q+53wmsN/eYLdgtjgBd3DBmHtPilCkiFICXyaA8z9LkJ\n"
-        "-----END PRIVATE KEY-----\n";
-
-    enum maid_pem_t type[] = {MAID_PEM_PUBLIC, MAID_PEM_PRIVATE};
-    char *data[] = {
-        "3076301006072a8648ce3d020106052b81040022036200049f52e5c0b37f281610"
-        "4551fa1df20c4f37c4a89395ced2de90b721a76862efc70268c63cd4506562cf09"
-        "f65ee4adcf8ce1a05e0866058db6be8625edb4958f2fbc9d944fb9506e143649f7"
-        "128b3c122641ca2f4356cc9fcbd79e8e1fbc017829",
-        "308184020100301006072a8648ce3d020106052b8104000a046d306b0201010420"
-        "55c07f50d3f16a547dcc36008d021f8e88d40e242e1a7489ac5104cd93d3ffdda1"
-        "44034200049ced426d82717f69ba9633ad13dd734913306fe5ecfd4ddc0a1f433a"
-        "c69336abee77c26b0dfde60b760b638017770c1987b4f8a50a48852025f2680f33"
-        "f4b909"};
-    char *export[] = {
-        "-----BEGIN PUBLIC KEY-----\n"
-        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEn1LlwLN/KBYQRVH6HfIMTzfEqJOVztLe\n"
-        "kLchp2hi78cCaMY81FBlYs8J9l7krc+M4aBeCGYFjba+hiXttJWPL7ydlE+5UG4U\n"
-        "Nkn3Eos8EiZByi9DVsyfy9eejh+8AXgp\n"
-        "-----END PUBLIC KEY-----\n",
-        "-----BEGIN PRIVATE KEY-----\n"
-        "MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgVcB/UNPxalR9zDYAjQIf\n"
-        "jojUDiQuGnSJrFEEzZPT/92hRANCAASc7UJtgnF/abqWM60T3XNJEzBv5ez9TdwK\n"
-        "H0M6xpM2q+53wmsN/eYLdgtjgBd3DBmHtPilCkiFICXyaA8z9LkJ\n"
-        "-----END PRIVATE KEY-----\n"};
-
-    ret -= test_pem(full, 2, type, data, export);
-
-    return ret;
-}
-
-extern u8
-maid_test_serial_rsa(void)
-{
-    /* Comparison with OpenSSL */
-
-    u8 ret = 2;
-
-    char *public =
-        "-----BEGIN RSA PUBLIC KEY-----\n"
-        "MIIBCQKCAQBDstz7BoLRNCLY+m7zJGkapVzGW3624kNmqshbeir6os6tIlUN6Zgi\n"
-        "sfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9qcdFtpbiN7EyJq0q5m/jqvm3uf8Rj/r8w\n"
-        "KZ0mZ9WjgPyU9qWqNY/kz69KgztOU2wfjDGUFTQlcpnSBpEaSophY+JvgnN+Ems+\n"
-        "aCVn5mJ0KeSBBOJa+ZnIqG5uMPE5nI16YI3EJ94QNkRRmRQohZSmnElahs9DsS5/\n"
-        "sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNUMrfEKbzfYofCK3tq7El1s7jYIHvY1Jer\n"
-        "wBpO+zHwGozbijidbsOTblc900sl/lplAgMBAAE=\n"
-        "-----END RSA PUBLIC KEY-----\n";
-    char *private =
-        "-----BEGIN RSA PRIVATE KEY-----\n"
-        "MIIEoQIBAAKCAQBDstz7BoLRNCLY+m7zJGkapVzGW3624kNmqshbeir6os6tIlUN\n"
-        "6Zgisfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9qcdFtpbiN7EyJq0q5m/jqvm3uf8Rj\n"
-        "/r8wKZ0mZ9WjgPyU9qWqNY/kz69KgztOU2wfjDGUFTQlcpnSBpEaSophY+JvgnN+\n"
-        "Ems+aCVn5mJ0KeSBBOJa+ZnIqG5uMPE5nI16YI3EJ94QNkRRmRQohZSmnElahs9D\n"
-        "sS5/sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNUMrfEKbzfYofCK3tq7El1s7jYIHvY\n"
-        "1JerwBpO+zHwGozbijidbsOTblc900sl/lplAgMBAAECggEAM7rS/MXm5DDwh9gl\n"
-        "O4mQ/plpIPD9DIYsdqD9ZFkfylDpmIZpc64RYEGY5bPll+soel2uw5AR458UhWFH\n"
-        "3zWALBg4rY46TchIW9IV0WqLc+R7YAklajtYoFbMDHK/XqbLWpB12m//OhowmcFZ\n"
-        "aep47kpUABGLvSmqvD/kVLCsuOmidTh7qSe7RRIAG1H4UluHtbTb3dX5DiuEFreW\n"
-        "t5E4dze7FA+J+2c5+s54V1wPuRdXV6AkEdAzwy9quahpp9ju2QvjTcraBH1dk7Iy\n"
-        "Feo0gnybJ0mGDqeuSj/BqjSVBf0c3harPK6lsngv/3XncjD9Xbz7nfd3MQsneL+1\n"
-        "LLd4gQKBgFyeWYdBkvOc+Xf5Fcud9DxV1epNdA05F17lJwdF45og7ccMTwzIGzHW\n"
-        "Q1usJfl7anJqWRbYkjs91nrFCgCodUe8fMtEa9DzZIC/9MOMK7JBLMVWz5JCalPy\n"
-        "rbooy/rNlunQxPBnRmRD5rWRPqsk0WtACy677tw3vzdLfrgd4v6xAoGBALse8Ir6\n"
-        "Dg9Z9bC1QhP3nMGB/jPRrl6AL87lzZ2Fd3SEj+nMRX0cyl3frn1+cmcSQLagEMmy\n"
-        "g5kS8skwaKTOGLL8Prdb6DF76upO3yNDenf3CMfn54mqTZQfFdFSCzVw9pt2dFoI\n"
-        "t/lt+VdesbRxqM9pnH9UdAxTYWDj6I7Bfwv1AoGAFWXMH1CKB9hbVllorKsocwwN\n"
-        "qN0OE8P930Gn26lM5R34cUUpujU8+y2aUEKcX2Ag/qANRxbv6dnmhGSjY/WHavRk\n"
-        "DH4ZPqQMsyYmAUuQCNW/5zOgLxVDBXQKqPil76Kx3AEMjtH9VErPsWEGDnoqG9In\n"
-        "AzwN+jiy5658b0MQX3ECgYEAnNU8xS76M9GxhC8XuAaUQvgCKEp5PElySJYBdSJV\n"
-        "Ubp9qHaGU2ubDX0aEaK2nj8FMEwOZg8SD217Qjcprd/zgai7pBELFtaGuWXrzfGT\n"
-        "pxLNMEfln1O2/AvlzHBYZq1MdFafBItEL3IGRz1d8iBFXbpl6a7OKTqFZqD+3Q++\n"
-        "vTUCgYAta25nGLvY6j7QoVww1yQoI2i3GRIaRBS1coIyumKClM+yDCGuX6jFC15S\n"
-        "lhfpeyBI62N6MbduGuPbbaawLtm0nEYICfoAvJUzSDx8li3AdqWO9WFjVQv5jRri\n"
-        "x2zTFULnmnGm1ZPBlE6xhgqaVEUU8qRR8IqYmLNq6xq/I3R5Ug==\n"
-        "-----END RSA PRIVATE KEY-----\n";
-
-    char *public2 =
-        "-----BEGIN PUBLIC KEY-----\n"
-        "MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQBDstz7BoLRNCLY+m7zJGka\n"
-        "pVzGW3624kNmqshbeir6os6tIlUN6Zgisfc5ZEN/jILa7ayOwz7yqZ4jQwEtow9q\n"
-        "cdFtpbiN7EyJq0q5m/jqvm3uf8Rj/r8wKZ0mZ9WjgPyU9qWqNY/kz69KgztOU2wf\n"
-        "jDGUFTQlcpnSBpEaSophY+JvgnN+Ems+aCVn5mJ0KeSBBOJa+ZnIqG5uMPE5nI16\n"
-        "YI3EJ94QNkRRmRQohZSmnElahs9DsS5/sKAC6zHR+Im5rUUbRe4V6HEgT0jJ7NNU\n"
-        "MrfEKbzfYofCK3tq7El1s7jYIHvY1JerwBpO+zHwGozbijidbsOTblc900sl/lpl\n"
-        "AgMBAAE=\n"
-        "-----END PUBLIC KEY-----\n";
-    char *private2 =
-        "-----BEGIN PRIVATE KEY-----\n"
-        "MIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAEOy3PsGgtE0Itj6\n"
-        "bvMkaRqlXMZbfrbiQ2aqyFt6Kvqizq0iVQ3pmCKx9zlkQ3+MgtrtrI7DPvKpniND\n"
-        "AS2jD2px0W2luI3sTImrSrmb+Oq+be5/xGP+vzApnSZn1aOA/JT2pao1j+TPr0qD\n"
-        "O05TbB+MMZQVNCVymdIGkRpKimFj4m+Cc34Saz5oJWfmYnQp5IEE4lr5mciobm4w\n"
-        "8TmcjXpgjcQn3hA2RFGZFCiFlKacSVqGz0OxLn+woALrMdH4ibmtRRtF7hXocSBP\n"
-        "SMns01Qyt8QpvN9ih8Ire2rsSXWzuNgge9jUl6vAGk77MfAajNuKOJ1uw5NuVz3T\n"
-        "SyX+WmUCAwEAAQKCAQAzutL8xebkMPCH2CU7iZD+mWkg8P0Mhix2oP1kWR/KUOmY\n"
-        "hmlzrhFgQZjls+WX6yh6Xa7DkBHjnxSFYUffNYAsGDitjjpNyEhb0hXRaotz5Htg\n"
-        "CSVqO1igVswMcr9epstakHXab/86GjCZwVlp6njuSlQAEYu9Kaq8P+RUsKy46aJ1\n"
-        "OHupJ7tFEgAbUfhSW4e1tNvd1fkOK4QWt5a3kTh3N7sUD4n7Zzn6znhXXA+5F1dX\n"
-        "oCQR0DPDL2q5qGmn2O7ZC+NNytoEfV2TsjIV6jSCfJsnSYYOp65KP8GqNJUF/Rze\n"
-        "Fqs8rqWyeC//dedyMP1dvPud93cxCyd4v7Ust3iBAoGAXJ5Zh0GS85z5d/kVy530\n"
-        "PFXV6k10DTkXXuUnB0XjmiDtxwxPDMgbMdZDW6wl+XtqcmpZFtiSOz3WesUKAKh1\n"
-        "R7x8y0Rr0PNkgL/0w4wrskEsxVbPkkJqU/KtuijL+s2W6dDE8GdGZEPmtZE+qyTR\n"
-        "a0ALLrvu3De/N0t+uB3i/rECgYEAux7wivoOD1n1sLVCE/ecwYH+M9GuXoAvzuXN\n"
-        "nYV3dISP6cxFfRzKXd+ufX5yZxJAtqAQybKDmRLyyTBopM4Ysvw+t1voMXvq6k7f\n"
-        "I0N6d/cIx+fniapNlB8V0VILNXD2m3Z0Wgi3+W35V16xtHGoz2mcf1R0DFNhYOPo\n"
-        "jsF/C/UCgYAVZcwfUIoH2FtWWWisqyhzDA2o3Q4Tw/3fQafbqUzlHfhxRSm6NTz7\n"
-        "LZpQQpxfYCD+oA1HFu/p2eaEZKNj9Ydq9GQMfhk+pAyzJiYBS5AI1b/nM6AvFUMF\n"
-        "dAqo+KXvorHcAQyO0f1USs+xYQYOeiob0icDPA36OLLnrnxvQxBfcQKBgQCc1TzF\n"
-        "Lvoz0bGELxe4BpRC+AIoSnk8SXJIlgF1IlVRun2odoZTa5sNfRoRoraePwUwTA5m\n"
-        "DxIPbXtCNymt3/OBqLukEQsW1oa5ZevN8ZOnEs0wR+WfU7b8C+XMcFhmrUx0Vp8E\n"
-        "i0QvcgZHPV3yIEVdumXprs4pOoVmoP7dD769NQKBgC1rbmcYu9jqPtChXDDXJCgj\n"
-        "aLcZEhpEFLVygjK6YoKUz7IMIa5fqMULXlKWF+l7IEjrY3oxt24a49ttprAu2bSc\n"
-        "RggJ+gC8lTNIPHyWLcB2pY71YWNVC/mNGuLHbNMVQueacabVk8GUTrGGCppURRTy\n"
-        "pFHwipiYs2rrGr8jdHlS\n"
-        "-----END PRIVATE KEY-----\n";
-
-    char *hash =
-        "355cd8229d6d67a9fd82ff31a77d5636831a2fd8fc007e46487488e5213e5d7a";
-    char *sign =
-        "2d432e7d7a187f8e2f3ad3706cfb711df47ba777dbcba7cc3b9bc501f0a5ad65"
-        "0928ecb7422ebfc274953da5dad58facc9cde6589f00f0936039a4769727d917"
-        "6ed83df226686782e27b2ecc6e34789bdbe842d829f322f496abff3a4d4bb1cd"
-        "0aa6ed3f58fd5c60c17bb7c2fb0c250a2530b006f25c3c02cc04042b88de79e1"
-        "0c2fbc77c7a36bd90cb0043006d4f73b36534e9d6f345fbae1c56b17daf04423"
-        "882e8e95645e36fa3b73c4e433d600a46d76f0771343b1779de40e2168de54e6"
-        "e5ea683baee16bc44f719535b9cbad367d47b6c58fb61ff01bc9658e7f0efee0"
-        "5bc30ab176bb85af96ba7d66c713a52c05dddd0ad36df798437ed42fef5fd75d";
-
-    ret -= test_serial_rsa(2048, public,  private,  hash, sign, false);
-    ret -= test_serial_rsa(2048, public2, private2, hash, sign, true);
-
-    return ret;
-}
-
-extern u8
-maid_test_keygen_rsa(void)
-{
-    return 1 - test_keygen_rsa(2048);
 }

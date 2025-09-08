@@ -15,8 +15,8 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_SERIAL_H
-#define MAID_SERIAL_H
+#ifndef MAID_PEM_H
+#define MAID_PEM_H
 
 #include <maid/types.h>
 
@@ -39,23 +39,5 @@ struct maid_pem
 struct maid_pem *maid_pem_import(const char *input, const char **endptr);
 char *maid_pem_export(struct maid_pem *p);
 struct maid_pem *maid_pem_free(struct maid_pem *p);
-
-#include <maid/mp.h>
-
-enum maid_serial
-{
-    MAID_SERIAL_UNKNOWN,
-    MAID_SERIAL_RSA_PUBLIC,
-    MAID_SERIAL_RSA_PRIVATE,
-    MAID_SERIAL_PKCS8_RSA_PUBLIC,
-    MAID_SERIAL_PKCS8_RSA_PRIVATE,
-    MAID_SERIAL_ED25519_PUBLIC,
-    MAID_SERIAL_ED25519_PRIVATE
-};
-
-enum maid_serial maid_serial_import(struct maid_pem *p, size_t *bits,
-                                    maid_mp_word **output);
-struct maid_pem *maid_serial_export(enum maid_serial s, size_t bits,
-                                    maid_mp_word **input);
 
 #endif

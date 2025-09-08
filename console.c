@@ -32,12 +32,10 @@
 #include <maid/mac.h>
 #include <maid/aead.h>
 #include <maid/hash.h>
-#include <maid/pub.h>
+#include <maid/rsa.h>
 #include <maid/ecc.h>
 #include <maid/sign.h>
 #include <maid/kex.h>
-#include <maid/serial.h>
-#include <maid/keygen.h>
 #include <maid/test.h>
 
 /* Filter functions */
@@ -144,7 +142,9 @@ get_data(char *input, u8 *out, size_t size, bool lt)
                 else
                 {
                     size = st.st_size;
+
                     get_data_fz = (size == 0);
+                    ret = size;
                 }
             }
 
@@ -251,72 +251,6 @@ get_data(char *input, u8 *out, size_t size, bool lt)
     return ret;
 }
 
-static maid_pub *
-get_pub(char *filename, size_t *bits, bool private)
-{
-    maid_pub *ret = NULL;
-
-    static u8 buffer[65536] = {0};
-
-    const char *next = NULL;
-    struct maid_pem *p = NULL, *p2 = NULL;
-    if (get_data(filename, buffer, sizeof(buffer), true) &&
-         (p  = maid_pem_import((char *)buffer, &next)) &&
-        !(p2 = maid_pem_import(next, NULL)))
-    {
-        maid_mp_word *params[8] = {NULL};
-
-        enum maid_serial t = maid_serial_import(p, bits, params);
-        if (!private && (t == MAID_SERIAL_RSA_PUBLIC ||
-                         t == MAID_SERIAL_PKCS8_RSA_PUBLIC))
-        {
-            struct maid_rsa_key rsa = {.modulo   = params[0],
-                                       .exponent = params[1]};
-            ret = maid_pub_new(maid_rsa_public, &rsa, *bits);
-            if (!ret)
-                fprintf(stderr, "Out of memory\n");
-        }
-        else if (private && (t == MAID_SERIAL_RSA_PRIVATE ||
-                             t == MAID_SERIAL_PKCS8_RSA_PRIVATE))
-        {
-            struct maid_rsa_key_full rsa = {.modulo      = params[0],
-                                            .encryption  = params[1],
-                                            .decryption  = params[2],
-                                            .prime1      = params[3],
-                                            .prime2      = params[4],
-                                            .exponent1   = params[5],
-                                            .exponent2   = params[6],
-                                            .coefficient = params[7]};
-            ret = maid_pub_new(maid_rsa_private_crt, &rsa, *bits);
-            if (!ret)
-                fprintf(stderr, "Out of memory\n");
-        }
-        else if (t == MAID_SERIAL_UNKNOWN)
-            fprintf(stderr, "Unknown format\n");
-        else
-            fprintf(stderr, "Not a %s key\n",
-                    (private) ? "private" : "public");
-
-        size_t words = maid_mp_words(*bits);
-        for (size_t i = 0; i < 8; i++)
-        {
-            maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-            free(params[i]);
-        }
-    }
-    else if (p == NULL || next == NULL)
-        fprintf(stderr, "Invalid PEM file\n");
-    else
-        fprintf(stderr, "PEM file contain a bundle\n");
-
-    maid_pem_free(p);
-    maid_pem_free(p2);
-
-    maid_mem_clear(buffer, sizeof(buffer));
-
-    return ret;
-}
-
 /* Main functions */
 
 static bool
@@ -337,8 +271,8 @@ usage(char *ctx)
                 "    verify      Verifies a signature\n\n"
                 "    exchange    Generates a public-key for key exchange\n"
                 "    secret      Generates a secret from key exchange\n\n"
-                "    pubkey      Extracts public key from private key\n"
-                "    info        Displays PEM data information\n\n"
+                "    keygen      Generates a private key using entropy\n"
+                "    pubgen      Extracts public key from private key\n"
                 "    encode      Encodes data to a certain format\n"
                 "    decode      Decodes data from a certain format\n\n"
                 "Arguments:\n"
@@ -426,25 +360,25 @@ usage(char *ctx)
                 "maid sign [algorithm] [key] [hash]\n"
                 "Signs a hash\n\n"
                 "Algorithms:\n"
-                "    rsa-pkcs1-sha1       (key: PEM <= 64k, hash: 20)\n"
-                "    rsa-pkcs1-sha224     (key: PEM <= 64k, hash: 28)\n"
-                "    rsa-pkcs1-sha256     (key: PEM <= 64k, hash: 32)\n"
-                "    rsa-pkcs1-sha384     (key: PEM <= 64k, hash: 48)\n"
-                "    rsa-pkcs1-sha512     (key: PEM <= 64k, hash: 64)\n"
-                "    rsa-pkcs1-sha512-224 (key: PEM <= 64k, hash: 28)\n"
-                "    rsa-pkcs1-sha512-256 (key: PEM <= 64k, hash: 32)\n");
+                "    rsa-pkcs1-sha1       (key: PKCS#1 DER <= 4k, hash: 20)\n"
+                "    rsa-pkcs1-sha224     (key: PKCS#1 DER <= 4k, hash: 28)\n"
+                "    rsa-pkcs1-sha256     (key: PKCS#1 DER <= 4k, hash: 32)\n"
+                "    rsa-pkcs1-sha384     (key: PKCS#1 DER <= 4k, hash: 48)\n"
+                "    rsa-pkcs1-sha512     (key: PKCS#1 DER <= 4k, hash: 64)\n"
+                "    rsa-pkcs1-sha512-224 (key: PKCS#1 DER <= 4k, hash: 28)\n"
+                "    rsa-pkcs1-sha512-256 (key: PKCS#1 DER <= 4k, hash: 32)\n");
     else if (strcmp(ctx, "verify") == 0)
         fprintf(stderr,
-                "maid verify [algorithm] [key] [signature]\n"
+                "maid verify [algorithm] [key] [hash] [signature]\n"
                 "Verifies a signature\n\n"
                 "Algorithms:\n"
-                "    rsa-pkcs1-sha1       (key: PEM <= 64k)\n"
-                "    rsa-pkcs1-sha224     (key: PEM <= 64k)\n"
-                "    rsa-pkcs1-sha256     (key: PEM <= 64k)\n"
-                "    rsa-pkcs1-sha384     (key: PEM <= 64k)\n"
-                "    rsa-pkcs1-sha512     (key: PEM <= 64k)\n"
-                "    rsa-pkcs1-sha512-224 (key: PEM <= 64k)\n"
-                "    rsa-pkcs1-sha512-256 (key: PEM <= 64k)\n");
+                "    rsa-pkcs1-sha1       (key: PKCS#1 DER <= 4k, hash: 20)\n"
+                "    rsa-pkcs1-sha224     (key: PKCS#1 DER <= 4k, hash: 28)\n"
+                "    rsa-pkcs1-sha256     (key: PKCS#1 DER <= 4k, hash: 32)\n"
+                "    rsa-pkcs1-sha384     (key: PKCS#1 DER <= 4k, hash: 48)\n"
+                "    rsa-pkcs1-sha512     (key: PKCS#1 DER <= 4k, hash: 64)\n"
+                "    rsa-pkcs1-sha512-224 (key: PKCS#1 DER <= 4k, hash: 28)\n"
+                "    rsa-pkcs1-sha512-256 (key: PKCS#1 DER <= 4k, hash: 32)\n");
     else if (strcmp(ctx, "exchange") == 0)
         fprintf(stderr, "maid exchange [algorithm] [private]\n"
                         "Generates a public-key for key exchange\n\n"
@@ -466,12 +400,11 @@ usage(char *ctx)
                         "    ctr-drbg-aes-128 (entropy: 32)\n"
                         "    ctr-drbg-aes-192 (entropy: 40)\n"
                         "    ctr-drbg-aes-256 (entropy: 48)\n");
-    else if (strcmp(ctx, "pubkey") == 0)
-        fprintf(stderr, "maid pubkey [key <= 64k]\n"
-                        "Extracts public key from private key\n");
-    else if (strcmp(ctx, "info") == 0)
-        fprintf(stderr, "maid info [data <= 64k]\n"
-                        "Displays PEM data information\n");
+    else if (strcmp(ctx, "pubgen") == 0)
+        fprintf(stderr, "maid pubgen [algorithm] [key]\n"
+                        "Extracts public key from private key\n"
+                        "Algorithms:\n"
+                        "    rsa (key: PKCS#1 DER <= 4k)\n");
     else if (strcmp(ctx, "encode") == 0)
         fprintf(stderr, "maid encode [algorithm] < data\n"
                         "Encodes data to a certain format\n\n"
@@ -986,120 +919,149 @@ sign_verify(int argc, char *argv[], bool verify)
 {
     bool ret = false;
 
-    if (argc == 4)
+    if ((!verify && argc == 4) || (verify && argc == 5))
     {
         int out = STDOUT_FILENO;
 
-        volatile size_t bits = 0;
-        maid_pub *pub = get_pub(argv[2], (size_t *)&bits, !verify);
-
-        maid_sign *ctx = NULL;
-        volatile size_t words = maid_mp_words(bits);
-        u8 buffer[words * sizeof(maid_mp_word)];
-        maid_mem_clear(buffer, sizeof(buffer));
-
-        if (pub && bits)
+        u8 key[4096] = {0};
+        size_t n = get_data(argv[2], key, sizeof(key), true);
+        if (n)
         {
             ret = true;
 
             const struct maid_sign_def *sign_d = NULL;
-            size_t hash_s = 0;
-            size_t min_bits = 0;
+            u8 type = 0;
 
             if (strcmp(argv[1], "rsa-pkcs1-sha1") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha1;
-                hash_s   = 20;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha1;
+                type   = 1;
             }
             else if (strcmp(argv[1], "rsa-pkcs1-sha224") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha224;
-                hash_s   = 28;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha224;
+                type   = 1;
             }
             else if (strcmp(argv[1], "rsa-pkcs1-sha256") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha256;
-                hash_s   = 32;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha256;
+                type   = 1;
             }
             else if (strcmp(argv[1], "rsa-pkcs1-sha384") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha384;
-                hash_s   = 48;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha384;
+                type   = 1;
             }
             else if (strcmp(argv[1], "rsa-pkcs1-sha512") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha512;
-                hash_s   = 64;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha512;
+                type   = 1;
             }
             else if (strcmp(argv[1], "rsa-pkcs1-sha512-224") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha512_224;
-                hash_s   = 28;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha512_224;
+                type   = 1;
             }
             else if (strcmp(argv[1], "rsa-pkcs1-sha512-256") == 0)
             {
-                sign_d   = &maid_pkcs1_v1_5_sha512_256;
-                hash_s   = 32;
-                min_bits = 2048;
+                sign_d = &maid_pkcs1_v1_5_sha512_256;
+                type   = 1;
             }
             else
                 ret = usage((verify) ? "verify" : "sign");
 
-            if (bits < min_bits)
+            void *pub = NULL;
+            if (ret && type)
             {
-                fprintf(stderr, "Key of %lu bits is smaller than %lu\n",
-                        bits, min_bits);
-                ret = false;
+                switch (type)
+                {
+                    case 1:
+                        if (verify)
+                        {
+                            pub = maid_rsa_new(key, n);
+                            if (!pub)
+                                fprintf(stderr, "Invalid public key\n");
+                        }
+                        else
+                        {
+                            pub = maid_rsa_new2(key, n);
+                            if (!pub)
+                                fprintf(stderr, "Invalid private key\n");
+                        }
+
+                        if (!pub)
+                            ret = false;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            maid_sign *ctx = NULL;
+            if (ret)
+            {
+                if (!verify)
+                    ctx = maid_sign_new(*sign_d, NULL, pub);
+                else
+                    ctx = maid_sign_new(*sign_d, pub, NULL);
+
+                if (!ctx)
+                {
+                    fprintf(stderr, "Out of memory\n");
+                    ret = false;
+                }
             }
 
             if (ret)
             {
                 ret = false;
 
-                if (!verify && get_data(argv[3], buffer, hash_s, false))
+                size_t hash_s = 0;
+                size_t sign_s = 0;
+                if (maid_sign_size(ctx, &hash_s, &sign_s) && hash_s && sign_s)
                 {
-                    ctx = maid_sign_new(*sign_d, NULL, pub, bits);
+                    u8 hash[hash_s];
+                    u8 sign[sign_s];
 
-                    if (ctx)
+                    if (!verify && get_data(argv[3], hash, hash_s, false))
                     {
-                        maid_sign_generate(ctx, buffer);
-                        size_t sign_s = words * sizeof(maid_mp_word);
-                        ret = (write(out, buffer, sign_s) ==
-                               (ssize_t)sign_s);
+                        if (maid_sign_generate(ctx, hash, sign))
+                            ret = (write(out, sign, sign_s) ==
+                                   (ssize_t)sign_s);
+                        else
+                            fprintf(stderr, "Signature failed\n");
                     }
-                    else
-                        fprintf(stderr, "Out of memory\n");
-                }
-                else if (get_data(argv[3], buffer, sizeof(buffer), false))
-                {
-                    ctx = maid_sign_new(*sign_d, pub, NULL, bits);
-
-                    if (ctx)
+                    else if (verify &&
+                             get_data(argv[3], hash, hash_s, false) &&
+                             get_data(argv[4], sign, sign_s, false))
                     {
-                        if (maid_sign_verify(ctx, buffer))
-                            ret = (write(out, buffer, hash_s) ==
-                                   (ssize_t)hash_s);
+                        if (maid_sign_verify(ctx, hash, sign))
+                            ret = true;
                         else
                             fprintf(stderr, "Invalid signature\n");
                     }
-                    else
-                        fprintf(stderr, "Out of memory\n");
-                }
 
-                maid_sign_del(ctx);
+                    maid_mem_clear(hash, sizeof(hash));
+                    maid_mem_clear(sign, sizeof(sign));
+                }
+            }
+            maid_sign_del(ctx);
+
+            if (ret && type)
+            {
+                switch (type)
+                {
+                    case 1:
+                        if (verify)
+                            maid_rsa_del(pub);
+                        else
+                            maid_rsa_del2(pub);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
-
-        bits = 0;
-        words = 0;
-        maid_mem_clear(buffer, sizeof(buffer));
-        maid_pub_del(pub);
     }
     else
         ret = usage((verify) ? "verify" : "sign");
@@ -1212,7 +1174,7 @@ keygen(int argc, char *argv[])
     {
         ret = true;
 
-        FILE *output = stdout;
+        int out = STDOUT_FILENO;
         size_t bits = 0;
 
         if (strcmp(argv[1], "rsa-2048") == 0)
@@ -1225,10 +1187,9 @@ keygen(int argc, char *argv[])
             ret = usage("keygen");
 
         u8 entropy[48] = {0};
-
         size_t entropy_s = 0;
-        const struct maid_rng_def *def = NULL;
 
+        const struct maid_rng_def *def = NULL;
         if (ret)
         {
             if (strcmp(argv[2], "ctr-drbg-aes-128") == 0)
@@ -1263,32 +1224,21 @@ keygen(int argc, char *argv[])
 
         if (ret)
         {
-            maid_mp_word *params[8];
-            size_t words = maid_keygen_rsa(bits, params, gen);
+            ret = false;
 
-            struct maid_pem *p = NULL;
-            p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PRIVATE, bits, params);
-            if (p)
+            maid_rsa_private *key = maid_rsa_keygen(bits, 65537, gen);
+            if (key)
             {
-                char *str = maid_pem_export(p);
-                if (str)
-                    fprintf(output, "%s\n", str);
-                else
-                    fprintf(stderr, "Out of memory\n");
-                free(str);
+                size_t size = 0;
+                u8 *ex = maid_rsa_export2(key, &size);
+                if (ex && size)
+                {
+                    write(out, ex, size);
+                    ret = true;
+                }
+                free(ex);
             }
-            else
-            {
-                fprintf(stderr, "Failed to export key\n");
-                ret = false;
-            }
-            maid_pem_free(p);
-
-            for (size_t i = 0; i < 8; i++)
-            {
-                maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-                free(params[i]);
-            }
+            maid_rsa_del2(key);
         }
 
         maid_rng_del(gen);
@@ -1301,166 +1251,63 @@ keygen(int argc, char *argv[])
 }
 
 static bool
-pubkey(int argc, char *argv[])
+pubgen(int argc, char *argv[])
 {
     bool ret = false;
 
-    if (argc == 2)
+    if (argc == 3)
     {
-        char *filename = argv[1];
-        FILE *output = stdout;
+        ret = true;
 
-        struct maid_pem *p = NULL;
-        static u8 buffer[65536] = {0};
-        if (get_data(filename, buffer, sizeof(buffer), true) &&
-            (p = maid_pem_import((char *)buffer, NULL)))
+        int out = STDOUT_FILENO;
+
+        u8 type = 0;
+        if (strcmp(argv[1], "rsa") == 0)
+            type = 1;
+        else
+            ret = usage("pubgen");
+
+        u8 data[4096] = {0};
+        size_t data_s = 0;
+
+        if (ret)
+            data_s = get_data(argv[2], data, sizeof(data), true);
+
+        if (data_s)
         {
-            maid_mp_word *params[8] = {NULL};
-            size_t bits = 0;
-
-            enum maid_serial t = maid_serial_import(p, &bits, params);
-            size_t words = maid_mp_words(bits);
-            if (t == MAID_SERIAL_RSA_PRIVATE ||
-                t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
+            ret = false;
+            switch (type)
             {
-                struct maid_pem *p = NULL;
-                p = maid_serial_export(MAID_SERIAL_PKCS8_RSA_PUBLIC,
-                                       bits, params);
-                if (p)
-                {
-                    char *str = maid_pem_export(p);
-                    if (str)
-                        fprintf(output, "%s\n", str);
-                    else
-                        fprintf(stderr, "Out of memory\n");
-                    free(str);
-                    ret = true;
-                }
-                else
-                    fprintf(stderr, "Failed to export key\n");
-                maid_pem_free(p);
-            }
-            else if (t == MAID_SERIAL_RSA_PUBLIC ||
-                     t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
-                fprintf(stderr, "File is already a public key\n");
-            else
-                fprintf(stderr, "Unknown format\n");
+                case 1:;
+                    maid_rsa_private *rsa = maid_rsa_new2(data, data_s);
+                    if (rsa)
+                    {
+                        maid_rsa_public *pub = maid_rsa_pubgen(rsa);
+                        if (pub)
+                        {
+                            size_t size = 0;
+                            u8 *ex = maid_rsa_export(pub, &size);
+                            if (ex && size)
+                            {
+                                write(out, ex, size);
+                                ret = true;
+                            }
+                            free(ex);
+                        }
+                        maid_rsa_del(pub);
+                    }
+                    maid_rsa_del2(rsa);
+                    break;
 
-            for (size_t i = 0; i < 8; i++)
-            {
-                maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-                free(params[i]);
+                default:
+                    break;
             }
         }
-        else if (p == NULL)
-            fprintf(stderr, "Invalid PEM file\n");
 
-        maid_mem_clear(buffer, sizeof(buffer));
-        maid_pem_free(p);
+        maid_mem_clear(data, sizeof(data));
     }
     else
-        ret = usage("pubkey");
-
-    return ret;
-}
-
-static bool
-info(int argc, char *argv[])
-{
-    bool ret = false;
-
-    (void)argv;
-    if (argc == 2)
-    {
-        FILE *output = stdout;
-
-        static u8 buffer[65536] = {0};
-        if (get_data(argv[1], buffer, sizeof(buffer), true))
-        {
-            bool empty = true;
-            const char *current = (char*)buffer;
-            const char *endptr  = (char*)buffer;
-
-            while (current && current[0] != '\0')
-            {
-                struct maid_pem *p = maid_pem_import(current, &endptr);
-                if (!p)
-                    break;
-                empty = false;
-
-                maid_mp_word *params[8] = {NULL};
-                size_t bits = 0;
-
-                enum maid_serial t = maid_serial_import(p, &bits, params);
-                size_t words = maid_mp_words(bits);
-                if (t == MAID_SERIAL_RSA_PUBLIC ||
-                    t == MAID_SERIAL_PKCS8_RSA_PUBLIC)
-                {
-                    fprintf(output, "RSA Public Key (%ld bits)\n\n", bits);
-                    maid_mp_debug(output, words, "Modulus",  params[0], true);
-                    maid_mp_debug(output, words, "Exponent", params[1], false);
-                    fprintf(output, "\n");
-                    ret = true;
-                }
-                else if (t == MAID_SERIAL_RSA_PRIVATE ||
-                         t == MAID_SERIAL_PKCS8_RSA_PRIVATE)
-                {
-                    fprintf(output, "RSA Private Key (%ld bits)\n\n", bits);
-                    maid_mp_debug(output, words, "Modulus",  params[0], true);
-                    maid_mp_debug(output, words, "Public Exponent",
-                                  params[1], false);
-                    maid_mp_debug(output, words, "Private Exponent",
-                                  params[2], true);
-                    maid_mp_debug(output, words, "Prime 1",
-                                  params[3], true);
-                    maid_mp_debug(output, words, "Prime 2",
-                                  params[4], true);
-                    maid_mp_debug(output, words, "Exponent 1",
-                                  params[5], true);
-                    maid_mp_debug(output, words, "Exponent 2",
-                                  params[6], true);
-                    maid_mp_debug(output, words, "Coefficient",
-                                  params[7], true);
-                    ret = true;
-                }
-                else if (t == MAID_SERIAL_ED25519_PUBLIC)
-                {
-                    fprintf(output, "Ed25519 Public Key\n\n");
-                    maid_mp_debug(output, words, "X", params[0], false);
-                    maid_mp_debug(output, words, "Y", params[1], false);
-                    ret = true;
-                }
-                else if (t == MAID_SERIAL_ED25519_PRIVATE)
-                {
-                    fprintf(output, "Ed25519 Private Key\n\n");
-                    maid_mp_debug(output, words, "Scalar", params[0], false);
-                    ret = true;
-                }
-                else
-                {
-                    fprintf(stderr, "Unknown format\n");
-                    ret = false;
-                    break;
-                }
-
-                for (size_t i = 0; i < 8; i++)
-                {
-                    maid_mem_clear(params[i], words * sizeof(maid_mp_word));
-                    free(params[i]);
-                }
-
-                current = endptr;
-                maid_pem_free(p);
-            }
-
-            if (empty)
-                fprintf(stderr, "No PEM data found\n");
-        }
-
-        maid_mem_clear(buffer, sizeof(buffer));
-    }
-    else
-        ret = usage("info");
+        ret = usage("pubgen");
 
     return ret;
 }
@@ -1626,14 +1473,11 @@ test(int argc, char *argv[])
 
         TEST(maid_test_rsa)
         TEST(maid_test_edwards25519)
-        TEST(maid_test_pkcs1)
-        TEST(maid_test_dh)
-
-        /* Interfaces */
-
         TEST(maid_test_pem)
-        TEST(maid_test_serial_rsa)
-        TEST(maid_test_keygen_rsa)
+        TEST(maid_test_spki)
+        TEST(maid_test_pkcs8)
+        TEST(maid_test_pkcs1_v1_5)
+        TEST(maid_test_dh)
 
         #undef TEST
 
@@ -1677,10 +1521,8 @@ main(int argc, char *argv[])
             ret = exchange_secret(argc, argv, true);
         else if (strcmp(argv[0], "keygen") == 0)
             ret = keygen(argc, argv);
-        else if (strcmp(argv[0], "pubkey") == 0)
-            ret = pubkey(argc, argv);
-        else if (strcmp(argv[0], "info") == 0)
-            ret = info(argc, argv);
+        else if (strcmp(argv[0], "pubgen") == 0)
+            ret = pubgen(argc, argv);
         else if (strcmp(argv[0], "encode") == 0)
             ret = encode_decode(argc, argv, false);
         else if (strcmp(argv[0], "decode") == 0)

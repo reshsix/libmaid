@@ -18,48 +18,30 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/pub.h>
-
 #include <maid/sign.h>
 
 struct maid_sign
 {
-    bool generate, verify;
     struct maid_sign_def def;
     void *context;
 };
 
 extern struct maid_sign *
-maid_sign_new(struct maid_sign_def def, maid_pub *public,
-              maid_pub *private, size_t bits)
+maid_sign_new(struct maid_sign_def def, void *pub, void *priv)
 {
     struct maid_sign *ret = NULL;
-    ret = calloc(1, sizeof(struct maid_sign));
+    if (pub || priv)
+        ret = calloc(1, sizeof(struct maid_sign));
 
     if (ret)
     {
-        ret->generate = (bool)private;
-        ret->verify   = (bool)public;
-
         memcpy(&(ret->def), &def, sizeof(struct maid_sign_def));
-        ret->context = def.new(def.version, public, private, bits);
+        ret->context = def.new(def.version, pub, priv);
         if (!(ret->context))
             ret = maid_sign_del(ret);
     }
 
     return ret;
-}
-
-extern void
-maid_sign_renew(struct maid_sign *s, maid_pub *public, maid_pub *private)
-{
-    if (s)
-    {
-        s->generate = (bool)private;
-        s->verify   = (bool)public;
-
-        s->def.renew(s->context, public, private);
-    }
 }
 
 extern struct maid_sign *
@@ -72,20 +54,35 @@ maid_sign_del(struct maid_sign *s)
     return NULL;
 }
 
-extern void
-maid_sign_generate(struct maid_sign *s, u8 *buffer)
-{
-    if (s && buffer && s->generate)
-        s->def.generate(s->context, buffer);
-}
-
 extern bool
-maid_sign_verify(struct maid_sign *s, u8 *buffer)
+maid_sign_size(struct maid_sign *s, size_t *hash_s, size_t *sign_s)
 {
     bool ret = false;
 
-    if (s && buffer && s->verify)
-        ret = s->def.verify(s->context, buffer);
+    if (s)
+        ret = s->def.size(s->context, hash_s, sign_s);
+
+    return ret;
+}
+
+extern bool
+maid_sign_generate(struct maid_sign *s, const u8 *hash, u8 *sign)
+{
+    bool ret = false;
+
+    if (s && hash && sign)
+        ret = s->def.generate(s->context, hash, sign);
+
+    return ret;
+}
+
+extern bool
+maid_sign_verify(struct maid_sign *s, const u8 *hash, const u8 *sign)
+{
+    bool ret = false;
+
+    if (s && hash && sign)
+        ret = s->def.verify(s->context, hash, sign);
 
     return ret;
 }

@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include <maid/mem.h>
-#include <maid/pub.h>
+#include <maid/rsa.h>
 
 #include <maid/sign.h>
 
@@ -38,10 +38,12 @@ struct pkcs1
     const u8 *der;
     size_t der_s;
     size_t hash_s;
-    u8 *hash, *buffer;
 
-    maid_pub *public;
-    maid_pub *private;
+    maid_mp_word *scalar;
+    u8 *buffer;
+
+    maid_rsa_public  *pub;
+    maid_rsa_private *prv;
 };
 
 extern void *
@@ -52,10 +54,9 @@ pkcs1_del(void *pkcs1)
         struct pkcs1 *p = pkcs1;
 
         size_t outl = p->words * sizeof(maid_mp_word);
-        maid_mem_clear(p->hash,   p->hash_s);
+        maid_mp_mov(p->words, p->scalar, NULL);
+        free(p->scalar);
         maid_mem_clear(p->buffer, outl);
-
-        free(p->hash);
         free(p->buffer);
 
         maid_mem_clear(p, sizeof(struct pkcs1));
@@ -87,15 +88,29 @@ static u8 sha512_256_der[] = {0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
                               0x00, 0x04, 0x20};
 
 extern void *
-pkcs1_new(u8 version, maid_pub *public, maid_pub *private, size_t bits)
+pkcs1_new(u8 version, void *pub, void *prv)
 {
-    struct pkcs1 *ret = NULL;
-    if (bits && bits % (sizeof(maid_mp_word) * 8) == 0 && bits >= 2048)
-        ret = calloc(1, sizeof(struct pkcs1));
+    struct pkcs1 *ret = calloc(1, sizeof(struct pkcs1));
 
     if (ret)
     {
-        ret->words = maid_mp_words(bits);
+        if (pub && prv)
+        {
+            ret->words = maid_rsa_size(pub);
+            if (ret->words != maid_rsa_size2(prv))
+                ret = pkcs1_del(ret);
+        }
+        else if (pub)
+            ret->words = maid_rsa_size(pub);
+        else if (prv)
+            ret->words = maid_rsa_size(prv);
+    }
+
+    if (ret)
+    {
+        ret->pub = pub;
+        ret->prv = prv;
+
         switch (version)
         {
             case PKCS1_v1_5_SHA1:
@@ -136,82 +151,77 @@ pkcs1_new(u8 version, maid_pub *public, maid_pub *private, size_t bits)
         }
 
         size_t outl = ret->words * sizeof(maid_mp_word);
-        ret->hash   = calloc(1, ret->hash_s);
+        ret->scalar = calloc(1, outl);
         ret->buffer = calloc(1, outl);
-        if (ret->hash && ret->buffer)
-        {
-            ret->public  = public;
-            ret->private = private;
-        }
-        else
+        if (!(ret->scalar && ret->buffer))
             ret = pkcs1_del(ret);
     }
 
     return ret;
 }
 
-extern void
-pkcs1_renew(void *pkcs1, maid_pub *public, maid_pub *private)
+extern bool
+pkcs1_size(void *pkcs1, size_t *hash_s, size_t *sign_s)
 {
-    if (pkcs1)
-    {
-        struct pkcs1 *p = pkcs1;
-        p->public  = public;
-        p->private = private;
-    }
-}
+    bool ret = true;
 
-extern void
-pkcs1_generate(void *pkcs1, u8 *buffer)
-{
     struct pkcs1 *p = pkcs1;
+    if (hash_s)
+        *hash_s = p->hash_s;
+    if (sign_s)
+        *sign_s = p->words * sizeof(maid_mp_word);
 
-    if (p && buffer && p->private)
-    {
-        memcpy(p->hash, buffer, p->hash_s);
-
-        size_t outl = p->words * sizeof(maid_mp_word);
-        buffer[0] = 0x00;
-        buffer[1] = 0x01;
-        for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
-            buffer[i] = 0xFF;
-
-        memcpy(&(buffer[outl - p->hash_s - p->der_s]), p->der, p->der_s);
-        buffer[outl - p->hash_s - p->der_s - 1] = 0x0;
-        memcpy(&(buffer[outl - p->hash_s]), p->hash, p->hash_s);
-
-        maid_pub_apply(p->private, buffer);
-    }
+    return ret;
 }
 
 extern bool
-pkcs1_verify(void *pkcs1, u8 *buffer)
+pkcs1_generate(void *pkcs1, const u8 *hash, u8 *sign)
 {
+    bool ret = true;
+
+    struct pkcs1 *p = pkcs1;
+    size_t outl = p->words * sizeof(maid_mp_word);
+
+    sign[0] = 0x00;
+    sign[1] = 0x01;
+    for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
+        sign[i] = 0xFF;
+
+    memcpy(&(sign[outl - p->hash_s - p->der_s]), p->der, p->der_s);
+    sign[outl - p->hash_s - p->der_s - 1] = 0x0;
+    memcpy(&(sign[outl - p->hash_s]), hash, p->hash_s);
+
+    maid_mp_read(p->words, p->scalar, sign, true);
+    if (maid_rsa_decrypt(p->prv, p->scalar))
+        maid_mp_write(p->words, p->scalar, sign, true);
+    else
+        ret = false;
+
+    return ret;
+}
+
+extern bool
+pkcs1_verify(void *pkcs1, const u8 *hash, const u8 *sign)
+{
+    volatile bool ret = true;
+
     struct pkcs1 *p = pkcs1;
 
-    volatile bool ret = (p && buffer && p->public);
+    maid_mp_read(p->words, p->scalar, sign, true);
+    maid_rsa_encrypt(p->pub, p->scalar);
+    maid_mp_write(p->words, p->scalar, p->buffer, true);
 
-    if (ret)
-    {
-        size_t outl = p->words * sizeof(maid_mp_word);
-        memcpy(p->buffer, buffer, outl);
-        maid_pub_apply(p->public, p->buffer);
+    size_t outl = p->words * sizeof(maid_mp_word);
+    ret &= (p->buffer[0] == 0x00);
+    ret &= (p->buffer[1] == 0x01);
+    for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
+        ret &= (p->buffer[i] == 0xFF);
 
-        ret &= (p->buffer[0] == 0x00);
-        ret &= (p->buffer[1] == 0x01);
-        for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
-            ret &= (p->buffer[i] == 0xFF);
+    for (size_t i = 0; i < p->der_s; i++)
+        ret &= (p->buffer[outl - p->hash_s - p->der_s + i] == p->der[i]);
+    ret &= (p->buffer[outl - p->hash_s - p->der_s - 1] == 0x0);
 
-        for (size_t i = 0; i < p->der_s; i++)
-            ret &= (p->buffer[outl - p->hash_s - p->der_s + i] == p->der[i]);
-        ret &= (p->buffer[outl - p->hash_s - p->der_s - 1] == 0x0);
-
-        if (ret)
-        {
-            maid_mem_clear(buffer, outl);
-            memcpy(buffer, &(p->buffer[outl - p->hash_s]), p->hash_s);
-        }
-    }
+    ret &= maid_mem_cmp(hash, &(p->buffer[outl - p->hash_s]), p->hash_s);
 
     return ret;
 }
@@ -222,7 +232,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha1 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA1
@@ -232,7 +242,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha224 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA224
@@ -242,7 +252,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha256 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA256
@@ -252,7 +262,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha384 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA384
@@ -262,7 +272,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha512 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA512
@@ -272,7 +282,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha512_224 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA512_224
@@ -282,7 +292,7 @@ const struct maid_sign_def maid_pkcs1_v1_5_sha512_256 =
 {
     .new      = pkcs1_new,
     .del      = pkcs1_del,
-    .renew    = pkcs1_renew,
+    .size     = pkcs1_size,
     .generate = pkcs1_generate,
     .verify   = pkcs1_verify,
     .version  = PKCS1_v1_5_SHA512_256

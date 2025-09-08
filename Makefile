@@ -48,15 +48,14 @@ $(FOLDERS):
 OBJS = crypto/aes.o crypto/chacha.o \
        crypto/poly1305.o crypto/gcm.o crypto/hmac.o \
        crypto/drbg.o crypto/sha.o crypto/blake2.o \
+	   crypto/pkcs1.o crypto/dh.o \
 	   crypto/pbkdf2.o \
-	   crypto/rsa.o crypto/pkcs1.o crypto/dh.o \
 	   crypto/ed25519.o \
        mem.o mp.o \
 	   block.o stream.o mac.o aead.o \
 	   rng.o hash.o \
-	   pub.o ecc.o sign.o kex.o \
-	   serial.o keygen.o \
-	   pass.o test.o
+	   rsa.o ecc.o pem.o asn1.o spki.o pkcs8.o \
+	   sign.o kex.o pass.o test.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@

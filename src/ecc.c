@@ -104,18 +104,6 @@ maid_ecc_copy(struct maid_ecc *c, struct maid_ecc_point *p,
         c->def.copy(c->context, p, q);
 }
 
-extern size_t
-maid_ecc_info(struct maid_ecc *c, const struct maid_ecc_point *p,
-              maid_mp_word **s)
-{
-    size_t ret = 0;
-
-    if (c && p && s)
-        ret = c->def.info(c->context, p, s);
-
-    return ret;
-}
-
 extern bool
 maid_ecc_encode(struct maid_ecc *c, u8 *buffer, const struct maid_ecc_point *p)
 {
