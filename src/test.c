@@ -929,19 +929,16 @@ test_pkcs1_v1_5(struct maid_sign_def def,
 
         if (pub && prv && s)
         {
-            size_t hash_s = 0;
-            size_t sign_s = 0;
-            ret = (maid_sign_size(s, &hash_s, &sign_s) &&
-                   hash_s && hash_s == sizeof(ib) &&
-                   sign_s && sign_s == sizeof(ob));
+            size_t sign_s = maid_sign_size(s);
 
+            ret = (sign_s == sizeof(ob));
             if (ret)
             {
                 u8 sign[sign_s];
-                ret = maid_sign_generate(s, ib, sign)    &&
-                      maid_mem_cmp(sign, ob, sizeof(ob)) &&
-                      maid_sign_verify(s, ib, sign) &&
-                     !maid_sign_verify(s, ob, sign);
+                ret = maid_sign_generate(s, ib, sizeof(ib), sign) &&
+                      maid_mem_cmp(sign, ob, sizeof(ob))          &&
+                      maid_sign_verify(s, ib, sizeof(ib), sign)   &&
+                     !maid_sign_verify(s, ob, sizeof(ob), sign);
             }
         }
         else
@@ -2199,16 +2196,7 @@ maid_test_pkcs1_v1_5(void)
         "c76cd31542e79a71a6d593c1944eb1860a9a544514f2a451f08a9898b36aeb1a"
         "bf23747952";
 
-    char *in[] =
-        {"4e48c4228f01db757fda98686fa5aef95aec63cc",
-         "89e22066badb9d5262fb51d981cd4e9b2ac5865d8c5238df9dbc1ad1",
-         "dd101d8844273c7a5befef11512d673c0ac400fa34667c1c217c6b29c3732879",
-         "576d7898741ac32308d74569e22fbce8fc85f4b814f7440de90b6d057268201f"
-         "f77ed79741161d48dd33b8f2ad0886e2",
-         "c3829c88ea2a4f8a21d48e929a75196516c906fa05cacb6cb8d2c254a2fa63de"
-         "5b8b2bd4444480799bbbed199574e09b4a541cb548f01d3cb46a147f64446487",
-         "e1bb41e7664ba644f50d6c6e5a2ea6a267ab471fd71fe3f54088c3d9",
-         "7697b103b1f31832eec478e2d0f3b90a64d245182c8069d5d21ebf0c960aeb76"};
+    char *in = "626162796c6f6e0a";
     char *out[] =
         {"3c55e44519d78b0d46c0db23ef74834199216fdba052cf3abfa2faea4f2c7180"
          "2c17e2ce7e7a601b2fad8c592cb9f318934d86a16472f5a499892b4c34530c92"
@@ -2274,7 +2262,7 @@ maid_test_pkcs1_v1_5(void)
          maid_pkcs1_v1_5_sha512_224, maid_pkcs1_v1_5_sha512_256};
 
     for (u8 i = 0; i < 7; i++)
-        ret -= test_pkcs1_v1_5(defs[i], public, private, in[i], out[i]);
+        ret -= test_pkcs1_v1_5(defs[i], public, private, in, out[i]);
 
     return ret;
 }

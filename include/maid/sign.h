@@ -26,9 +26,9 @@ struct maid_sign_def
 {
     void * (*new)(u8, void *, void *);
     void * (*del)(void *);
-    bool (*size)(void *, size_t *, size_t *);
-    bool (*generate)(void *, const u8 *, u8 *);
-    bool (*verify)(void *, const u8 *, const u8 *);
+    size_t (*size)(void *);
+    bool (*generate)(void *, const u8 *, size_t, u8 *);
+    bool (*verify)(void *, const u8 *, size_t, const u8 *);
     u8 version;
 };
 
@@ -37,9 +37,10 @@ struct maid_sign_def
 typedef struct maid_sign maid_sign;
 maid_sign *maid_sign_new(struct maid_sign_def def, void *pub, void *priv);
 maid_sign *maid_sign_del(maid_sign *s);
-bool maid_sign_size(maid_sign *s, size_t *hash_s, size_t *sign_s);
-bool maid_sign_generate(maid_sign *s, const u8 *hash, u8 *sign);
-bool maid_sign_verify(maid_sign *s, const u8 *hash, const u8 *sign);
+size_t maid_sign_size(maid_sign *s);
+bool maid_sign_generate(maid_sign *s, const u8 *data, size_t size, u8 *sign);
+bool maid_sign_verify(maid_sign *s,
+                      const u8 *data, size_t size, const u8 *sign);
 
 /* External algorithms */
 
@@ -50,5 +51,7 @@ extern const struct maid_sign_def maid_pkcs1_v1_5_sha384;
 extern const struct maid_sign_def maid_pkcs1_v1_5_sha512;
 extern const struct maid_sign_def maid_pkcs1_v1_5_sha512_224;
 extern const struct maid_sign_def maid_pkcs1_v1_5_sha512_256;
+
+extern const struct maid_sign_def maid_ed25519;
 
 #endif

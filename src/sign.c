@@ -47,42 +47,43 @@ maid_sign_new(struct maid_sign_def def, void *pub, void *priv)
 extern struct maid_sign *
 maid_sign_del(struct maid_sign *s)
 {
-    if (s)
+    if (s && s->context)
         s->def.del(s->context);
     free(s);
 
     return NULL;
 }
 
-extern bool
-maid_sign_size(struct maid_sign *s, size_t *hash_s, size_t *sign_s)
+extern size_t
+maid_sign_size(struct maid_sign *s)
 {
-    bool ret = false;
+    size_t ret = 0;
 
     if (s)
-        ret = s->def.size(s->context, hash_s, sign_s);
+        ret = s->def.size(s->context);
 
     return ret;
 }
 
 extern bool
-maid_sign_generate(struct maid_sign *s, const u8 *hash, u8 *sign)
+maid_sign_generate(struct maid_sign *s, const u8 *data, size_t size, u8 *sign)
 {
     bool ret = false;
 
-    if (s && hash && sign)
-        ret = s->def.generate(s->context, hash, sign);
+    if (s && sign)
+        ret = s->def.generate(s->context, data, size, sign);
 
     return ret;
 }
 
 extern bool
-maid_sign_verify(struct maid_sign *s, const u8 *hash, const u8 *sign)
+maid_sign_verify(struct maid_sign *s,
+                 const u8 *data, size_t size, const u8 *sign)
 {
     bool ret = false;
 
-    if (s && hash && sign)
-        ret = s->def.verify(s->context, hash, sign);
+    if (s && sign)
+        ret = s->def.verify(s->context, data, size, sign);
 
     return ret;
 }

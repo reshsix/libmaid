@@ -126,6 +126,18 @@ maid_ecc_decode(struct maid_ecc *c, const u8 *buffer, struct maid_ecc_point *p)
     return ret;
 }
 
+extern bool
+maid_ecc_cmp(struct maid_ecc *c, const struct maid_ecc_point *p,
+                                 const struct maid_ecc_point *q)
+{
+    bool ret = false;
+
+    if (c && p && q)
+        ret = c->def.cmp(c->context, p, q);
+
+    return ret;
+}
+
 extern void
 maid_ecc_dbl(struct maid_ecc *c, struct maid_ecc_point *p)
 {
@@ -173,4 +185,48 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
 
         maid_ecc_copy(c, p, c->r0);
     }
+}
+
+extern size_t
+maid_ecc_size(struct maid_ecc *c, size_t *public_s, size_t *private_s)
+{
+    size_t ret = 0;
+
+    if (c)
+        ret = c->def.size(c->context, public_s, private_s);
+
+    return ret;
+}
+
+extern bool
+maid_ecc_keygen(struct maid_ecc *c, u8 *private, maid_rng *g)
+{
+    bool ret = false;
+
+    if (c && private && g)
+        ret = c->def.keygen(c->context, private, g);
+
+    return ret;
+}
+
+extern bool
+maid_ecc_pubgen(struct maid_ecc *c, const u8 *private, u8 *public)
+{
+    bool ret = false;
+
+    if (c && private && public)
+    {
+        maid_ecc_point *p = maid_ecc_alloc(c);
+        maid_mp_word s[c->words];
+        if (c->def.scalar(c->context, private, s))
+        {
+            maid_ecc_base(c, p);
+            maid_ecc_mul(c, p, s, true);
+            ret = maid_ecc_encode(c, public, p);
+        }
+        maid_mp_mov(c->words, s, NULL);
+        maid_ecc_free(c, p);
+    }
+
+    return ret;
 }

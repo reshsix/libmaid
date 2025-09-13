@@ -20,6 +20,7 @@
 
 #include <maid/mem.h>
 #include <maid/rsa.h>
+#include <maid/hash.h>
 
 #include <maid/sign.h>
 
@@ -41,6 +42,7 @@ struct pkcs1
 
     maid_mp_word *scalar;
     u8 *buffer;
+    maid_hash *hash;
 
     maid_rsa_public  *pub;
     maid_rsa_private *prv;
@@ -58,6 +60,7 @@ pkcs1_del(void *pkcs1)
         free(p->scalar);
         maid_mem_clear(p->buffer, outl);
         free(p->buffer);
+        maid_hash_del(p->hash);
 
         maid_mem_clear(p, sizeof(struct pkcs1));
     }
@@ -111,39 +114,47 @@ pkcs1_new(u8 version, void *pub, void *prv)
         ret->pub = pub;
         ret->prv = prv;
 
+        const struct maid_hash_def *hash = NULL;
         switch (version)
         {
             case PKCS1_v1_5_SHA1:
+                hash        = &maid_sha1;
                 ret->der    = sha1_der;
                 ret->der_s  = sizeof(sha1_der);
                 ret->hash_s = 20;
                 break;
             case PKCS1_v1_5_SHA224:
+                hash        = &maid_sha224;
                 ret->der    = sha224_der;
                 ret->der_s  = sizeof(sha224_der);
                 ret->hash_s = 28;
                 break;
             case PKCS1_v1_5_SHA256:
+                hash        = &maid_sha256;
                 ret->der    = sha256_der;
                 ret->der_s  = sizeof(sha256_der);
                 ret->hash_s = 32;
                 break;
             case PKCS1_v1_5_SHA384:
+                hash        = &maid_sha384;
                 ret->der    = sha384_der;
                 ret->der_s  = sizeof(sha384_der);
                 ret->hash_s = 48;
                 break;
             case PKCS1_v1_5_SHA512:
+                hash        = &maid_sha512;
                 ret->der    = sha512_der;
                 ret->der_s  = sizeof(sha512_der);
                 ret->hash_s = 64;
                 break;
             case PKCS1_v1_5_SHA512_224:
+                hash        = &maid_sha512_224;
                 ret->der    = sha512_224_der;
                 ret->der_s  = sizeof(sha512_224_der);
                 ret->hash_s = 28;
                 break;
             case PKCS1_v1_5_SHA512_256:
+                hash        = &maid_sha512_256;
                 ret->der    = sha512_256_der;
                 ret->der_s  = sizeof(sha512_256_der);
                 ret->hash_s = 32;
@@ -153,75 +164,86 @@ pkcs1_new(u8 version, void *pub, void *prv)
         size_t outl = ret->words * sizeof(maid_mp_word);
         ret->scalar = calloc(1, outl);
         ret->buffer = calloc(1, outl);
-        if (!(ret->scalar && ret->buffer))
+        ret->hash   = maid_hash_new(*hash);
+        if (!(ret->scalar && ret->buffer && ret->hash))
             ret = pkcs1_del(ret);
     }
 
     return ret;
 }
 
-extern bool
-pkcs1_size(void *pkcs1, size_t *hash_s, size_t *sign_s)
+extern size_t
+pkcs1_size(void *pkcs1)
 {
-    bool ret = true;
+    struct pkcs1 *p = pkcs1;
+    return p->words * sizeof(maid_mp_word);
+}
+
+extern bool
+pkcs1_generate(void *pkcs1, const u8 *data, size_t size, u8 *sign)
+{
+    bool ret = false;
 
     struct pkcs1 *p = pkcs1;
-    if (hash_s)
-        *hash_s = p->hash_s;
-    if (sign_s)
-        *sign_s = p->words * sizeof(maid_mp_word);
+    if (p->prv)
+    {
+        u8 hash[p->hash_s];
+        maid_hash_update(p->hash, data, size);
+        maid_hash_digest(p->hash, hash);
+        maid_hash_renew(p->hash);
+
+        size_t outl = p->words * sizeof(maid_mp_word);
+        sign[0] = 0x00;
+        sign[1] = 0x01;
+        for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
+            sign[i] = 0xFF;
+
+        memcpy(&(sign[outl - p->hash_s - p->der_s]), p->der, p->der_s);
+        sign[outl - p->hash_s - p->der_s - 1] = 0x0;
+        memcpy(&(sign[outl - p->hash_s]), hash, p->hash_s);
+
+        maid_mp_read(p->words, p->scalar, sign, true);
+        if (maid_rsa_decrypt(p->prv, p->scalar))
+        {
+            maid_mp_write(p->words, p->scalar, sign, true);
+            ret = true;
+        }
+    }
 
     return ret;
 }
 
 extern bool
-pkcs1_generate(void *pkcs1, const u8 *hash, u8 *sign)
-{
-    bool ret = true;
-
-    struct pkcs1 *p = pkcs1;
-    size_t outl = p->words * sizeof(maid_mp_word);
-
-    sign[0] = 0x00;
-    sign[1] = 0x01;
-    for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
-        sign[i] = 0xFF;
-
-    memcpy(&(sign[outl - p->hash_s - p->der_s]), p->der, p->der_s);
-    sign[outl - p->hash_s - p->der_s - 1] = 0x0;
-    memcpy(&(sign[outl - p->hash_s]), hash, p->hash_s);
-
-    maid_mp_read(p->words, p->scalar, sign, true);
-    if (maid_rsa_decrypt(p->prv, p->scalar))
-        maid_mp_write(p->words, p->scalar, sign, true);
-    else
-        ret = false;
-
-    return ret;
-}
-
-extern bool
-pkcs1_verify(void *pkcs1, const u8 *hash, const u8 *sign)
+pkcs1_verify(void *pkcs1, const u8 *data, size_t size, const u8 *sign)
 {
     volatile bool ret = true;
 
     struct pkcs1 *p = pkcs1;
+    if (p->pub)
+    {
+        u8 hash[p->hash_s];
+        maid_hash_update(p->hash, data, size);
+        maid_hash_digest(p->hash, hash);
+        maid_hash_renew(p->hash);
 
-    maid_mp_read(p->words, p->scalar, sign, true);
-    maid_rsa_encrypt(p->pub, p->scalar);
-    maid_mp_write(p->words, p->scalar, p->buffer, true);
+        maid_mp_read(p->words, p->scalar, sign, true);
+        maid_rsa_encrypt(p->pub, p->scalar);
+        maid_mp_write(p->words, p->scalar, p->buffer, true);
 
-    size_t outl = p->words * sizeof(maid_mp_word);
-    ret &= (p->buffer[0] == 0x00);
-    ret &= (p->buffer[1] == 0x01);
-    for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
-        ret &= (p->buffer[i] == 0xFF);
+        size_t outl = p->words * sizeof(maid_mp_word);
+        ret &= (p->buffer[0] == 0x00);
+        ret &= (p->buffer[1] == 0x01);
+        for (size_t i = 2; i < outl - p->hash_s - p->der_s - 1; i++)
+            ret &= (p->buffer[i] == 0xFF);
 
-    for (size_t i = 0; i < p->der_s; i++)
-        ret &= (p->buffer[outl - p->hash_s - p->der_s + i] == p->der[i]);
-    ret &= (p->buffer[outl - p->hash_s - p->der_s - 1] == 0x0);
+        for (size_t i = 0; i < p->der_s; i++)
+            ret &= (p->buffer[outl - p->hash_s - p->der_s + i] == p->der[i]);
+        ret &= (p->buffer[outl - p->hash_s - p->der_s - 1] == 0x0);
 
-    ret &= maid_mem_cmp(hash, &(p->buffer[outl - p->hash_s]), p->hash_s);
+        ret &= maid_mem_cmp(hash, &(p->buffer[outl - p->hash_s]), p->hash_s);
+    }
+    else
+        ret = false;
 
     return ret;
 }

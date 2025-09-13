@@ -20,7 +20,10 @@
 
 #include <maid/mp.h>
 #include <maid/mem.h>
+#include <maid/hash.h>
+
 #include <maid/ecc.h>
+#include <maid/sign.h>
 
 static bool
 import_mp(size_t words, maid_mp_word *output, const char *input)
@@ -47,6 +50,7 @@ struct edwards25519
 {
     size_t words;
     maid_mp_word *d, *p, *x, *y;
+    maid_hash *hash;
 };
 
 static void *
@@ -59,6 +63,7 @@ edwards25519_del(void *ctx)
         free(c->p);
         free(c->x);
         free(c->y);
+        maid_hash_del(c->hash);
     }
     free(ctx);
 
@@ -77,7 +82,8 @@ edwards25519_new(void)
         ret->p = calloc(ret->words, sizeof(maid_mp_word));
         ret->x = calloc(ret->words, sizeof(maid_mp_word));
         ret->y = calloc(ret->words, sizeof(maid_mp_word));
-        if (!(ret->words && ret->d && ret->p && ret->x && ret->y))
+        ret->hash = maid_hash_new(maid_sha512);
+        if (!(ret->words && ret->d && ret->p && ret->x && ret->y && ret->hash))
             ret = edwards25519_del(ret);
     }
 
@@ -106,10 +112,14 @@ edwards25519_free(void *ctx, struct maid_ecc_point *p)
 
     if (p)
     {
-        maid_mp_mov(words, p->x, NULL);
-        maid_mp_mov(words, p->y, NULL);
-        maid_mp_mov(words, p->z, NULL);
-        maid_mp_mov(words, p->t, NULL);
+        if (p->x)
+            maid_mp_mov(words, p->x, NULL);
+        if (p->y)
+            maid_mp_mov(words, p->y, NULL);
+        if (p->z)
+            maid_mp_mov(words, p->z, NULL);
+        if (p->t)
+            maid_mp_mov(words, p->t, NULL);
 
         free(p->x);
         free(p->y);
@@ -162,7 +172,7 @@ edwards25519_base(void *ctx, struct maid_ecc_point *p)
 
 static void
 edwards25519_copy(void *ctx, struct maid_ecc_point *p,
-             const struct maid_ecc_point *q)
+                  const struct maid_ecc_point *q)
 {
     struct edwards25519 *c = ctx;
     size_t words = c->words;
@@ -256,6 +266,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
         maid_mp_mulmod(words, v, y, c->p);
         maid_mp_mulmod(words, v, y, c->p);
         maid_mp_addmod(words, v, buf, c->p);
+
         /* x = u/v ^ (p + 3)/8 */
         maid_mp_mov(words, x, v);
         ret = maid_mp_invmod(words, x, c->p);
@@ -286,7 +297,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                 maid_mp_submod(words, v, u, c->p);
 
                 /* xI might be */
-                if (maid_mp_cmp(words, buf, v) != 0)
+                if (maid_mp_cmp(words, buf, v) == 0)
                 {
                     MAID_ALLOC_MP(I, 1)
 
@@ -308,18 +319,20 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
             }
         }
 
-        /* x is a square root, but needs to match parity */
         if (ret)
         {
+            /* x parity check */
             maid_mp_mov(words, buf, NULL);
-            if (xp && maid_mp_cmp(words, x, buf) == 0)
-               ret = false;
-
-            if (ret && (((bool)(x[xi] & xj)) == xp))
+            if ((((bool)(x[0] & 1)) != xp))
             {
-                maid_mp_mov(words, buf, x);
-                maid_mp_mov(words, x, c->p);
-                maid_mp_sub(words, x, buf);
+                if (maid_mp_cmp(words, buf, x) != 0)
+                {
+                    maid_mp_mov(words, buf, x);
+                    maid_mp_mov(words, x, c->p);
+                    maid_mp_sub(words, x, buf);
+                }
+                else
+                    ret = false;
             }
         }
 
@@ -342,6 +355,48 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
 
     xp = false;
     MAID_CLEAR_MP(y)
+
+    return ret;
+}
+
+static bool
+edwards25519_cmp(void *ctx, const struct maid_ecc_point *a,
+                            const struct maid_ecc_point *b)
+{
+    volatile bool ret = true;
+
+    struct edwards25519 *c = ctx;
+    size_t words = c->words;
+
+    MAID_ALLOC_MP(buf, 1)
+    MAID_ALLOC_MP(buf2, 1)
+    MAID_ALLOC_MP(zi, 1)
+    MAID_ALLOC_MP(zi2, 1)
+
+    /* Inverse Z calculation */
+    maid_mp_mov(words, zi,  a->z);
+    maid_mp_mov(words, zi2, b->z);
+    ret &= maid_mp_invmod(words, zi,  c->p);
+    ret &= maid_mp_invmod(words, zi2, c->p);
+
+    /* X comparison */
+    maid_mp_mov(words, buf,  a->x);
+    maid_mp_mov(words, buf2, b->x);
+    maid_mp_mulmod(words, buf,  zi,  c->p);
+    maid_mp_mulmod(words, buf2, zi2, c->p);
+    ret &= (maid_mp_cmp(words, buf, buf2) == 0);
+
+    /* Y comparison */
+    maid_mp_mov(words, buf,  a->y);
+    maid_mp_mov(words, buf2, b->y);
+    maid_mp_mulmod(words, buf,  zi,  c->p);
+    maid_mp_mulmod(words, buf2, zi2, c->p);
+    ret &= (maid_mp_cmp(words, buf, buf2) == 0);
+
+    MAID_CLEAR_MP(buf)
+    MAID_CLEAR_MP(buf2)
+    MAID_CLEAR_MP(zi)
+    MAID_CLEAR_MP(zi2)
 
     return ret;
 }
@@ -417,7 +472,7 @@ edwards25519_dbl(void *ctx, struct maid_ecc_point *a)
 
 static void
 edwards25519_add(void *ctx, struct maid_ecc_point *a,
-            const struct maid_ecc_point *b)
+                 const struct maid_ecc_point *b)
 {
     struct edwards25519 *c = ctx;
     size_t words = c->words;
@@ -495,12 +550,304 @@ edwards25519_add(void *ctx, struct maid_ecc_point *a,
     MAID_CLEAR_MP(buf)
 }
 
+static size_t
+edwards25519_size(void *ctx, size_t *key_s, size_t *point_s)
+{
+    struct edwards25519 *c = ctx;
+    size_t words = c->words;
+
+    if (key_s)
+        *key_s = 34;
+    if (point_s)
+        *point_s = 32;
+
+    return words;
+}
+
+static bool
+edwards25519_keygen(void *ctx, u8 *data, maid_rng *g)
+{
+    (void)ctx;
+
+    data[0] = 0x04;
+    data[1] = 32;
+    maid_rng_generate(g, &(data[2]), data[1]);
+
+    return true;
+}
+
+static bool
+edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
+{
+    bool ret = false;
+
+    if (data[0] == 0x04 && data[1] == 32)
+    {
+        struct edwards25519 *c = ctx;
+
+        u8 buffer[64] = {0};
+        maid_hash_update(c->hash, &(data[2]), 32);
+        maid_hash_digest(c->hash, buffer);
+        maid_hash_renew(c->hash);
+
+        buffer[0]  &= 248;
+        buffer[31] &= 63;
+        buffer[31] |= 64;
+
+        maid_mp_read(c->words, s, buffer, false);
+        maid_mem_clear(buffer, sizeof(buffer));
+
+        ret = true;
+    }
+
+    return ret;
+}
+
 const struct maid_ecc_def maid_edwards25519 =
 {
     .new    = edwards25519_new,    .del    = edwards25519_del,
     .alloc  = edwards25519_alloc,  .free   = edwards25519_free,
     .base   = edwards25519_base,   .copy   = edwards25519_copy,
     .encode = edwards25519_encode, .decode = edwards25519_decode,
-    .dbl    = edwards25519_dbl,    .add    = edwards25519_add,
+    .cmp    = edwards25519_cmp,    .dbl    = edwards25519_dbl,
+    .add    = edwards25519_add,    .size   = edwards25519_size,
+    .keygen = edwards25519_keygen, .scalar = edwards25519_scalar,
     .bits   = 256
+};
+
+/* Ed25519 signature definition */
+
+struct ed25519
+{
+    bool sign, verify;
+
+    /* Used in both */
+    size_t words;
+    maid_ecc *ecc;
+    maid_hash *hash;
+    maid_ecc_point *point;
+    maid_mp_word *modulo;
+    u8 pubenc[32];
+
+    /* Used in generation */
+    u8 prefix[32];
+    maid_mp_word *scalar;
+
+    /* Used in verification */
+    maid_ecc_point *public, *point2;
+};
+
+extern void *
+ed25519_del(void *ed25519)
+{
+    struct ed25519 *ed = ed25519;
+
+    maid_hash_del(ed->hash);
+
+    maid_ecc_free(ed->ecc, ed->point);
+    maid_ecc_free(ed->ecc, ed->point2);
+    maid_ecc_free(ed->ecc, ed->public);
+    maid_ecc_del(ed->ecc);
+
+    maid_mem_clear(ed->pubenc, sizeof(ed->pubenc));
+    maid_mem_clear(ed->prefix, sizeof(ed->prefix));
+
+    if (ed->scalar)
+        maid_mp_mov(ed->words, ed->scalar, NULL);
+    if (ed->modulo)
+        maid_mp_mov(ed->words, ed->modulo, NULL);
+    free(ed->scalar);
+    free(ed->modulo);
+
+    free(ed25519);
+    return NULL;
+}
+
+extern void *
+ed25519_new(u8 version, void *pub, void *prv)
+{
+    struct ed25519 *ret = calloc(1, sizeof(struct ed25519));
+
+    (void)version;
+    if (ret)
+    {
+        /* Allocation */
+        ret->words  = maid_mp_words(256);
+        ret->ecc    = maid_ecc_new(maid_edwards25519);
+        ret->hash   = maid_hash_new(maid_sha512);
+        ret->point  = maid_ecc_alloc(ret->ecc);
+        ret->modulo = calloc(ret->words * 2, sizeof(maid_mp_word));
+        if (!(ret->words && ret->ecc && ret->hash &&
+              ret->point && ret->modulo))
+            ret = ed25519_del(ret);
+        if (ret && prv)
+        {
+            ret->sign   = true;
+            ret->scalar = calloc(ret->words * 2, sizeof(maid_mp_word));
+            if (!(ret->scalar))
+                ret = ed25519_del(ret);
+        }
+        if (ret && pub)
+        {
+            ret->verify = true;
+            ret->point2 = maid_ecc_alloc(ret->ecc);
+            ret->public = maid_ecc_alloc(ret->ecc);
+            if (!(ret->point2 && ret->public))
+                ret = ed25519_del(ret);
+        }
+
+        /* Private key loading */
+        if (ret && prv)
+        {
+            u8 *data = prv;
+            if (data[0] == 0x04 && data[1] == 32)
+            {
+                u8 buffer[64] = {0};
+                maid_hash_update(ret->hash, &(data[2]), 32);
+                maid_hash_digest(ret->hash, buffer);
+                maid_hash_renew(ret->hash);
+
+                buffer[0]  &= 248;
+                buffer[31] &= 63;
+                buffer[31] |= 64;
+
+                maid_mp_read(ret->words, ret->scalar, buffer, false);
+                memcpy(ret->prefix, &(buffer[32]), 32);
+                maid_mem_clear(buffer, sizeof(buffer));
+            }
+            else
+                ret = ed25519_del(ret);
+        }
+
+        /* Public key loading */
+        if (ret && pub)
+        {
+            memcpy(ret->pubenc, pub, 32);
+            if (!maid_ecc_decode(ret->ecc, ret->pubenc, ret->public))
+                ret = ed25519_del(ret);
+        }
+
+        /* Copy curve order (modulo) */
+        if (ret)
+        {
+            if (!(import_mp(ret->words, ret->modulo,
+                            "10000000000000000000000000000000"
+                            "14def9dea2f79cd65812631a5cf5d3ed")))
+                ret = ed25519_del(ret);
+        }
+    }
+
+    return ret;
+}
+
+extern size_t
+ed25519_size(void *ed)
+{
+    (void)ed;
+    return 64;
+}
+
+extern bool
+ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
+{
+    bool ret = true;
+
+    struct ed25519 *ed = ed25519;
+    if (ed->sign)
+    {
+        u8 hash[64] = {0};
+        /* r = SHA512(prefix data) % modulo */
+        maid_mp_word r[ed->words * 2];
+        maid_hash_renew(ed->hash);
+        maid_hash_update(ed->hash, ed->prefix, 32);
+        maid_hash_update(ed->hash, data, size);
+        maid_hash_digest(ed->hash, hash);
+        maid_mp_read(ed->words * 2, r, hash, false);
+        maid_mp_mod(ed->words * 2, r, ed->modulo);
+
+        /* First part of the signature (R = rB) */
+        maid_ecc_base(ed->ecc, ed->point);
+        maid_ecc_mul(ed->ecc, ed->point, r, true);
+        maid_ecc_encode(ed->ecc, sign, ed->point);
+
+        /* k = SHA512(R public data) % modulo */
+        maid_mp_word k[ed->words * 2];
+        maid_hash_renew(ed->hash);
+        maid_hash_update(ed->hash, sign, 32);
+        maid_hash_update(ed->hash, ed->pubenc, 32);
+        maid_hash_update(ed->hash, data, size);
+        maid_hash_digest(ed->hash, hash);
+        maid_mp_read(ed->words * 2, k, hash, false);
+        maid_mp_mod(ed->words * 2, k, ed->modulo);
+
+        /* Second part of the signature (s = (r + ka) % modulo) */
+        maid_mp_mulmod(ed->words, k, ed->scalar, ed->modulo);
+        maid_mp_addmod(ed->words, k, r, ed->modulo);
+        maid_mp_write(ed->words, k, &(sign[32]), false);
+
+        /* Cleaning up */
+        maid_mem_clear(hash, sizeof(hash));
+        maid_mp_mov(ed->words * 2, r, NULL);
+        maid_mp_mov(ed->words * 2, k, NULL);
+    }
+    else
+        ret = false;
+
+    return ret;
+}
+
+extern bool
+ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
+{
+    bool ret = true;
+
+    struct ed25519 *ed = ed25519;
+    ret &= ed->verify;
+
+    /* R decoding */
+    ret &= maid_ecc_decode(ed->ecc, sign, ed->point);
+
+    /* s decoding */
+    maid_mp_word s[ed->words];
+    maid_mp_read(ed->words, s, &(sign[32]), false);
+    ret &= (maid_mp_cmp(ed->words, s, ed->modulo) > 0);
+
+    maid_mp_word k[ed->words * 2];
+    /* k = SHA512(R public data) % modulo */
+    u8 hash[64] = {0};
+    maid_hash_renew(ed->hash);
+    maid_hash_update(ed->hash, sign, 32);
+    maid_hash_update(ed->hash, ed->pubenc, 32);
+    maid_hash_update(ed->hash, data, size);
+    maid_hash_digest(ed->hash, hash);
+    maid_mp_read(ed->words * 2, k, hash, false);
+    maid_mp_mod(ed->words * 2, k, ed->modulo);
+
+    /* point2 = R + kP */
+    maid_ecc_copy(ed->ecc, ed->point2, ed->public);
+    maid_ecc_mul(ed->ecc, ed->point2, k, false);
+    maid_ecc_add(ed->ecc, ed->point2, ed->point);
+
+    /* point = sB */
+    maid_ecc_base(ed->ecc, ed->point);
+    maid_ecc_mul(ed->ecc, ed->point, s, false);
+
+    /* sB ?= R + kP */
+    ret &= maid_ecc_cmp(ed->ecc, ed->point, ed->point2);
+    maid_mem_clear(hash, sizeof(hash));
+
+    maid_mp_mov(ed->words, s, NULL);
+    maid_mp_mov(ed->words, k, NULL);
+
+    return ret;
+}
+
+const struct maid_sign_def maid_ed25519 =
+{
+    .new      = ed25519_new,
+    .del      = ed25519_del,
+    .size     = ed25519_size,
+    .generate = ed25519_generate,
+    .verify   = ed25519_verify,
+    .version  = 0
 };

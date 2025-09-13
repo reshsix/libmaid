@@ -19,6 +19,7 @@
 #define MAID_ECC_H
 
 #include <maid/mp.h>
+#include <maid/rng.h>
 #include <maid/types.h>
 
 typedef struct maid_ecc maid_ecc;
@@ -37,13 +38,16 @@ struct maid_ecc_def
     void (*base)(void *, maid_ecc_point *);
     void (*copy)(void *, maid_ecc_point *, const maid_ecc_point *);
 
-    size_t (*info)(void *, const maid_ecc_point *, maid_mp_word **);
     bool (*encode)(void *, u8 *, const maid_ecc_point *);
     bool (*decode)(void *, const u8 *, maid_ecc_point *);
 
+    bool (*cmp)(void *, const maid_ecc_point *, const maid_ecc_point *);
     void (*dbl)(void *, maid_ecc_point *);
-    void (*add)(void *, maid_ecc_point *,
-                const maid_ecc_point *);
+    void (*add)(void *, maid_ecc_point *, const maid_ecc_point *);
+
+    size_t (*size)(void *, size_t *, size_t *);
+    bool (*keygen)(void *, u8 *, maid_rng *);
+    bool (*scalar)(void *, const u8 *, maid_mp_word *);
 
     size_t bits;
 };
@@ -59,14 +63,19 @@ maid_ecc_point *maid_ecc_free(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_base(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_copy(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 
-size_t maid_ecc_info(maid_ecc *c, const maid_ecc_point *p, maid_mp_word **s);
 bool maid_ecc_encode(maid_ecc *c, u8 *buffer, const maid_ecc_point *p);
 bool maid_ecc_decode(maid_ecc *c, const u8 *buffer, maid_ecc_point *p);
 
+bool maid_ecc_cmp(maid_ecc *c, const maid_ecc_point *p,
+                               const maid_ecc_point *q);
 void maid_ecc_dbl(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_add(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 void maid_ecc_mul(maid_ecc *c, maid_ecc_point *p,
                   const maid_mp_word *s, bool constant);
+
+size_t maid_ecc_size(maid_ecc *c, size_t *key_s, size_t *point_s);
+bool maid_ecc_keygen(maid_ecc *c, u8 *private, maid_rng *g);
+bool maid_ecc_pubgen(maid_ecc *c, const u8 *private, u8 *public);
 
 /* External algorithms */
 
