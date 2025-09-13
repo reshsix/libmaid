@@ -720,11 +720,22 @@ ed25519_new(u8 version, void *pub, void *prv)
         }
 
         /* Public key loading */
-        if (ret && pub)
+        if (ret)
         {
-            memcpy(ret->pubenc, pub, 32);
-            if (!maid_ecc_decode(ret->ecc, ret->pubenc, ret->public))
-                ret = ed25519_del(ret);
+            if (pub)
+            {
+                memcpy(ret->pubenc, pub, 32);
+                if (!maid_ecc_decode(ret->ecc, ret->pubenc, ret->public))
+                    ret = ed25519_del(ret);
+            }
+            else
+            {
+                /* Pubenc is needed even for signing */
+                maid_ecc_base(ret->ecc, ret->point);
+                maid_ecc_mul(ret->ecc, ret->point, ret->scalar, true);
+                if (!maid_ecc_encode(ret->ecc, ret->pubenc, ret->point))
+                    ret = ed25519_del(ret);
+            }
         }
 
         /* Copy curve order (modulo) */
