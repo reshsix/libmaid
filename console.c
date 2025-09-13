@@ -213,11 +213,39 @@ get_data(char *input, u8 *out, size_t size, bool lt)
         input = &(input[5]);
         conv = (size * 4) / 3;
     }
+    else if (strncmp(input, "str:", 4) == 0)
+    {
+        ret = strlen(input) - 4;
+        if ((!lt && ret == size) || (lt && ret <= size))
+            memcpy(out, &(input[4]), ret);
+        else
+        {
+            fprintf(stderr, "%s: %s than %ld chars (%ld chars)\n",
+                    input, ((ret < size) ? "shorter" : "longer"), size, ret);
+            ret = 0;
+        }
+    }
     else if (strcmp(input, "zero:") == 0)
     {
         maid_mem_clear(out, size);
         get_data_fz = (size == 0);
         ret = size;
+    }
+    else if (strcmp(input, "random:") == 0)
+    {
+        char *filename = "/dev/urandom";
+
+        int in = open(filename, O_RDONLY, 0);
+        if (in >= 0)
+        {
+            if (read(in, out, size) == (ssize_t)size)
+                ret = size;
+        }
+
+        if (!ret && size)
+            perror(filename);
+
+        close(in);
     }
     else if (strcmp(input, "null:") == 0)
     {
@@ -282,7 +310,9 @@ usage(char *ctx)
                 "    b32h:       Base32 string (extended hex)\n"
                 "    b64:        Base64 string\n"
                 "    b64u:       Base64 string (url-safe)\n"
+                "    str:        Ascii string\n"
                 "    zero:       Full zeros\n"
+                "    random:     Random data\n"
                 "    null:       Empty argument\n");
     else if (strcmp(ctx, "stream") == 0)
         fprintf(stderr, "maid stream [algorithm] [key] [iv]"
