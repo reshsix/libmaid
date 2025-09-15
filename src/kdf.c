@@ -19,16 +19,16 @@
 #include <string.h>
 
 #include <maid/mem.h>
-#include <maid/pass.h>
+#include <maid/kdf.h>
 
-struct maid_pass
+struct maid_kdf
 {
-    struct maid_pass_def def;
+    struct maid_kdf_def def;
     void *ctx;
 };
 
-extern struct maid_pass *
-maid_pass_del(maid_pass *p)
+extern struct maid_kdf *
+maid_kdf_del(maid_kdf *p)
 {
     if (p)
         p->def.del(p->ctx);
@@ -37,36 +37,36 @@ maid_pass_del(maid_pass *p)
     return NULL;
 }
 
-extern struct maid_pass *
-maid_pass_new(struct maid_pass_def def, const void *params)
+extern struct maid_kdf *
+maid_kdf_new(struct maid_kdf_def def, const void *params, size_t output_s)
 {
-    struct maid_pass *ret = NULL;
+    struct maid_kdf *ret = NULL;
     if (params)
-        ret = calloc(1, sizeof(struct maid_pass));
+        ret = calloc(1, sizeof(struct maid_kdf));
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_pass_def));
+        memcpy(&(ret->def), &def, sizeof(struct maid_kdf_def));
 
-        ret->ctx = def.new(def.version, params);
+        ret->ctx = def.new(def.version, params, output_s);
         if (!(ret->ctx))
-            ret = maid_pass_del(ret);
+            ret = maid_kdf_del(ret);
     }
 
     return ret;
 }
 
 extern void
-maid_pass_renew(struct maid_pass *p, const void *params)
+maid_kdf_renew(struct maid_kdf *p, const void *params)
 {
     if (p)
         p->def.renew(p->ctx, params);
 }
 
 extern void
-maid_pass_hash(struct maid_pass *p, const char *pwd,
-               const u8 *salt, size_t salt_s, u8 *output)
+maid_kdf_hash(struct maid_kdf *p, const u8 *data, size_t data_s,
+              const u8 *salt, size_t salt_s, u8 *output)
 {
     if (p)
-        p->def.hash(p->ctx, pwd, salt, salt_s, output);
+        p->def.hash(p->ctx, data, data_s, salt, salt_s, output);
 }

@@ -31,9 +31,9 @@ enum
     SHA1, SHA224, SHA256, SHA384, SHA512, SHA512_224, SHA512_256
 };
 
-struct pbkdf2
+struct hkdf
 {
-    struct maid_pbkdf2_params prm;
+    struct maid_hkdf_params prm;
     size_t output_s;
 
     maid_mac  *prf;
@@ -42,15 +42,15 @@ struct pbkdf2
 };
 
 static void *
-pbkdf2_del(void *ctx)
+hkdf_del(void *ctx)
 {
     if (ctx)
     {
-        struct pbkdf2 *p = ctx;
+        struct hkdf *p = ctx;
         maid_mac_del(p->prf);
         maid_hash_del(p->hash);
 
-        maid_mem_clear(ctx, sizeof(struct pbkdf2));
+        maid_mem_clear(ctx, sizeof(struct hkdf));
     }
     free(ctx);
 
@@ -58,9 +58,9 @@ pbkdf2_del(void *ctx)
 }
 
 static void *
-pbkdf2_new(u8 version, const void *params, size_t output_s)
+hkdf_new(u8 version, const void *params, size_t output_s)
 {
-    struct pbkdf2 *ret = calloc(1, sizeof(struct pbkdf2));
+    struct hkdf *ret = calloc(1, sizeof(struct hkdf));
 
     if (ret)
     {
@@ -113,154 +113,148 @@ pbkdf2_new(u8 version, const void *params, size_t output_s)
                 break;
         }
 
-        if (output_s <= (((1ULL << 32) - 1) * ret->digest_s))
+        if (output_s <= (255 * ret->digest_s))
         {
             u8 empty[128] = {0};
             ret->prf  = maid_mac_new(*mdef, empty);
             ret->hash = maid_hash_new(*hdef);
             if (ret->prf && ret->hash)
             {
-                memcpy(&(ret->prm), params, sizeof(struct maid_pbkdf2_params));
+                memcpy(&(ret->prm), params, sizeof(struct maid_hkdf_params));
                 ret->output_s = output_s;
             }
             else
-                ret = pbkdf2_del(ret);
+                ret = hkdf_del(ret);
         }
         else
-            ret = pbkdf2_del(ret);
+            ret = hkdf_del(ret);
     }
 
     return ret;
 }
 
 static void
-pbkdf2_renew(void *ctx, const void *params)
+hkdf_renew(void *ctx, const void *params)
 {
     if (ctx && params)
     {
-        struct pbkdf2 *p = ctx;
-        memcpy(&(p->prm), params, sizeof(struct maid_pbkdf2_params));
+        struct hkdf *p = ctx;
+        memcpy(&(p->prm), params, sizeof(struct maid_hkdf_params));
     }
 }
 
 static void
-pbkdf2_hash(void *ctx, const u8 *data, size_t data_s,
-            const u8 *salt, size_t salt_s, u8 *output)
+hkdf_hash(void *ctx, const u8 *data, size_t data_s,
+          const u8 *salt, size_t salt_s, u8 *output)
 {
     if (ctx && data && salt && output)
     {
-        struct pbkdf2 *p = ctx;
+        struct hkdf *p = ctx;
         maid_mem_clear(output, p->output_s);
 
+        /* PRK = HMAC(salt, data) */
         u8 key[p->key_s];
         maid_mem_clear(key, sizeof(key));
-
-        if (data_s <= sizeof(key))
-            memcpy(key, data, data_s);
-        else
+        if (salt_s > p->key_s)
         {
             maid_hash_renew(p->hash);
-            maid_hash_update(p->hash, data, data_s);
+            maid_hash_update(p->hash, salt, salt_s);
             maid_hash_digest(p->hash, key);
         }
-
+        else
+            memcpy(key, salt, salt_s);
         maid_mac_renew(p->prf, key);
-        maid_mem_clear(key, sizeof(key));
+        maid_mac_update(p->prf, data, data_s);
+        maid_mac_digest(p->prf, key);
 
-        size_t out_s = p->output_s;
-        size_t digest_s = p->digest_s;
-
-        u8 buffer[digest_s];
-        for (u32 b = 1; out_s; b++)
+        /* OKM = HKDF_Expand(PRK, info, output_s) */
+        size_t l = p->output_s;
+        for (u8 i = 1; l; i++)
         {
-            if (out_s < digest_s)
-                digest_s = out_s;
+            maid_mac_renew(p->prf, key);
+            if (i != 1)
+                maid_mac_update(p->prf, &(output[p->digest_s * (i - 2)]),
+                                p->digest_s);
+            maid_mac_update(p->prf, p->prm.info, p->prm.info_s);
 
-            u8 b32[4] = {0};
-            maid_mem_write(b32, 0, sizeof(b32), true, b);
-
-            maid_mac_renew(p->prf, NULL);
-            maid_mac_update(p->prf, salt, salt_s);
-            maid_mac_update(p->prf, b32, sizeof(b32));
-            maid_mac_digest(p->prf, buffer);
-            for (size_t i = 0; i < digest_s; i++)
-                output[i] ^= buffer[i];
-
-            for (u32 i = 1; i < p->prm.iterations; i++)
+            maid_mac_update(p->prf, &i, 1);
+            if (l >= p->digest_s)
             {
-                maid_mac_renew(p->prf, NULL);
-                maid_mac_update(p->prf, buffer, sizeof(buffer));
-                maid_mac_digest(p->prf, buffer);
-                for (size_t j = 0; j < digest_s; j++)
-                    output[j] ^= buffer[j];
+                maid_mac_digest(p->prf, &(output[p->digest_s * (i - 1)]));
+                l -= p->digest_s;
             }
+            else
+            {
+                u8 hash[p->digest_s];
+                maid_mac_digest(p->prf, hash);
+                memcpy(&(output[p->digest_s * (i - 1)]), hash, l);
 
-            output = &(output[digest_s]);
-            out_s -= digest_s;
+                maid_mem_clear(hash, sizeof(hash));
+                l = 0;
+            }
         }
-        maid_mem_clear(buffer, sizeof(buffer));
     }
 }
 
-const struct maid_kdf_def maid_pbkdf2_sha1 =
+const struct maid_kdf_def maid_hkdf_sha1 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA1
 };
 
-const struct maid_kdf_def maid_pbkdf2_sha224 =
+const struct maid_kdf_def maid_hkdf_sha224 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA224
 };
 
-const struct maid_kdf_def maid_pbkdf2_sha256 =
+const struct maid_kdf_def maid_hkdf_sha256 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA256
 };
 
-const struct maid_kdf_def maid_pbkdf2_sha384 =
+const struct maid_kdf_def maid_hkdf_sha384 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA384
 };
 
-const struct maid_kdf_def maid_pbkdf2_sha512 =
+const struct maid_kdf_def maid_hkdf_sha512 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA512
 };
 
-const struct maid_kdf_def maid_pbkdf2_sha512_224 =
+const struct maid_kdf_def maid_hkdf_sha512_224 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA512_224
 };
 
-const struct maid_kdf_def maid_pbkdf2_sha512_256 =
+const struct maid_kdf_def maid_hkdf_sha512_256 =
 {
-    .new     = pbkdf2_new,
-    .del     = pbkdf2_del,
-    .renew   = pbkdf2_renew,
-    .hash    = pbkdf2_hash,
+    .new     = hkdf_new,
+    .del     = hkdf_del,
+    .renew   = hkdf_renew,
+    .hash    = hkdf_hash,
     .version = SHA512_256
 };

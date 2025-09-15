@@ -16,7 +16,7 @@ Version: 1.4 alpha
 | AEAD structures              | AES-GCM, Chacha20Poly1305  |
 | Random number generators     | CTR-DRBG-AES               |
 | Hash functions               | SHA-1, SHA-2, BLAKE2       |
-| Key derivation functions     | PBKDF2                     |
+| Key derivation functions     | HKDF PBKDF2                |
 |                              |                            |
 | Assymetric primitives        | RSA, ECC                   |
 | Elliptic curves              | Edwards25519               |
@@ -62,5 +62,5 @@ available
 |                                     | [AEADs](docs/aead.md)               | [ASN1 format](docs/asn1.md)         |
 |                                     | [CSPRNGs](docs/rng.md)              | [SPKI structure](docs/spki.md)      |
 |                                     | [Hash functions](docs/hash.md)      | [PKCS#8 structure](docs/pkcs8.md)   |
-|                                     | [Password hashing](docs/pass.md)    | [Digital signatures](docs/sign.md)  |
+|                                     | [Key derivation](docs/kdf.md)       | [Digital signatures](docs/sign.md)  |
 |                                     |                                     | [Key exchange](docs/kex.md)         |
