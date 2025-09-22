@@ -1560,6 +1560,7 @@ test(int argc, char *argv[])
         /* Asymmetric cryptography */
 
         TEST(maid_test_rsa)
+        TEST(maid_test_curve25519)
         TEST(maid_test_edwards25519)
         TEST(maid_test_pem)
         TEST(maid_test_spki)

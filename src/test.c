@@ -767,10 +767,17 @@ test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
             maid_ecc_copy(c, r1, NULL);
             maid_ecc_copy(c, r2, r0);
 
+            u32 flags = maid_ecc_flags(c);
+
             ret = maid_ecc_encode(c, tb, r2);
             ret &= maid_mem_cmp(tb, bb, sizeof(tb));
-            ret &= maid_ecc_encode(c, tb, r1);
-            ret &= maid_mem_cmp(tb, ib, sizeof(tb));
+            if (!(flags & MAID_ECC_NO_INF))
+            {
+                ret &= maid_ecc_encode(c, tb, r1);
+                ret &= maid_mem_cmp(tb, ib, sizeof(tb));
+            }
+            else
+                ret &= !maid_ecc_encode(c, tb, r1);
             ret &= maid_ecc_decode(c, bb, r1);
             ret &= maid_ecc_encode(c, tb, r1);
             ret &= maid_mem_cmp(tb, bb, sizeof(tb));
@@ -1920,6 +1927,24 @@ maid_test_rsa(void)
     ret -= test_rsa2();
 
     return ret;
+}
+
+extern u8
+maid_test_curve25519(void)
+{
+    return 1 - test_ecc(maid_curve25519, maid_mp_words(256),
+                        "09000000000000000000000000000000"
+                        "00000000000000000000000000000000",
+                        "00000000000000000000000000000000"
+                        "00000000000000000000000000000000",
+                        "fb4e68dd9c46ae5c5c0b351eed5c3f8f"
+                        "1471157d680c75d9b7f17318d542d320",
+                        "123c71fbaf030ac059081c62674e82f8"
+                        "64ba1bc2914d5345e6ab576d1abc121c",
+                        "00000000000000000000000000000000"
+                        "000000000000000000000000cafebabe",
+                        "9621848b67243ccc97468fa237c8ff4c"
+                        "675c04824a59a4b4607037f6116be166");
 }
 
 extern u8

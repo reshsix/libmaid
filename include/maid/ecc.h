@@ -27,6 +27,13 @@ typedef struct maid_ecc_point maid_ecc_point;
 
 /* Internal interface */
 
+enum
+{
+    MAID_ECC_DIFF_ADD  = 1,
+    MAID_ECC_NO_INF    = 2,
+    MAID_ECC_LADDER_AD = 4
+};
+
 struct maid_ecc_def
 {
     void * (*new)(void);
@@ -49,7 +56,10 @@ struct maid_ecc_def
     bool (*keygen)(void *, u8 *, maid_rng *);
     bool (*scalar)(void *, const u8 *, maid_mp_word *);
 
+    void (*debug)(void *, const char *, const maid_ecc_point *);
+
     size_t bits;
+    u32 flags;
 };
 
 /* External interface */
@@ -74,11 +84,16 @@ void maid_ecc_mul(maid_ecc *c, maid_ecc_point *p,
                   const maid_mp_word *s, bool constant);
 
 size_t maid_ecc_size(maid_ecc *c, size_t *key_s, size_t *point_s);
+u32 maid_ecc_flags(maid_ecc *c);
+
 bool maid_ecc_keygen(maid_ecc *c, u8 *private, maid_rng *g);
 bool maid_ecc_pubgen(maid_ecc *c, const u8 *private, u8 *public);
 
+void maid_ecc_debug(maid_ecc *c, const char *name, const maid_ecc_point *a);
+
 /* External algorithms */
 
+extern const struct maid_ecc_def maid_curve25519;
 extern const struct maid_ecc_def maid_edwards25519;
 
 #endif

@@ -15,6 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -166,7 +167,7 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
         size_t words = c->words;
         size_t maid_mp_bits = sizeof(maid_mp_word) * 8;
 
-        volatile bool bit = false;
+        volatile bool bit = false, started = false;
         for (size_t i = 0; i < words * maid_mp_bits; i++)
         {
             size_t ii = (words * maid_mp_bits) - i - 1;
@@ -174,12 +175,45 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
             size_t e = ii / maid_mp_bits;
             u8     f = ii % maid_mp_bits;
             bit = ((s) ? s[e] : ((e == 0) ? 0x1 : 0x0)) & (1ULL << f);
+            started |= bit;
 
-            c->def.dbl(c->context, c->r0);
-            if (bit)
-                c->def.add(c->context, c->r0, c->r1);
-            else if (constant)
-                c->def.add(c->context, c->r2, c->r0);
+            if (c->def.flags & MAID_ECC_LADDER_AD)
+            {
+                if (started)
+                {
+                    if (bit)
+                    {
+                        c->def.add(c->context, c->r0, c->r1);
+                        c->def.dbl(c->context, c->r1);
+                    }
+                    else
+                    {
+                        c->def.add(c->context, c->r1, c->r0);
+                        c->def.dbl(c->context, c->r0);
+                    }
+                }
+                else if (constant)
+                {
+                    c->def.add(c->context, c->r2, c->r0);
+                    c->def.dbl(c->context, c->r0);
+                }
+            }
+            else
+            {
+                if (started)
+                {
+                    c->def.dbl(c->context, c->r0);
+                    if (bit)
+                        c->def.add(c->context, c->r0, c->r1);
+                    else if (constant)
+                        c->def.add(c->context, c->r2, c->r1);
+                }
+                else if (constant)
+                {
+                    c->def.dbl(c->context, c->r2);
+                    c->def.add(c->context, c->r2, c->r1);
+                }
+            }
         }
         bit = false;
 
@@ -194,6 +228,17 @@ maid_ecc_size(struct maid_ecc *c, size_t *public_s, size_t *private_s)
 
     if (c)
         ret = c->def.size(c->context, public_s, private_s);
+
+    return ret;
+}
+
+extern u32
+maid_ecc_flags(struct maid_ecc *c)
+{
+    u32 ret = 0;
+
+    if (c)
+        ret = c->def.flags;
 
     return ret;
 }
@@ -229,4 +274,12 @@ maid_ecc_pubgen(struct maid_ecc *c, const u8 *private, u8 *public)
     }
 
     return ret;
+}
+
+extern void
+maid_ecc_debug(struct maid_ecc *c, const char *name,
+               const struct maid_ecc_point *a)
+{
+    if (c)
+        c->def.debug(c->context, name, a);
 }

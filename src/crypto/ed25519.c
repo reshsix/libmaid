@@ -15,6 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -282,7 +283,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
             maid_mp_shr(words, buf, 3);
 
             /* x = x^buf */
-            maid_mp_expmod(words, x, buf, c->p, true);
+            maid_mp_expmod2(words, x, buf, c->p, true);
 
             /* buf = vx^2 */
             maid_mp_mov(words, buf, x);
@@ -307,7 +308,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                     maid_mp_sub(words, buf, I);
                     maid_mp_shr(words, buf, 2);
                     I[0] = 2;
-                    maid_mp_expmod(words, I, buf, c->p, false);
+                    maid_mp_expmod2(words, I, buf, c->p, false);
 
                     /* x *= I */
                     maid_mp_mulmod(words, x, I, c->p);
@@ -603,6 +604,17 @@ edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
     return ret;
 }
 
+static void
+edwards25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
+{
+    struct edwards25519 *c = ctx;
+    fprintf(stderr, "%s (edwards25519)\n", name);
+    maid_mp_debug(c->words, "x", a->x);
+    maid_mp_debug(c->words, "y", a->y);
+    maid_mp_debug(c->words, "z", a->z);
+    maid_mp_debug(c->words, "t", a->t);
+}
+
 const struct maid_ecc_def maid_edwards25519 =
 {
     .new    = edwards25519_new,    .del    = edwards25519_del,
@@ -612,6 +624,7 @@ const struct maid_ecc_def maid_edwards25519 =
     .cmp    = edwards25519_cmp,    .dbl    = edwards25519_dbl,
     .add    = edwards25519_add,    .size   = edwards25519_size,
     .keygen = edwards25519_keygen, .scalar = edwards25519_scalar,
+    .debug  = edwards25519_debug,
     .bits   = 256
 };
 

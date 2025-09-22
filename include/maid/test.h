@@ -36,6 +36,7 @@ u8 maid_test_hmac_sha1(void);
 u8 maid_test_hmac_sha2(void);
 
 u8 maid_test_rsa(void);
+u8 maid_test_curve25519(void);
 u8 maid_test_edwards25519(void);
 u8 maid_test_pem(void);
 u8 maid_test_spki(void);
