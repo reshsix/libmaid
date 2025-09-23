@@ -6,24 +6,24 @@
 ## Status
 Version: 1.4 alpha
 
-| Category                     | Algorithms                 |
-| -----------------------------|----------------------------|
-| Encoding schemes             | Base16, Base32, Base64     |
-| Block ciphers                | AES                        |
-| Block cipher modes           | EBC, CTR                   |
-| Stream ciphers               | Chacha20                   |
-| Message authentication codes | Poly1305, HMAC, BLAKE2     |
-| AEAD structures              | AES-GCM, Chacha20Poly1305  |
-| Random number generators     | CTR-DRBG-AES               |
-| Hash functions               | SHA-1, SHA-2, BLAKE2       |
-| Key derivation functions     | HKDF, PBKDF2               |
-|                              |                            |
-| Asymmetric primitives        | RSA, ECC                   |
-| Elliptic curves              | Curve25519, Edwards25519   |
-| Public-key encodings         | PEM, DER                   |
-| Public key structures        | PKCS#1, SPKI, PKCS#8       |
-| Digital signatures           | RSA-PKCS#1 (v1.5), Ed25519 |
-| Key-exchange methods         | Diffie-Hellman             |
+| Category                     | Algorithms                   |
+| -----------------------------|------------------------------|
+| Encoding schemes             | Base16, Base32, Base64       |
+| Block ciphers                | AES                          |
+| Block cipher modes           | EBC, CTR                     |
+| Stream ciphers               | Chacha20                     |
+| Message authentication codes | Poly1305, HMAC, BLAKE2       |
+| AEAD structures              | AES-GCM, Chacha20Poly1305    |
+| Random number generators     | CTR-DRBG-AES                 |
+| Hash functions               | SHA-1, SHA-2, BLAKE2         |
+| Key derivation functions     | HKDF, PBKDF2                 |
+|                              |                              |
+| Asymmetric primitives        | RSA, ECC                     |
+| Elliptic curves              | Curve25519/448, Edwards25519 |
+| Public-key encodings         | PEM, DER                     |
+| Public key structures        | PKCS#1, SPKI, PKCS#8         |
+| Digital signatures           | RSA-PKCS#1 (v1.5), Ed25519   |
+| Key-exchange methods         | Diffie-Hellman               |
 
 ### Warnings
 - AES is currently implemented using LUT, so it might be

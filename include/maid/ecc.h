@@ -94,6 +94,7 @@ void maid_ecc_debug(maid_ecc *c, const char *name, const maid_ecc_point *a);
 /* External algorithms */
 
 extern const struct maid_ecc_def maid_curve25519;
+extern const struct maid_ecc_def maid_curve448;
 extern const struct maid_ecc_def maid_edwards25519;
 
 #endif
