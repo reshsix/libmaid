@@ -44,14 +44,6 @@ bool maid_sign_verify(maid_sign *s,
 
 /* External algorithms */
 
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha1;
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha224;
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha256;
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha384;
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha512;
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha512_224;
-extern const struct maid_sign_def maid_pkcs1_v1_5_sha512_256;
-
 extern const struct maid_sign_def maid_ed25519;
 
 #endif

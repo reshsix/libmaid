@@ -32,7 +32,6 @@
 #include <maid/mac.h>
 #include <maid/aead.h>
 #include <maid/hash.h>
-#include <maid/rsa.h>
 #include <maid/ecc.h>
 #include <maid/sign.h>
 #include <maid/kex.h>
@@ -300,7 +299,7 @@ usage(char *ctx)
                 "    exchange    Generates a public-key for key exchange\n"
                 "    secret      Generates a secret from key exchange\n\n"
                 "    keygen      Generates a private key using entropy\n"
-                "    pubgen      Extracts public key from private key\n"
+                "    pubgen      Extracts public key from private key\n\n"
                 "    encode      Encodes data to a certain format\n"
                 "    decode      Decodes data from a certain format\n\n"
                 "Arguments:\n"
@@ -387,30 +386,16 @@ usage(char *ctx)
                         "    chacha20poly1305 (key: 32, iv: 12, aad <= 4k)\n");
     else if (strcmp(ctx, "sign") == 0)
         fprintf(stderr,
-                "maid sign [algorithm] [key] [data] < message\n"
-                "Signs a hash\n\n"
+                "maid sign [algorithm] [key] [data]\n"
+                "Signs a message\n\n"
                 "Algorithms:\n"
-                "    rsa-pkcs1-sha1       (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha224     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha256     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha384     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha512     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha512-224 (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha512-256 (key: PKCS#1 DER)\n"
-                "    ed25519              (key: OCTET STRING 32)\n");
+                "    ed25519              (key: 32)\n");
     else if (strcmp(ctx, "verify") == 0)
         fprintf(stderr,
-                "maid verify [algorithm] [key] [data] [signature] < message\n"
+                "maid verify [algorithm] [key] [data] [signature]\n"
                 "Verifies a signature\n\n"
                 "Algorithms:\n"
-                "    rsa-pkcs1-sha1       (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha224     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha256     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha384     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha512     (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha512-224 (key: PKCS#1 DER)\n"
-                "    rsa-pkcs1-sha512-256 (key: PKCS#1 DER)\n"
-                "    ed25519              (key: ENCODED POINT)\n");
+                "    ed25519              (key: 32)\n");
     else if (strcmp(ctx, "exchange") == 0)
         fprintf(stderr, "maid exchange [algorithm] [private]\n"
                         "Generates a public-key for key exchange\n\n"
@@ -425,9 +410,6 @@ usage(char *ctx)
         fprintf(stderr, "maid keygen [algorithm] [generator] [entropy]\n"
                         "Generates a private key using entropy\n\n"
                         "Algorithms:\n"
-                        "    rsa-2048\n"
-                        "    rsa-3072\n"
-                        "    rsa-4096\n"
                         "    ed25519\n\n"
                         "Generators:\n"
                         "    ctr-drbg-aes-128 (entropy: 32)\n"
@@ -437,7 +419,6 @@ usage(char *ctx)
         fprintf(stderr, "maid pubgen [algorithm] [key]\n"
                         "Extracts public key from private key\n"
                         "Algorithms:\n"
-                        "    rsa     (key: PKCS#1 DER)\n"
                         "    ed25519 (key: OCTET STRING 32)\n");
     else if (strcmp(ctx, "encode") == 0)
         fprintf(stderr, "maid encode [algorithm] < data\n"
@@ -964,74 +945,21 @@ sign_verify(int argc, char *argv[], bool verify)
             int out = STDOUT_FILENO;
 
             const struct maid_sign_def *sign_d = NULL;
-            u8 type = 0;
 
-            if (strcmp(argv[1], "rsa-pkcs1-sha1") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha1;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "rsa-pkcs1-sha224") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha224;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "rsa-pkcs1-sha256") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha256;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "rsa-pkcs1-sha384") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha384;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "rsa-pkcs1-sha512") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha512;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "rsa-pkcs1-sha512-224") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha512_224;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "rsa-pkcs1-sha512-256") == 0)
-            {
-                sign_d = &maid_pkcs1_v1_5_sha512_256;
-                type   = 1;
-            }
-            else if (strcmp(argv[1], "ed25519") == 0)
+            void *pub = NULL;
+            if (strcmp(argv[1], "ed25519") == 0)
             {
                 sign_d = &maid_ed25519;
-                type   = 2;
+                if (n == 32)
+                    pub = key;
             }
             else
                 ret = usage((verify) ? "verify" : "sign");
 
-            void *pub = NULL;
-            if (ret && type)
+            if (ret && !pub)
             {
-                switch (type)
-                {
-                    case 1:
-                        if (verify)
-                            pub = maid_rsa_new(key, n);
-                        else
-                            pub = maid_rsa_new2(key, n);
-                        break;
-                    case 2:
-                        if ((verify && n == 32) || (!verify && n == 34))
-                            pub = key;
-                    default:
-                        break;
-                }
-
-                if (!pub)
-                {
-                    fprintf(stderr, "Invalid key\n");
-                    ret = false;
-                }
+                fprintf(stderr, "Invalid key\n");
+                ret = false;
             }
 
             maid_sign *ctx = NULL;
@@ -1080,21 +1008,6 @@ sign_verify(int argc, char *argv[], bool verify)
                 maid_mem_clear(sign, sizeof(sign));
             }
             maid_sign_del(ctx);
-
-            if (ret && type)
-            {
-                switch (type)
-                {
-                    case 1:
-                        if (verify)
-                            maid_rsa_del(pub);
-                        else
-                            maid_rsa_del2(pub);
-                        break;
-                    default:
-                        break;
-                }
-            }
         }
     }
     else
@@ -1209,26 +1122,10 @@ keygen(int argc, char *argv[])
         ret = true;
 
         int out = STDOUT_FILENO;
-        size_t type = 0;
 
-        size_t bits = 0;
-        if (strcmp(argv[1], "rsa-2048") == 0)
-        {
+        size_t type = 0;
+        if (strcmp(argv[1], "ed25519") == 0)
             type = 1;
-            bits = 2048;
-        }
-        else if (strcmp(argv[1], "rsa-3072") == 0)
-        {
-            type = 1;
-            bits = 3072;
-        }
-        else if (strcmp(argv[1], "rsa-4096") == 0)
-        {
-            type = 1;
-            bits = 4096;
-        }
-        else if (strcmp(argv[1], "ed25519") == 0)
-            type = 2;
         else
             ret = usage("keygen");
 
@@ -1272,33 +1169,11 @@ keygen(int argc, char *argv[])
         {
             switch (type)
             {
-                case 1:
-                    ret = false;
-
-                    maid_rsa_private *key = maid_rsa_keygen(bits, 65537, gen);
-                    if (key)
-                    {
-                        size_t size = 0;
-                        u8 *ex = maid_rsa_export2(key, &size);
-                        if (ex && size)
-                        {
-                            write(out, ex, size);
-                            ret = true;
-                        }
-                        else
-                            fprintf(stderr, "Export failed\n");
-                        maid_mem_clear(ex, size);
-                        free(ex);
-                    }
-                    else
-                        fprintf(stderr, "Generation failed\n");
-                    maid_rsa_del2(key);
-                    break;
-                case 2:;
+                case 1:;
                     maid_ecc *ed25519 = maid_ecc_new(maid_edwards25519);
                     if (ed25519)
                     {
-                        u8 key[34] = {0};
+                        u8 key[32] = {0};
                         if (maid_ecc_keygen(ed25519, key, gen))
                         {
                             write(out, key, sizeof(key));
@@ -1332,14 +1207,11 @@ pubgen(int argc, char *argv[])
     if (argc == 3)
     {
         ret = true;
-
         int out = STDOUT_FILENO;
 
         u8 type = 0;
-        if (strcmp(argv[1], "rsa") == 0)
+        if (strcmp(argv[1], "ed25519") == 0)
             type = 1;
-        else if (strcmp(argv[1], "ed25519") == 0)
-            type = 2;
         else
             ret = usage("pubgen");
 
@@ -1355,26 +1227,6 @@ pubgen(int argc, char *argv[])
             switch (type)
             {
                 case 1:;
-                    maid_rsa_private *rsa = maid_rsa_new2(data, data_s);
-                    if (rsa)
-                    {
-                        maid_rsa_public *pub = maid_rsa_pubgen(rsa);
-                        if (pub)
-                        {
-                            size_t size = 0;
-                            u8 *ex = maid_rsa_export(pub, &size);
-                            if (ex && size)
-                            {
-                                write(out, ex, size);
-                                ret = true;
-                            }
-                            free(ex);
-                        }
-                        maid_rsa_del(pub);
-                    }
-                    maid_rsa_del2(rsa);
-                    break;
-                case 2:;
                     maid_ecc *ed25519 = maid_ecc_new(maid_edwards25519);
                     if (ed25519)
                     {
@@ -1543,8 +1395,6 @@ test(int argc, char *argv[])
         TEST(maid_test_mem)
         TEST(maid_test_mp)
 
-        /* Symmetric cryptography */
-
         TEST(maid_test_aes_ecb)
         TEST(maid_test_aes_ctr)
         TEST(maid_test_aes_gcm)
@@ -1556,17 +1406,9 @@ test(int argc, char *argv[])
         TEST(maid_test_sha2)
         TEST(maid_test_hmac_sha1)
         TEST(maid_test_hmac_sha2)
-
-        /* Asymmetric cryptography */
-
-        TEST(maid_test_rsa)
         TEST(maid_test_curve25519)
         TEST(maid_test_curve448)
         TEST(maid_test_edwards25519)
-        TEST(maid_test_pem)
-        TEST(maid_test_spki)
-        TEST(maid_test_pkcs8)
-        TEST(maid_test_pkcs1_v1_5)
         TEST(maid_test_dh)
 
         #undef TEST

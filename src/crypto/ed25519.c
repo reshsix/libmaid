@@ -569,39 +569,28 @@ static bool
 edwards25519_keygen(void *ctx, u8 *data, maid_rng *g)
 {
     (void)ctx;
-
-    data[0] = 0x04;
-    data[1] = 32;
-    maid_rng_generate(g, &(data[2]), data[1]);
-
+    maid_rng_generate(g, data, 32);
     return true;
 }
 
 static bool
 edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 {
-    bool ret = false;
+    struct edwards25519 *c = ctx;
 
-    if (data[0] == 0x04 && data[1] == 32)
-    {
-        struct edwards25519 *c = ctx;
+    u8 buffer[64] = {0};
+    maid_hash_update(c->hash, data, 32);
+    maid_hash_digest(c->hash, buffer);
+    maid_hash_renew(c->hash);
 
-        u8 buffer[64] = {0};
-        maid_hash_update(c->hash, &(data[2]), 32);
-        maid_hash_digest(c->hash, buffer);
-        maid_hash_renew(c->hash);
+    buffer[0]  &= 248;
+    buffer[31] &= 63;
+    buffer[31] |= 64;
 
-        buffer[0]  &= 248;
-        buffer[31] &= 63;
-        buffer[31] |= 64;
+    maid_mp_read(c->words, s, buffer, false);
+    maid_mem_clear(buffer, sizeof(buffer));
 
-        maid_mp_read(c->words, s, buffer, false);
-        maid_mem_clear(buffer, sizeof(buffer));
-
-        ret = true;
-    }
-
-    return ret;
+    return true;
 }
 
 static void
@@ -713,23 +702,19 @@ ed25519_new(u8 version, void *pub, void *prv)
         if (ret && prv)
         {
             u8 *data = prv;
-            if (data[0] == 0x04 && data[1] == 32)
-            {
-                u8 buffer[64] = {0};
-                maid_hash_update(ret->hash, &(data[2]), 32);
-                maid_hash_digest(ret->hash, buffer);
-                maid_hash_renew(ret->hash);
 
-                buffer[0]  &= 248;
-                buffer[31] &= 63;
-                buffer[31] |= 64;
+            u8 buffer[64] = {0};
+            maid_hash_update(ret->hash, data, 32);
+            maid_hash_digest(ret->hash, buffer);
+            maid_hash_renew(ret->hash);
 
-                maid_mp_read(ret->words, ret->scalar, buffer, false);
-                memcpy(ret->prefix, &(buffer[32]), 32);
-                maid_mem_clear(buffer, sizeof(buffer));
-            }
-            else
-                ret = ed25519_del(ret);
+            buffer[0]  &= 248;
+            buffer[31] &= 63;
+            buffer[31] |= 64;
+
+            maid_mp_read(ret->words, ret->scalar, buffer, false);
+            memcpy(ret->prefix, &(buffer[32]), 32);
+            maid_mem_clear(buffer, sizeof(buffer));
         }
 
         /* Public key loading */
