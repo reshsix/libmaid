@@ -9,19 +9,16 @@ Version: 1.4 alpha
 | Category                     | Algorithms                   |
 | -----------------------------|------------------------------|
 | Encoding schemes             | Base16, Base32, Base64       |
-| Block ciphers                | AES-CTR                      |
 | Stream ciphers               | Chacha20                     |
 | Message authentication codes | Poly1305, HMAC, BLAKE2       |
-| AEAD structures              | AES-GCM, Chacha20Poly1305    |
-| Random number generators     | CTR-DRBG-AES                 |
+| AEAD structures              | Chacha20Poly1305             |
+| Random number generators     | Chacha20-RNG                 |
 | Hash functions               | SHA-1, SHA-2, BLAKE2         |
 | Key derivation functions     | HKDF, PBKDF2                 |
 | Digital signatures           | Ed25519                      |
 | Key-exchange methods         | Diffie-Hellman               |
 
 ### Warnings
-- AES is currently implemented using LUT, so it might be
-vulnerable to cache-timing attacks
 - Elliptic curves are currently implemented without a cswap, so they might be
 vulnerable to branch-prediction attacks
 
@@ -53,7 +50,6 @@ available
 | [Memory utils](docs/mem.md)         |
 | [Multiprecision](docs/mp.md)        |
 |                                     |
-| [Block ciphers](docs/block.md)      |
 | [Stream ciphers](docs/stream.md)    |
 | [MACs](docs/mac.md)                 |
 | [AEADs](docs/aead.md)               |

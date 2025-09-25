@@ -22,6 +22,7 @@
 #include <maid/stream.h>
 #include <maid/mac.h>
 #include <maid/aead.h>
+#include <maid/rng.h>
 
 /* Chacha20 implementation */
 
@@ -194,12 +195,12 @@ chacha_generate(void *ctx, u8 *out)
 
 const struct maid_stream_def maid_chacha20 =
 {
-    .new = chacha_new,
-    .del = chacha_del,
-    .renew = chacha_renew,
+    .new      = chacha_new,
+    .del      = chacha_del,
+    .renew    = chacha_renew,
     .generate = chacha_generate,
-    .state_s = 64,
-    .version = CHACHA20_IETF
+    .state_s  = 64,
+    .version  = CHACHA20_IETF
 };
 
 /* Maid AEAD definitions */
@@ -233,13 +234,78 @@ chacha20poly1305_init(struct maid_stream_def def,
 
 const struct maid_aead_def maid_chacha20poly1305 =
 {
-    .init.stream = chacha20poly1305_init,
-    .mode.stream = maid_stream_xor,
-    .c_def.stream = maid_chacha20,
+    .init  = chacha20poly1305_init,
+    .mode  = maid_stream_xor,
+    .s_def = maid_chacha20,
 
-    .m_def = &maid_poly1305,
-    .s_big = false,
+    .m_def  = &maid_poly1305,
+    .s_big  = false,
     .s_bits = false,
+};
 
-    .block = false
+/* Maid RNG definitions */
+
+struct chacha20_rng
+{
+    maid_stream *st;
+};
+
+static void *
+chacha20_rng_del(void *ctx)
+{
+    if (ctx)
+    {
+        struct chacha20_rng *chr = ctx;
+        maid_stream_del(chr->st);
+    }
+    free(ctx);
+
+    return NULL;
+}
+
+static void *
+chacha20_rng_new(u8 version, const u8 *entropy)
+{
+    struct chacha20_rng *ret = calloc(1, sizeof(struct chacha20_rng));
+
+    (void)version;
+    if (ret)
+    {
+        ret->st = maid_stream_new(maid_chacha20, entropy, &(entropy[32]), 0);
+        if (!(ret->st))
+            ret = chacha20_rng_del(ret);
+    }
+
+    return ret;
+}
+
+static void
+chacha20_rng_renew(void *ctx, const u8 *entropy)
+{
+    if (ctx)
+    {
+        struct chacha20_rng *ctr = ctx;
+        maid_stream_renew(ctr->st, entropy, &(entropy[32]), 0);
+    }
+}
+
+static void
+chacha20_rng_generate(void *ctx, u8 *buffer)
+{
+    if (ctx && buffer)
+    {
+        struct chacha20_rng *ctr = ctx;
+        memset(buffer, '\0', 64);
+        maid_stream_xor(ctr->st, buffer, 64);
+    }
+}
+
+const struct maid_rng_def maid_chacha20_rng =
+{
+    .new      = chacha20_rng_new,
+    .del      = chacha20_rng_del,
+    .renew    = chacha20_rng_renew,
+    .generate = chacha20_rng_generate,
+    .state_s  = 64,
+    .version  = 0
 };

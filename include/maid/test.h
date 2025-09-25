@@ -29,7 +29,6 @@ u8 maid_test_aes_gcm(void);
 u8 maid_test_chacha(void);
 u8 maid_test_poly1305(void);
 u8 maid_test_chacha20poly1305(void);
-u8 maid_test_ctr_drbg(void);
 u8 maid_test_sha1(void);
 u8 maid_test_sha2(void);
 u8 maid_test_hmac_sha1(void);

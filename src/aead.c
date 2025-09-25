@@ -19,7 +19,6 @@
 #include <string.h>
 
 #include <maid/mem.h>
-#include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
 
@@ -30,11 +29,7 @@ struct maid_aead
     u8 step, *buffer;
 
     struct maid_aead_def def;
-    union
-    {
-        maid_stream *stream;
-        maid_block *block;
-    } c_ctx;
+    maid_stream *s_ctx;
     maid_mac *m_ctx;
 
     size_t s_ad, s_ct;
@@ -45,10 +40,7 @@ maid_aead_del(struct maid_aead *ae)
 {
     if (ae)
     {
-        if (ae->def.block)
-            maid_block_del(ae->c_ctx.block);
-        else
-            maid_stream_del(ae->c_ctx.stream);
+        maid_stream_del(ae->s_ctx);
         maid_mac_del(ae->m_ctx);
 
         maid_mem_clear(ae->buffer, ae->def.m_def->state_s);
@@ -73,18 +65,9 @@ maid_aead_new(struct maid_aead_def def,
         memcpy(&(ret->def), &def, sizeof(struct maid_aead_def));
 
         bool initialized = false;
-        if (def.block)
-        {
-            def.init.block(def.c_def.block, key, nonce,
-                           &(ret->c_ctx.block), &(ret->m_ctx), false);
-            initialized = (ret->c_ctx.block && ret->m_ctx);
-        }
-        else
-        {
-            def.init.stream(def.c_def.stream, key, nonce,
-                            &(ret->c_ctx.stream), &(ret->m_ctx), false);
-            initialized = (ret->c_ctx.block && ret->m_ctx);
-        }
+        def.init(def.s_def, key, nonce,
+                 &(ret->s_ctx), &(ret->m_ctx), false);
+        initialized = (ret->s_ctx && ret->m_ctx);
 
         ret->buffer = calloc(1, def.m_def->state_s);
         if (!(initialized && ret->buffer))
@@ -100,12 +83,8 @@ maid_aead_renew(struct maid_aead *ae, const u8 *restrict key,
 {
     if (ae)
     {
-        if (ae->def.block)
-            ae->def.init.block(ae->def.c_def.block, key, nonce,
-                               &(ae->c_ctx.block), &(ae->m_ctx), true);
-        else
-            ae->def.init.stream(ae->def.c_def.stream, key, nonce,
-                                &(ae->c_ctx.stream), &(ae->m_ctx), true);
+        ae->def.init(ae->def.s_def, key, nonce,
+                     &(ae->s_ctx), &(ae->m_ctx), true);
 
         ae->step = 0;
         ae->s_ad = 0;
@@ -139,21 +118,13 @@ maid_aead_crypt(struct maid_aead *ae, u8 *buffer, size_t size, bool decrypt)
 
         if (!decrypt)
         {
-            if (ae->def.block)
-                ae->def.mode.block(ae->c_ctx.block, buffer, size);
-            else
-                ae->def.mode.stream(ae->c_ctx.stream, buffer, size);
-
+            ae->def.mode(ae->s_ctx, buffer, size);
             maid_mac_update(ae->m_ctx, buffer, size);
         }
         else
         {
             maid_mac_update(ae->m_ctx, buffer, size);
-
-            if (ae->def.block)
-                ae->def.mode.block(ae->c_ctx.block, buffer, size);
-            else
-                ae->def.mode.stream(ae->c_ctx.stream, buffer, size);
+            ae->def.mode(ae->s_ctx, buffer, size);
         }
         ae->s_ct += size;
     }

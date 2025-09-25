@@ -42,8 +42,6 @@ void maid_rng_generate(maid_rng *g, u8 *buffer, size_t size);
 
 /* External algorithms */
 
-extern const struct maid_rng_def maid_ctr_drbg_aes_128;
-extern const struct maid_rng_def maid_ctr_drbg_aes_192;
-extern const struct maid_rng_def maid_ctr_drbg_aes_256;
+extern const struct maid_rng_def maid_chacha20_rng;
 
 #endif

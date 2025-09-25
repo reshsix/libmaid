@@ -27,7 +27,6 @@
 
 #include <maid/mem.h>
 
-#include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
 #include <maid/aead.h>
@@ -38,18 +37,6 @@
 #include <maid/test.h>
 
 /* Filter functions */
-
-static bool
-filter_block_ctr(void *ctx, int out, u8 *buf, size_t buf_c)
-{
-    if (buf_c)
-    {
-        maid_block_ctr(ctx, buf, buf_c);
-        write(out, buf, buf_c);
-    }
-
-    return true;
-}
 
 static bool
 filter_stream(void *ctx, int out, u8 *buf, size_t buf_c)
@@ -318,9 +305,6 @@ usage(char *ctx)
                         " < stream\n"
                         "Encrypts/decrypts a stream\n\n"
                         "Algorithms:\n"
-                        "    aes-128-ctr (key: 16, iv: 16)\n"
-                        "    aes-192-ctr (key: 24, iv: 16)\n"
-                        "    aes-256-ctr (key: 32, iv: 16)\n"
                         "    chacha20    (key: 32, iv: 12)\n");
     else if (strcmp(ctx, "mac") == 0)
         fprintf(stderr, "maid mac [algorithm] [key] < message\n"
@@ -346,9 +330,7 @@ usage(char *ctx)
         fprintf(stderr, "maid rng [algorithm] [entropy]\n"
                         "Pseudo-randomly generate bytes\n\n"
                         "Algorithms:\n"
-                        "    ctr-drbg-aes-128 (entropy: 32)\n"
-                        "    ctr-drbg-aes-192 (entropy: 40)\n"
-                        "    ctr-drbg-aes-256 (entropy: 48)\n");
+                        "    chacha20-rng (entropy: 44)\n");
     else if (strcmp(ctx, "hash") == 0)
         fprintf(stderr, "maid hash [algorithm] < message\n"
                         "Hashes a message\n\n"
@@ -372,17 +354,11 @@ usage(char *ctx)
         fprintf(stderr, "maid encrypt [algorithm] [key] [iv] [aad] < message\n"
                         "Encrypts a message\n\n"
                         "Algorithms:\n"
-                        "    aes-128-gcm      (key: 16, iv: 12, aad <= 4k)\n"
-                        "    aes-192-gcm      (key: 24, iv: 12, aad <= 4k)\n"
-                        "    aes-256-gcm      (key: 32, iv: 12, aad <= 4k)\n"
                         "    chacha20poly1305 (key: 32, iv: 12, aad <= 4k)\n");
     else if (strcmp(ctx, "decrypt") == 0)
         fprintf(stderr, "maid decrypt [algorithm] [key] [iv] [aad] < message\n"
                         "Decrypts a message\n\n"
                         "Algorithms:\n"
-                        "    aes-128-gcm      (key: 16, iv: 12, aad <= 4k)\n"
-                        "    aes-192-gcm      (key: 24, iv: 12, aad <= 4k)\n"
-                        "    aes-256-gcm      (key: 32, iv: 12, aad <= 4k)\n"
                         "    chacha20poly1305 (key: 32, iv: 12, aad <= 4k)\n");
     else if (strcmp(ctx, "sign") == 0)
         fprintf(stderr,
@@ -412,9 +388,7 @@ usage(char *ctx)
                         "Algorithms:\n"
                         "    ed25519\n\n"
                         "Generators:\n"
-                        "    ctr-drbg-aes-128 (entropy: 32)\n"
-                        "    ctr-drbg-aes-192 (entropy: 40)\n"
-                        "    ctr-drbg-aes-256 (entropy: 48)\n");
+                        "    chacha20-rng (entropy: 44)\n");
     else if (strcmp(ctx, "pubgen") == 0)
         fprintf(stderr, "maid pubgen [algorithm] [key]\n"
                         "Extracts public key from private key\n"
@@ -453,34 +427,16 @@ stream(int argc, char *argv[])
 
     if (argc == 4)
     {
+        ret = true;
+
         u8 key[32] = {0};
         u8  iv[16] = {0};
 
         size_t key_s = 0;
         size_t iv_s  = 0;
-        const struct maid_block_def  *def_b = NULL;
-        const struct maid_stream_def *def_s = NULL;
 
-        ret = true;
-        if (strcmp(argv[1], "aes-128-ctr") == 0)
-        {
-            key_s  = 16;
-            iv_s   = 16;
-            def_b   = &maid_aes_128;
-        }
-        else if (strcmp(argv[1], "aes-192-ctr") == 0)
-        {
-            key_s  = 24;
-            iv_s   = 16;
-            def_b  = &maid_aes_192;
-        }
-        else if (strcmp(argv[1], "aes-256-ctr") == 0)
-        {
-            key_s  = 32;
-            iv_s   = 16;
-            def_b  = &maid_aes_256;
-        }
-        else if (strcmp(argv[1], "chacha20") == 0)
+        const struct maid_stream_def *def_s = NULL;
+        if (strcmp(argv[1], "chacha20") == 0)
         {
             key_s  = 32;
             iv_s   = 16;
@@ -492,23 +448,13 @@ stream(int argc, char *argv[])
         if (ret && get_data(argv[2], key, key_s, false) &&
                    get_data(argv[3],  iv, iv_s,  false))
         {
-            void *ctx = NULL;
-
-            if (def_s)
-                ctx = maid_stream_new(*def_s, key, iv, 0);
-            else
-                ctx = maid_block_new (*def_b, key, iv);
-
+            void *ctx = maid_stream_new(*def_s, key, iv, 0);
             if (ctx)
-                run_filter(ctx, (def_s) ? filter_stream    :
-                                          filter_block_ctr);
+                run_filter(ctx, filter_stream);
             else
                 fprintf(stderr, "Out of memory\n");
 
-            if (def_s)
-                maid_stream_del(ctx);
-            else
-                maid_block_del(ctx);
+            maid_stream_del(ctx);
         }
 
         maid_mem_clear(key, sizeof(key));
@@ -652,20 +598,10 @@ rng(int argc, char *argv[])
         size_t entropy_s = 0;
         const struct maid_rng_def *def = NULL;
 
-        if (strcmp(argv[1], "ctr-drbg-aes-128") == 0)
+        if (strcmp(argv[1], "chacha20-rng") == 0)
         {
-            entropy_s = 32;
-            def       = &maid_ctr_drbg_aes_128;
-        }
-        else if (strcmp(argv[1], "ctr-drbg-aes-192") == 0)
-        {
-            entropy_s = 40;
-            def       = &maid_ctr_drbg_aes_192;
-        }
-        else if (strcmp(argv[1], "ctr-drbg-aes-256") == 0)
-        {
-            entropy_s = 48;
-            def       = &maid_ctr_drbg_aes_256;
+            entropy_s = 44;
+            def       = &maid_chacha20_rng;
         }
         else
             ret = usage("rng");
@@ -781,28 +717,7 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
         ssize_t tag_s = 0;
         const struct maid_aead_def *def = NULL;
 
-        if (strcmp(argv[1], "aes-128-gcm") == 0)
-        {
-            key_s = 16;
-            iv_s  = 12;
-            tag_s = 16;
-            def = &maid_aes_gcm_128;
-        }
-        else if (strcmp(argv[1], "aes-192-gcm") == 0)
-        {
-            key_s = 24;
-            iv_s  = 12;
-            tag_s = 16;
-            def = &maid_aes_gcm_192;
-        }
-        else if (strcmp(argv[1], "aes-256-gcm") == 0)
-        {
-            key_s = 32;
-            iv_s  = 12;
-            tag_s = 16;
-            def = &maid_aes_gcm_256;
-        }
-        else if (strcmp(argv[1], "chacha20poly1305") == 0)
+        if (strcmp(argv[1], "chacha20poly1305") == 0)
         {
             key_s = 32;
             iv_s  = 12;
@@ -1135,20 +1050,10 @@ keygen(int argc, char *argv[])
         const struct maid_rng_def *def = NULL;
         if (ret)
         {
-            if (strcmp(argv[2], "ctr-drbg-aes-128") == 0)
+            if (strcmp(argv[2], "chacha20-rng") == 0)
             {
-                entropy_s = 32;
-                def       = &maid_ctr_drbg_aes_128;
-            }
-            else if (strcmp(argv[2], "ctr-drbg-aes-192") == 0)
-            {
-                entropy_s = 40;
-                def       = &maid_ctr_drbg_aes_192;
-            }
-            else if (strcmp(argv[2], "ctr-drbg-aes-256") == 0)
-            {
-                entropy_s = 48;
-                def       = &maid_ctr_drbg_aes_256;
+                entropy_s = 44;
+                def       = &maid_chacha20_rng;
             }
             else
                 ret = usage("keygen");
@@ -1395,13 +1300,9 @@ test(int argc, char *argv[])
         TEST(maid_test_mem)
         TEST(maid_test_mp)
 
-        TEST(maid_test_aes_ecb)
-        TEST(maid_test_aes_ctr)
-        TEST(maid_test_aes_gcm)
         TEST(maid_test_chacha)
         TEST(maid_test_poly1305)
         TEST(maid_test_chacha20poly1305)
-        TEST(maid_test_ctr_drbg)
         TEST(maid_test_sha1)
         TEST(maid_test_sha2)
         TEST(maid_test_hmac_sha1)

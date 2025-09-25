@@ -26,27 +26,14 @@
 
 struct maid_aead_def
 {
-    union
-    {
-        void (*block)(struct maid_block_def, const u8 *, const u8 *,
-                      maid_block **, maid_mac **, bool);
-        void (*stream)(struct maid_stream_def, const u8 *, const u8 *,
-                       maid_stream **, maid_mac **, bool);
-    } init;
-    union
-    {
-        void (*block)(maid_block *, u8 *, size_t);
-        void (*stream)(maid_stream *, u8 *, size_t);
-    } mode;
+    void (*init)(struct maid_stream_def, const u8 *, const u8 *,
+                 maid_stream **, maid_mac **, bool);
+    void (*mode)(maid_stream *, u8 *, size_t);
 
-    union
-    {
-        struct maid_block_def block;
-        struct maid_stream_def stream;
-    } c_def;
+    struct maid_stream_def s_def;
     const struct maid_mac_def *m_def;
 
-    bool s_bits, s_big, block;
+    bool s_bits, s_big;
 };
 
 /* External interface */
