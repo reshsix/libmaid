@@ -150,7 +150,18 @@ extern void
 maid_ecc_add(struct maid_ecc *c, struct maid_ecc_point *p,
              const struct maid_ecc_point *q)
 {
-    if (c && p && q)
+    if (c && p && q && !(c->def.flags & MAID_ECC_DIFF_ADD))
+        c->def.add(c->context, p, q);
+}
+
+static void
+ladder_add(maid_ecc *c, struct maid_ecc_point *p,
+           const struct maid_ecc_point *q,
+           const struct maid_ecc_point *org)
+{
+    if (c->def.flags & MAID_ECC_DIFF_ADD)
+        c->def.add2(c->context, p, q, org);
+    else
         c->def.add(c->context, p, q);
 }
 
@@ -183,18 +194,18 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
                 {
                     if (bit)
                     {
-                        c->def.add(c->context, c->r0, c->r1);
+                        ladder_add(c, c->r0, c->r1, p);
                         c->def.dbl(c->context, c->r1);
                     }
                     else
                     {
-                        c->def.add(c->context, c->r1, c->r0);
+                        ladder_add(c, c->r1, c->r0, p);
                         c->def.dbl(c->context, c->r0);
                     }
                 }
                 else if (constant)
                 {
-                    c->def.add(c->context, c->r2, c->r0);
+                    ladder_add(c, c->r2, c->r0, p);
                     c->def.dbl(c->context, c->r0);
                 }
             }
@@ -204,14 +215,14 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
                 {
                     c->def.dbl(c->context, c->r0);
                     if (bit)
-                        c->def.add(c->context, c->r0, c->r1);
+                        ladder_add(c, c->r0, c->r1, p);
                     else if (constant)
-                        c->def.add(c->context, c->r2, c->r1);
+                        ladder_add(c, c->r2, c->r1, p);
                 }
                 else if (constant)
                 {
                     c->def.dbl(c->context, c->r2);
-                    c->def.add(c->context, c->r2, c->r1);
+                    ladder_add(c, c->r2, c->r1, p);
                 }
             }
         }
@@ -272,6 +283,17 @@ maid_ecc_pubgen(struct maid_ecc *c, const u8 *private, u8 *public)
         maid_mp_mov(c->words, s, NULL);
         maid_ecc_free(c, p);
     }
+
+    return ret;
+}
+
+extern bool
+maid_ecc_scalar(struct maid_ecc *c, const u8 *private, maid_mp_word *s)
+{
+    bool ret = false;
+
+    if (c && private && s)
+        ret = c->def.scalar(c->context, private, s);
 
     return ret;
 }

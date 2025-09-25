@@ -27,28 +27,19 @@ struct maid_kex
 };
 
 extern struct maid_kex *
-maid_kex_new(struct maid_kex_def def, const void *cfg, size_t bits)
+maid_kex_new(struct maid_kex_def def)
 {
-    struct maid_kex *ret = NULL;
-    if (cfg)
-        ret = calloc(1, sizeof(struct maid_kex));
+    struct maid_kex *ret = calloc(1, sizeof(struct maid_kex));
 
     if (ret)
     {
         memcpy(&(ret->def), &def, sizeof(struct maid_kex_def));
-        ret->context = def.new(cfg, bits);
+        ret->context = def.new();
         if (!(ret->context))
             ret = maid_kex_del(ret);
     }
 
     return ret;
-}
-
-extern void
-maid_kex_renew(struct maid_kex *x, const void *cfg)
-{
-    if (x && cfg)
-        x->def.renew(x->context, cfg);
 }
 
 extern struct maid_kex *
@@ -61,17 +52,25 @@ maid_kex_del(struct maid_kex *x)
     return NULL;
 }
 
-extern void
-maid_kex_gpub(struct maid_kex *x, const void *private, void *public)
+extern bool
+maid_kex_pubgen(struct maid_kex *x, const u8 *private, u8 *public)
 {
+    bool ret = false;
+
     if (x && private && public)
-        x->def.gpub(x->context, private, public);
+        ret = x->def.pubgen(x->context, private, public);
+
+    return ret;
 }
 
-extern void
-maid_kex_gsec(struct maid_kex *x, const void *private,
-              const void *public, u8 *buffer)
+extern bool
+maid_kex_secgen(struct maid_kex *x, const u8 *private,
+                const u8 *public, u8 *buffer)
 {
+    bool ret = false;
+
     if (x && private && public && buffer)
-        x->def.gsec(x->context, private, public, buffer);
+        ret = x->def.secgen(x->context, private, public, buffer);
+
+    return ret;
 }

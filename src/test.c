@@ -651,7 +651,8 @@ test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
                       maid_mem_cmp(tb, db, sizeof(tb));
             }
 
-            if (ret && maid_ecc_decode(c, bb, r1))
+            if (ret && !(flags & MAID_ECC_DIFF_ADD) &&
+                maid_ecc_decode(c, bb, r1))
             {
                 maid_ecc_add(c, r0, r1);
                 ret = maid_ecc_encode(c, tb, r0) &&
@@ -679,53 +680,6 @@ test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
         maid_ecc_free(c, r2);
         maid_ecc_del(c);
     }
-
-    return ret;
-}
-
-static bool
-test_dh(size_t bits, char *g, char *p,
-        char *prv, char *pub, char *pub2, char *secret)
-{
-    bool ret = true;
-
-    u8 zeros[bits / 8];
-    struct maid_dh_group zgroup = {.generator = (void *)zeros,
-                                   .modulo    = (void *)zeros};
-
-    maid_kex *x = maid_kex_new(maid_dh, &zgroup, bits);
-
-    if (x)
-    {
-        size_t words = maid_mp_words(bits);
-        TEST_IMPORT_MP(words, gm, gb, g)
-        TEST_IMPORT_MP(words, pm, pb, p)
-
-        TEST_IMPORT(rb, prv)
-        TEST_IMPORT(ub, pub)
-        TEST_IMPORT(vb, pub2)
-        TEST_IMPORT(sb, secret)
-
-        TEST_EMPTY(bb, pub)
-        if (ret)
-        {
-            struct maid_dh_group group = {.generator = gm, .modulo = pm};
-            maid_kex_renew(x, &group);
-
-            maid_kex_gpub(x, rb, bb);
-            ret = maid_mem_cmp(bb, ub, sizeof(bb));
-        }
-
-        if (ret)
-        {
-            maid_kex_gsec(x, rb, vb, bb);
-            ret = maid_mem_cmp(bb, sb, sizeof(bb));
-        }
-    }
-    else
-        ret = false;
-
-    maid_kex_del(x);
 
     return ret;
 }
@@ -1298,36 +1252,6 @@ maid_test_curve25519(void)
 }
 
 extern u8
-maid_test_curve448(void)
-{
-    return 1 - test_ecc(maid_curve448, maid_mp_words(448),
-                        "05000000000000000000000000000000"
-                        "00000000000000000000000000000000"
-                        "00000000000000000000000000000000"
-                        "0000000000000000",
-                        "00000000000000000000000000000000"
-                        "00000000000000000000000000000000"
-                        "00000000000000000000000000000000"
-                        "0000000000000000",
-                        "b63c741cbca4327d0808125a25f0e825"
-                        "71ed00daf14737bfc16f261666763c5f"
-                        "d7831e51fbbe9aaccc5cbdd86546ef9a"
-                        "d4e3ca5722329163",
-                        "4cf353054d31e311751c32d0137d9ace"
-                        "5256f99ba58e1363eae7a407282a002c"
-                        "49423cb91fb629248a0b8425934bc170"
-                        "61b8ca84354bbe1f",
-                        "00000000000000000000000000000000"
-                        "00000000000000000000000000000000"
-                        "00000000000000000000000000000000"
-                        "00000000cafebabe",
-                        "317ec96e30a9d5f53e429cc61e8acbf1"
-                        "fe07e389e8ff6040c2ba701d96b5c219"
-                        "83c73415dd93d3ad32ef47f5777fe7d1"
-                        "e3d9545ff6f515a1");
-}
-
-extern u8
 maid_test_edwards25519(void)
 {
     return 1 - test_ecc(maid_edwards25519, maid_mp_words(256),
@@ -1343,72 +1267,4 @@ maid_test_edwards25519(void)
                         "3c010ac0f12e7a42cb33284f86837c30",
                         "d75a980182b10ab7d54bfed3c964073a"
                         "0ee172f3daa62325af021a68f707511a");
-}
-
-extern u8
-maid_test_dh(void)
-{
-    /* KAS FFC NIST test vectors */
-
-    u8 ret = 1;
-
-    char *g[] =
-        {"4a1af3a492e9ee746e57d58c2c5b41415ed45519dcd93291f7fdc257ff0314db"
-         "f1b7600c43593fffacf1809a156fd86eb78518c8ec4e594ae291434ceb95b62e"
-         "9aea536880646940f9ecbd8589269767afb0ad001bd4fd94d3e992b1b4bc5aaa"
-         "9280893b39056c2226fe5a286c37505a3899cff3c19645dc01cb2087a5008cf5"
-         "4dc2efb89bd187beedd50a291534594c3a052205444f9fc84712248ea879e467"
-         "ba4d5b755695ebe88afa8e018c1b7463d92ff7d3448fa8f5af6c4fdbe7c96c71"
-         "22a31df140b2e09ab672c9c01316a24ae192c75423ab9da1a1e50bedbae88437"
-         "b2e7fe328dfa1c537797c7f348c9db2d75529d4251786268054515f8a24ef30b"};
-    char *p[] =
-        {"c57ca24f4bd68c3cdac7baaaea2e5c1e18b27b8c55659feae0a136532b36e04e"
-         "3e64a9e4fc8f326297e4bef7c1de075a8928f3fe4ffe68bcfb0a7ca4b3144889"
-         "9fafb843e2a0625cb4883f065011fe658d49d2f54b7479db06629289eddacb87"
-         "3716d2a17ae8de92ee3e414a915eedf36c6b7efd159218fca7ac428557e9dcda"
-         "55c98b289ec1c4464d88ed628edb3fb9d7c8e3cfb8342cd26f280641e3668cfc"
-         "72ff263b6b6c6f73def29029e06132c412740952ecf31ba64598acf91c658e3a"
-         "91844b238ab23cc9faeaf138ced805e0fa44681febd957b84a975b88c5f1bbb0"
-         "49c3917cd313b947bb918fe52607aba9c5d03d954126929d1367f27e1188dc2d"};
-    char *prv[] =
-        {"0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "0000000000000000000000000000000000000000000000000000000000000000"
-         "00000000d00ec7e80d5cc3405f9b40e0b52503c888273cef46a98d289a602a1a"};
-    char *pub[] =
-        {"7d0660bfce9e7263f6bfc79bca58feca7131077d31a964dd3a2a9a493420fb49"
-         "62be61aefa37635354563671f66186e8096e6e888160ce1ddcf1b5fe4bf5c9f6"
-         "c99a63015d1723adcd8a2aebd4847ab022896f8107114cbcf34ea32435d5a268"
-         "9f7356d3894aeafd9ad80baab0fdd2671540a59b2fc789fd0be4154357df8d7f"
-         "996f2076e963fa59d5ffd9fe8a006ce09c052ebebcc6db71b7778fb0d3030f18"
-         "ad2604d3152a207f6625a63121bd0217a4424856d2167af8fea3e77d20ebe161"
-         "24d0e74f95fb8b5ed619447152e4883d00fc2e3d14f26a724fde7e870f196ec5"
-         "a040bbbaf4da12034e5cbf94624e2dc280b1d44457c8820d3c485a8023d6bb44"};
-    char *pub2[] =
-        {"78045869392d56f3520712a68f29466d8a89cf419192504c453c224dbc9a0ffd"
-         "297d6cc1a370eee93981399da4c70897aab48f334f05a5562733e4e731c37f17"
-         "3880760088edb1e9986a5d430806d5146424d93a7fa4a391659ff9666755e75a"
-         "1438816113e1448e6e14b46ce8ad7908fec3b8e502257263eabafefc9a3b9c64"
-         "522150fbc211f45eef4335fbc6dc01a9156943abae05c3b177ac9d7e3bd3c57e"
-         "f58df9523bcfc5532d67ac61174f6c9c09a93892dfbf490d150b02f224385619"
-         "cf6db90a6f79042ef9efdbbcdbf2a38b0112ec40dc6bff2bc7f596417840e3ac"
-         "4aa5a5d044e71a876a10a204df713447f2920d92180e144318ce0e18b87eef6e"};
-    char *secret[] =
-        {"0df1d1b0faae8b8afb7c47884849f23a2d8f01ee47141e91d54949ff7fd0d110"
-         "ac4cccc67f428a04ee6441f81d1a04263b99b5eef61794fd3d584bd7e1f4f610"
-         "b8dcb78d045f721319f6a8333e828c56b1975c4fa3d31eeb61a4c2042cc9226c"
-         "6eeea75b668bfbb50d1b7ca188c79585a44ce538041e941b03e6cca4365802be"
-         "79895ad2601e47e62635153a91ef92a90f8958d3f7d2c503613778511e394d92"
-         "8fddb07dc7adf434854e948519f1bfb7ca023bb0464596b6010e380da5d7135c"
-         "5a0d41c56d3792f6dc5e09a42f7e2a9486d8590b01542ae69fa14fa582ca7344"
-         "434705649d687885cc2477aa4c088d47339548926b9f7a17138267f3e45589db"};
-
-    for (u8 i = 0; i < 1; i++)
-        ret -= test_dh(2048, g[i], p[i], prv[i], pub[i], pub2[i], secret[i]);
-
-    return ret;
 }

@@ -24,34 +24,23 @@
 
 struct maid_kex_def
 {
-    void * (*new)(const void *, size_t);
+    void * (*new)(void);
     void * (*del)(void *);
-    void (*renew)(void *, const void *);
-    void (*gpub)(void *, const void *, void *);
-    void (*gsec)(void *, const void *, const void *, u8 *);
-    u8 version;
+    bool (*pubgen)(void *, const u8 *, u8 *);
+    bool (*secgen)(void *, const u8 *, const u8 *, u8 *);
 };
 
 /* External interface */
 
 typedef struct maid_kex maid_kex;
-maid_kex *maid_kex_new(struct maid_kex_def def, const void *cfg, size_t bits);
-void maid_kex_renew(maid_kex *x, const void *cfg);
+maid_kex *maid_kex_new(struct maid_kex_def def);
 maid_kex *maid_kex_del(maid_kex *x);
-void maid_kex_gpub(maid_kex *x, const void *private, void *public);
-void maid_kex_gsec(maid_kex *x, const void *private,
-                   const void *public, u8 *buffer);
+bool maid_kex_pubgen(maid_kex *x, const u8 *private, u8 *public);
+bool maid_kex_secgen(maid_kex *x, const u8 *private,
+                     const u8 *public, u8 *buffer);
 
 /* External algorithms */
 
-#include <maid/mp.h>
-
-struct maid_dh_group
-{
-    maid_mp_word *generator;
-    maid_mp_word *modulo;
-};
-
-extern const struct maid_kex_def maid_dh;
+extern const struct maid_kex_def maid_x25519;
 
 #endif

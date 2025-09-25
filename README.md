@@ -16,7 +16,7 @@ Version: 1.4 alpha
 | Hash functions               | SHA-1, SHA-2, BLAKE2         |
 | Key derivation functions     | HKDF, PBKDF2                 |
 | Digital signatures           | Ed25519                      |
-| Key-exchange methods         | Diffie-Hellman               |
+| Key-exchange methods         | X25519                       |
 
 ### Warnings
 - Elliptic curves are currently implemented without a cswap, so they might be

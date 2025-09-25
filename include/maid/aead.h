@@ -18,7 +18,6 @@
 #ifndef MAID_AEAD_H
 #define MAID_AEAD_H
 
-#include <maid/block.h>
 #include <maid/stream.h>
 #include <maid/mac.h>
 

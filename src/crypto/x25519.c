@@ -25,6 +25,7 @@
 
 #include <maid/ecc.h>
 #include <maid/sign.h>
+#include <maid/kex.h>
 
 static bool
 import_mp(size_t words, maid_mp_word *output, const char *input)
@@ -280,8 +281,9 @@ curve25519_dbl(void *ctx, struct maid_ecc_point *a)
 }
 
 static void
-curve25519_add(void *ctx, struct maid_ecc_point *a,
-               const struct maid_ecc_point *b)
+curve25519_add2(void *ctx, struct maid_ecc_point *a,
+                const struct maid_ecc_point *b,
+                const struct maid_ecc_point *o)
 {
     struct curve25519 *c = ctx;
     size_t words = c->words;
@@ -305,17 +307,17 @@ curve25519_add(void *ctx, struct maid_ecc_point *a,
     maid_mp_addmod(words, buf, b->z, c->p);
     maid_mp_mulmod(words, bc, buf, c->p);
 
-    /* x = (AD + BC)^2 */
+    /* x = OZ * (AD + BC)^2 */
     maid_mp_mov(words, buf, ad);
     maid_mp_addmod(words, buf, bc, c->p);
-    maid_mp_mov(words, a->x, buf);
+    maid_mp_mov(words, a->x, o->z);
+    maid_mp_mulmod(words, a->x, buf, c->p);
     maid_mp_mulmod(words, a->x, buf, c->p);
 
-    /* z = 9 * (AD - BC)^2 */
+    /* z = OX * (AD - BC)^2 */
     maid_mp_mov(words, buf, ad);
     maid_mp_submod(words, buf, bc, c->p);
-    maid_mp_mov(words, a->z, NULL);
-    a->z[0] = 9;
+    maid_mp_mov(words, a->z, o->x);
     maid_mp_mulmod(words, a->z, buf, c->p);
     maid_mp_mulmod(words, a->z, buf, c->p);
 
@@ -349,7 +351,7 @@ curve25519_keygen(void *ctx, u8 *data, maid_rng *g)
 static bool
 curve25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 {
-    bool ret = false;
+    bool ret = true;
 
     struct curve25519 *c = ctx;
 
@@ -382,9 +384,87 @@ const struct maid_ecc_def maid_curve25519 =
     .base   = curve25519_base,   .copy   = curve25519_copy,
     .encode = curve25519_encode, .decode = curve25519_decode,
     .cmp    = curve25519_cmp,    .dbl    = curve25519_dbl,
-    .add    = curve25519_add,    .size   = curve25519_size,
+    .add2   = curve25519_add2,   .size   = curve25519_size,
     .keygen = curve25519_keygen, .scalar = curve25519_scalar,
     .debug  = curve25519_debug,
     .bits   = 256,
     .flags  = MAID_ECC_DIFF_ADD | MAID_ECC_NO_INF | MAID_ECC_LADDER_AD
+};
+
+/* Maid KEX definitions */
+
+struct x25519
+{
+    size_t words;
+    maid_ecc *c;
+    maid_ecc_point *p;
+    maid_mp_word *s;
+};
+
+extern void *
+x25519_del(void *x25519)
+{
+    if (x25519)
+    {
+        struct x25519 *x = x25519;
+        if (x->c)
+            maid_ecc_free(x->c, x->p);
+        maid_ecc_del(x->c);
+
+        if (x->s)
+            maid_mp_mov(x->words, x->s, NULL);
+        free(x->s);
+    }
+    free(x25519);
+
+    return NULL;
+}
+
+extern void *
+x25519_new(void)
+{
+    struct x25519 *ret = calloc(1, sizeof(struct x25519));
+
+    if (ret)
+    {
+        ret->words = maid_mp_words(256);
+        ret->c = maid_ecc_new(maid_curve25519);
+        ret->p = maid_ecc_alloc(ret->c);
+        ret->s = calloc(ret->words, sizeof(maid_mp_word));
+        if (!(ret->words && ret->c && ret->p && ret->s))
+            ret = x25519_del(ret);
+    }
+
+    return ret;
+}
+
+extern bool
+x25519_pubgen(void *x25519, const u8 *private, u8 *public)
+{
+    struct x25519 *x = x25519;
+    return maid_ecc_pubgen(x->c, private, public);
+}
+
+extern bool
+x25519_secgen(void *x25519, const u8 *private, const u8 *public, u8 *buffer)
+{
+    bool ret = false;
+
+    struct x25519 *x = x25519;
+
+    ret = maid_ecc_decode(x->c, public,  x->p) &&
+          maid_ecc_scalar(x->c, private, x->s);
+    if (ret)
+    {
+        maid_ecc_mul(x->c, x->p, x->s, true);
+        ret = maid_ecc_encode(x->c, buffer, x->p);
+    }
+
+    return ret;
+}
+
+const struct maid_kex_def maid_x25519 =
+{
+    .new    = x25519_new,    .del    = x25519_del,
+    .pubgen = x25519_pubgen, .secgen = x25519_secgen
 };

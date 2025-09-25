@@ -51,6 +51,8 @@ struct maid_ecc_def
     bool (*cmp)(void *, const maid_ecc_point *, const maid_ecc_point *);
     void (*dbl)(void *, maid_ecc_point *);
     void (*add)(void *, maid_ecc_point *, const maid_ecc_point *);
+    void (*add2)(void *, maid_ecc_point *,
+                 const maid_ecc_point *, const maid_ecc_point *);
 
     size_t (*size)(void *, size_t *, size_t *);
     bool (*keygen)(void *, u8 *, maid_rng *);
@@ -88,6 +90,7 @@ u32 maid_ecc_flags(maid_ecc *c);
 
 bool maid_ecc_keygen(maid_ecc *c, u8 *private, maid_rng *g);
 bool maid_ecc_pubgen(maid_ecc *c, const u8 *private, u8 *public);
+bool maid_ecc_scalar(maid_ecc *c, const u8 *private, maid_mp_word *s);
 
 void maid_ecc_debug(maid_ecc *c, const char *name, const maid_ecc_point *a);
 
