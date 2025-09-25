@@ -1174,6 +1174,32 @@ maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
 }
 
 extern void
+maid_mp_cswap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap)
+{
+    if (words && a && b)
+    {
+        MAID_ALLOC_MP(mask, 1)
+        MAID_ALLOC_MP(tmp,  1)
+
+        /* mask = 0 - bit */
+        tmp[0] = swap;
+        maid_mp_sub(words, mask, tmp);
+
+        /* tmp = (a ^ b) & mask */
+        maid_mp_mov(words, tmp, a);
+        maid_mp_xor(words, tmp, b);
+        maid_mp_and(words, tmp, mask);
+
+        /* a ^= tmp, b ^= tmp */
+        maid_mp_xor(words, a, tmp);
+        maid_mp_xor(words, b, tmp);
+
+        MAID_CLEAR_MP(mask)
+        MAID_CLEAR_MP(tmp)
+    }
+}
+
+extern void
 maid_mp_random(size_t words, maid_mp_word *a, maid_rng *g, size_t bits)
 {
     if (words && a && g && bits)

@@ -196,6 +196,19 @@ edwards25519_copy(void *ctx, struct maid_ecc_point *p,
     }
 }
 
+static void
+edwards25519_swap(void *ctx, struct maid_ecc_point *p,
+                  struct maid_ecc_point *q, bool swap)
+{
+    struct edwards25519 *c = ctx;
+    size_t words = c->words;
+
+    maid_mp_cswap(words, p->x, q->x, swap);
+    maid_mp_cswap(words, p->y, q->y, swap);
+    maid_mp_cswap(words, p->z, q->z, swap);
+    maid_mp_cswap(words, p->t, q->t, swap);
+}
+
 static bool
 edwards25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 {
@@ -609,6 +622,7 @@ const struct maid_ecc_def maid_edwards25519 =
     .new    = edwards25519_new,    .del    = edwards25519_del,
     .alloc  = edwards25519_alloc,  .free   = edwards25519_free,
     .base   = edwards25519_base,   .copy   = edwards25519_copy,
+    .swap   = edwards25519_swap,
     .encode = edwards25519_encode, .decode = edwards25519_decode,
     .cmp    = edwards25519_cmp,    .dbl    = edwards25519_dbl,
     .add    = edwards25519_add,    .size   = edwards25519_size,
@@ -730,7 +744,7 @@ ed25519_new(u8 version, void *pub, void *prv)
             {
                 /* Pubenc is needed even for signing */
                 maid_ecc_base(ret->ecc, ret->point);
-                maid_ecc_mul(ret->ecc, ret->point, ret->scalar, true);
+                maid_ecc_mul(ret->ecc, ret->point, ret->scalar);
                 if (!maid_ecc_encode(ret->ecc, ret->pubenc, ret->point))
                     ret = ed25519_del(ret);
             }
@@ -776,7 +790,7 @@ ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
 
         /* First part of the signature (R = rB) */
         maid_ecc_base(ed->ecc, ed->point);
-        maid_ecc_mul(ed->ecc, ed->point, r, true);
+        maid_ecc_mul(ed->ecc, ed->point, r);
         maid_ecc_encode(ed->ecc, sign, ed->point);
 
         /* k = SHA512(R public data) % modulo */
@@ -834,12 +848,12 @@ ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
 
     /* point2 = R + kP */
     maid_ecc_copy(ed->ecc, ed->point2, ed->public);
-    maid_ecc_mul(ed->ecc, ed->point2, k, false);
+    maid_ecc_mul(ed->ecc, ed->point2, k);
     maid_ecc_add(ed->ecc, ed->point2, ed->point);
 
     /* point = sB */
     maid_ecc_base(ed->ecc, ed->point);
-    maid_ecc_mul(ed->ecc, ed->point, s, false);
+    maid_ecc_mul(ed->ecc, ed->point, s);
 
     /* sB ?= R + kP */
     ret &= maid_ecc_cmp(ed->ecc, ed->point, ed->point2);

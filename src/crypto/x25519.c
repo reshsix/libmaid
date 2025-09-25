@@ -156,6 +156,17 @@ curve25519_copy(void *ctx, struct maid_ecc_point *p,
     }
 }
 
+static void
+curve25519_swap(void *ctx, struct maid_ecc_point *p,
+                struct maid_ecc_point *q, bool swap)
+{
+    struct curve25519 *c = ctx;
+    size_t words = c->words;
+
+    maid_mp_cswap(words, p->x, q->x, swap);
+    maid_mp_cswap(words, p->z, q->z, swap);
+}
+
 static bool
 curve25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 {
@@ -382,6 +393,7 @@ const struct maid_ecc_def maid_curve25519 =
     .new    = curve25519_new,    .del    = curve25519_del,
     .alloc  = curve25519_alloc,  .free   = curve25519_free,
     .base   = curve25519_base,   .copy   = curve25519_copy,
+    .swap   = curve25519_swap,
     .encode = curve25519_encode, .decode = curve25519_decode,
     .cmp    = curve25519_cmp,    .dbl    = curve25519_dbl,
     .add2   = curve25519_add2,   .size   = curve25519_size,
@@ -456,7 +468,7 @@ x25519_secgen(void *x25519, const u8 *private, const u8 *public, u8 *buffer)
           maid_ecc_scalar(x->c, private, x->s);
     if (ret)
     {
-        maid_ecc_mul(x->c, x->p, x->s, true);
+        maid_ecc_mul(x->c, x->p, x->s);
         ret = maid_ecc_encode(x->c, buffer, x->p);
     }
 

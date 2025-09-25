@@ -31,7 +31,8 @@ enum
 {
     MAID_ECC_DIFF_ADD  = 1,
     MAID_ECC_NO_INF    = 2,
-    MAID_ECC_LADDER_AD = 4
+    MAID_ECC_LADDER_AD = 4,
+    MAID_ECC_NO_CLAMP  = 8,
 };
 
 struct maid_ecc_def
@@ -44,6 +45,7 @@ struct maid_ecc_def
 
     void (*base)(void *, maid_ecc_point *);
     void (*copy)(void *, maid_ecc_point *, const maid_ecc_point *);
+    void (*swap)(void *, maid_ecc_point *, maid_ecc_point *, bool);
 
     bool (*encode)(void *, u8 *, const maid_ecc_point *);
     bool (*decode)(void *, const u8 *, maid_ecc_point *);
@@ -74,6 +76,8 @@ maid_ecc_point *maid_ecc_free(maid_ecc *c, maid_ecc_point *p);
 
 void maid_ecc_base(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_copy(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
+void maid_ecc_swap(maid_ecc *c, maid_ecc_point *p,
+                   maid_ecc_point *q, bool swap);
 
 bool maid_ecc_encode(maid_ecc *c, u8 *buffer, const maid_ecc_point *p);
 bool maid_ecc_decode(maid_ecc *c, const u8 *buffer, maid_ecc_point *p);
@@ -83,7 +87,7 @@ bool maid_ecc_cmp(maid_ecc *c, const maid_ecc_point *p,
 void maid_ecc_dbl(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_add(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 void maid_ecc_mul(maid_ecc *c, maid_ecc_point *p,
-                  const maid_mp_word *s, bool constant);
+                  const maid_mp_word *s);
 
 size_t maid_ecc_size(maid_ecc *c, size_t *key_s, size_t *point_s);
 u32 maid_ecc_flags(maid_ecc *c);
@@ -97,7 +101,6 @@ void maid_ecc_debug(maid_ecc *c, const char *name, const maid_ecc_point *a);
 /* External algorithms */
 
 extern const struct maid_ecc_def maid_curve25519;
-extern const struct maid_ecc_def maid_curve448;
 extern const struct maid_ecc_def maid_edwards25519;
 
 #endif

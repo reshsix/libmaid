@@ -78,6 +78,8 @@ bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod);
 void maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
                      const maid_mp_word *mod, bool constant);
 
+void maid_mp_cswap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap);
+
 #include <maid/rng.h>
 void maid_mp_random(size_t words, maid_mp_word *a, maid_rng *g, size_t bits);
 void maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,

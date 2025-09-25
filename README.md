@@ -1,10 +1,10 @@
 <div align="center">
-    <h1>A Cryptography Library for Maids</h1>
+    <h1>MAID Cryptography Library</h1>
     <img src="poster.png" width="350">
 </div>
 
 ## Status
-Version: 1.4 alpha
+Version: 1.4 beta
 
 | Category                     | Algorithms                   |
 | -----------------------------|------------------------------|
@@ -17,10 +17,6 @@ Version: 1.4 alpha
 | Key derivation functions     | HKDF                         |
 | Digital signatures           | Ed25519                      |
 | Key-exchange methods         | X25519                       |
-
-### Warnings
-- Elliptic curves are currently implemented without a cswap, so they might be
-vulnerable to branch-prediction attacks
 
 ## Instructions
 ### Requirements

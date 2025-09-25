@@ -661,15 +661,8 @@ test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
 
             if (ret && maid_ecc_decode(c, bb, r0))
             {
-                maid_ecc_mul(c, r0, sm, false);
+                maid_ecc_mul(c, r0, sm);
                 ret = maid_ecc_encode(c, tb, r0) &&
-                      maid_mem_cmp(tb, mb, sizeof(tb));
-            }
-
-            if (ret && maid_ecc_decode(c, bb, r2))
-            {
-                maid_ecc_mul(c, r2, sm, true);
-                ret = maid_ecc_encode(c, tb, r2) &&
                       maid_mem_cmp(tb, mb, sizeof(tb));
             }
         }

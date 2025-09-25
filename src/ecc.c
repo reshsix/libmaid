@@ -27,7 +27,7 @@ struct maid_ecc
     void *context;
 
     size_t words;
-    maid_ecc_point *r0, *r1, *r2;
+    maid_ecc_point *r0, *r1, *r2, *r3;
 };
 
 extern struct maid_ecc *
@@ -42,7 +42,8 @@ maid_ecc_new(struct maid_ecc_def def)
         ret->context = def.new();
         if (ret->context && (ret->r0 = def.alloc(ret->context))
                          && (ret->r1 = def.alloc(ret->context))
-                         && (ret->r2 = def.alloc(ret->context)))
+                         && (ret->r2 = def.alloc(ret->context))
+                         && (ret->r3 = def.alloc(ret->context)))
             ret->words = maid_mp_words(def.bits);
         else
             ret = maid_ecc_del(ret);
@@ -103,6 +104,14 @@ maid_ecc_copy(struct maid_ecc *c, struct maid_ecc_point *p,
 {
     if (c && p)
         c->def.copy(c->context, p, q);
+}
+
+extern void
+maid_ecc_swap(struct maid_ecc *c, struct maid_ecc_point *p,
+              struct maid_ecc_point *q, bool swap)
+{
+    if (c && p && q)
+        c->def.swap(c->context, p, q, swap);
 }
 
 extern bool
@@ -167,7 +176,7 @@ ladder_add(maid_ecc *c, struct maid_ecc_point *p,
 
 extern void
 maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
-             const maid_mp_word *s, bool constant)
+             const maid_mp_word *s)
 {
     if (c && p && s)
     {
@@ -190,40 +199,31 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
 
             if (c->def.flags & MAID_ECC_LADDER_AD)
             {
-                if (started)
-                {
-                    if (bit)
-                    {
-                        ladder_add(c, c->r0, c->r1, p);
-                        c->def.dbl(c->context, c->r1);
-                    }
-                    else
-                    {
-                        ladder_add(c, c->r1, c->r0, p);
-                        c->def.dbl(c->context, c->r0);
-                    }
-                }
-                else if (constant)
-                {
-                    ladder_add(c, c->r2, c->r0, p);
-                    c->def.dbl(c->context, c->r0);
-                }
+                if (c->def.flags & MAID_ECC_NO_CLAMP)
+                    c->def.swap(c->context, c->r0, c->r2, !started);
+
+                c->def.swap(c->context, c->r0, c->r1, !bit);
+
+                ladder_add(c, c->r0, c->r1, p);
+                c->def.dbl(c->context, c->r1);
+
+                c->def.swap(c->context, c->r0, c->r1, !bit);
+
+                if (c->def.flags & MAID_ECC_NO_CLAMP)
+                    c->def.swap(c->context, c->r0, c->r2, !started);
             }
             else
             {
-                if (started)
-                {
-                    c->def.dbl(c->context, c->r0);
-                    if (bit)
-                        ladder_add(c, c->r0, c->r1, p);
-                    else if (constant)
-                        ladder_add(c, c->r2, c->r1, p);
-                }
-                else if (constant)
-                {
-                    c->def.dbl(c->context, c->r2);
-                    ladder_add(c, c->r2, c->r1, p);
-                }
+                if (c->def.flags & MAID_ECC_NO_CLAMP)
+                    c->def.swap(c->context, c->r0, c->r3, !started);
+
+                c->def.dbl(c->context, c->r0);
+                c->def.swap(c->context, c->r0, c->r2, !bit);
+                ladder_add(c, c->r0, c->r1, p);
+                c->def.swap(c->context, c->r0, c->r2, !bit);
+
+                if (c->def.flags & MAID_ECC_NO_CLAMP)
+                    c->def.swap(c->context, c->r0, c->r3, !started);
             }
         }
         bit = false;
@@ -277,7 +277,7 @@ maid_ecc_pubgen(struct maid_ecc *c, const u8 *private, u8 *public)
         if (c->def.scalar(c->context, private, s))
         {
             maid_ecc_base(c, p);
-            maid_ecc_mul(c, p, s, true);
+            maid_ecc_mul(c, p, s);
             ret = maid_ecc_encode(c, public, p);
         }
         maid_mp_mov(c->words, s, NULL);
