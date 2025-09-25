@@ -51,25 +51,11 @@ struct maid_hkdf_params
     size_t info_s;
 };
 
-extern const struct maid_kdf_def maid_hkdf_sha1;
 extern const struct maid_kdf_def maid_hkdf_sha224;
 extern const struct maid_kdf_def maid_hkdf_sha256;
 extern const struct maid_kdf_def maid_hkdf_sha384;
 extern const struct maid_kdf_def maid_hkdf_sha512;
 extern const struct maid_kdf_def maid_hkdf_sha512_224;
 extern const struct maid_kdf_def maid_hkdf_sha512_256;
-
-struct maid_pbkdf2_params
-{
-    u32 iterations;
-};
-
-extern const struct maid_kdf_def maid_pbkdf2_sha1;
-extern const struct maid_kdf_def maid_pbkdf2_sha224;
-extern const struct maid_kdf_def maid_pbkdf2_sha256;
-extern const struct maid_kdf_def maid_pbkdf2_sha384;
-extern const struct maid_kdf_def maid_pbkdf2_sha512;
-extern const struct maid_kdf_def maid_pbkdf2_sha512_224;
-extern const struct maid_kdf_def maid_pbkdf2_sha512_256;
 
 #endif

@@ -27,7 +27,6 @@
 
 enum
 {
-    HMAC_SHA1,
     HMAC_SHA224, HMAC_SHA256, HMAC_SHA384, HMAC_SHA512,
     HMAC_SHA512_224, HMAC_SHA512_256
 };
@@ -97,11 +96,6 @@ hmac_new(u8 version, const u8 *key)
         const struct maid_hash_def *def = NULL;
         switch (version)
         {
-            case HMAC_SHA1:
-                def = &maid_sha1;
-                ret->hash_s = 20;
-                ret->bytes  = 64;
-                break;
             case HMAC_SHA224:
                 def = &maid_sha224;
                 ret->hash_s = 28;
@@ -183,18 +177,6 @@ hmac_digest(void *ctx, u8 *output)
         maid_hash_digest(h->hash, output);
     }
 }
-
-const struct maid_mac_def maid_hmac_sha1 =
-{
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
-    .update = hmac_update,
-    .digest = hmac_digest,
-    .state_s = 64,
-    .digest_s = 20,
-    .version = HMAC_SHA1
-};
 
 const struct maid_mac_def maid_hmac_sha224 =
 {

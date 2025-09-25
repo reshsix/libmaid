@@ -13,8 +13,8 @@ Version: 1.4 alpha
 | Message authentication codes | Poly1305, HMAC, BLAKE2       |
 | AEAD structures              | Chacha20Poly1305             |
 | Random number generators     | Chacha20-RNG                 |
-| Hash functions               | SHA-1, SHA-2, BLAKE2         |
-| Key derivation functions     | HKDF, PBKDF2                 |
+| Hash functions               | SHA-2, BLAKE2                |
+| Key derivation functions     | HKDF                         |
 | Digital signatures           | Ed25519                      |
 | Key-exchange methods         | X25519                       |
 

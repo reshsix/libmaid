@@ -22,12 +22,6 @@
 #include <maid/hash.h>
 
 static u32
-rl32(u32 a, u8 n)
-{
-    return (a << n) | (a >> (32 - n));
-}
-
-static u32
 rr32(u32 a, u8 n)
 {
     return (a >> n) | (a << (32 - n));
@@ -51,11 +45,11 @@ sr64(u64 a, u8 n)
     return a >> n;
 }
 
-/* SHA-1 and SHA-2 implementation */
+/* SHA-2 implementation */
 
 enum
 {
-    SHA_1, SHA_224, SHA_256, SHA_384, SHA_512, SHA_512_224, SHA_512_256
+    SHA_224, SHA_256, SHA_384, SHA_512, SHA_512_224, SHA_512_256
 };
 
 static void
@@ -63,12 +57,6 @@ sha_init(u8 version, void *h)
 {
     switch (version)
     {
-        case SHA_1:;
-            u32 i1[5] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476,
-                         0xc3d2e1f0};
-            memcpy(h, i1, sizeof(i1));
-            break;
-
         case SHA_224:;
             u32 i224[8] = {0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939,
                            0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4};
@@ -113,53 +101,6 @@ sha_init(u8 version, void *h)
             memcpy(h, i512_256, sizeof(i512_256));
             break;
     }
-}
-
-static void
-sha1_rounds(u32 *h, const u8 *message)
-{
-    u32 w[80] = {0};
-    for (u8 i = 0; i < 16; i++)
-        w[i] = maid_mem_read(message, i, sizeof(u32), true);
-
-    for (u8 i = 16; i < 80; i++)
-        w[i] = rl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
-
-    u32 var[] = {h[0], h[1], h[2], h[3], h[4]};
-    for (u8 i = 0; i < 80; i++)
-    {
-        u32 f = 0, k = 0;
-        if (i < 20)
-        {
-            f = (var[1] & var[2]) | (~(var[1]) & var[3]);
-            k = 0x5a827999;
-        }
-        else if (i < 40)
-        {
-            f = var[1] ^ var[2] ^ var[3];
-            k = 0x6ed9eba1;
-        }
-        else if (i < 60)
-        {
-            f = (var[1] & var[2]) ^ (var[1] & var[3]) ^ (var[2] & var[3]);
-            k = 0x8f1bbcdc;
-        }
-        else
-        {
-            f = var[1] ^ var[2] ^ var[3];
-            k = 0xca62c1d6;
-        }
-
-        u32 tmp = rl32(var[0], 5) + f + k + var[4] + w[i];
-        var[4] = var[3];
-        var[3] = var[2];
-        var[2] = rl32(var[1], 30);
-        var[1] = var[0];
-        var[0] = tmp;
-    }
-
-    for (u8 i = 0; i < 5; i++)
-        h[i] += var[i];
 }
 
 static void
@@ -301,10 +242,6 @@ sha_rounds(u8 version, void *h, const u8 *message)
 {
     switch (version)
     {
-        case SHA_1:;
-            sha1_rounds(h, message);
-            break;
-
         case SHA_224:;
         case SHA_256:;
             sha256_rounds(h, message);
@@ -328,10 +265,6 @@ sha_output(u8 version, void *h, u8 *tag)
 
     switch (version)
     {
-        case SHA_1:
-            length = 5;
-            break;
-
         case SHA_224:
             length = 7;
             break;
@@ -490,18 +423,6 @@ sha_digest(void *ctx, u8 *output)
         sha_output(s2->version, &(s2->h), output);
     }
 }
-
-const struct maid_hash_def maid_sha1 =
-{
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
-    .update = sha_update,
-    .digest = sha_digest,
-    .state_s = 64,
-    .digest_s = 20,
-    .version = SHA_1
-};
 
 const struct maid_hash_def maid_sha224 =
 {

@@ -1087,24 +1087,6 @@ maid_test_chacha20poly1305(void)
 }
 
 extern u8
-maid_test_sha1(void)
-{
-    u8 ret = 2;
-
-    char *input0 = "616263";
-    char *input1 = "6162636462636465636465666465666765666768666768696768696a"
-                   "68696a6b696a6b6c6a6b6c6d6b6c6d6e6c6d6e6f6d6e6f706e6f7071";
-
-    char *outputs0 = "a9993e364706816aba3e25717850c26c9cd0d89d";
-    char *outputs1 = "84983e441c3bd26ebaae4aa1f95129e5e54670f1";
-
-    ret -= test_hash(maid_sha1, input0, outputs0);
-    ret -= test_hash(maid_sha1, input1, outputs1);
-
-    return ret;
-}
-
-extern u8
 maid_test_sha2(void)
 {
     /* SHA-2 NIST CSRC examples */
@@ -1166,24 +1148,6 @@ maid_test_sha2(void)
         ret -= test_hash(defs512[i], input0, outputs0[i + 2]);
         ret -= test_hash(defs512[i], input2, outputs2[i + 0]);
     }
-
-    return ret;
-}
-
-extern u8
-maid_test_hmac_sha1(void)
-{
-    /* HMAC RFC2202 test vectors */
-
-    u8 ret = 1;
-
-    char *key = "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0000000000000000"
-                "00000000000000000000000000000000000000000000000000000000"
-                "0000000000000000";
-    char *data = "4869205468657265";
-    char *tag = "b617318655057264e28bc0b6fb378c8ef146be00";
-
-    ret -= test_mac(maid_hmac_sha1, key, data, tag);
 
     return ret;
 }

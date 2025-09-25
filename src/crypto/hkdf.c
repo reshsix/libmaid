@@ -28,7 +28,7 @@
 
 enum
 {
-    SHA1, SHA224, SHA256, SHA384, SHA512, SHA512_224, SHA512_256
+    SHA224, SHA256, SHA384, SHA512, SHA512_224, SHA512_256
 };
 
 struct hkdf
@@ -69,12 +69,6 @@ hkdf_new(u8 version, const void *params, size_t output_s)
 
         switch (version)
         {
-            case SHA1:
-                mdef = &maid_hmac_sha1;
-                hdef = &maid_sha1;
-                ret->key_s    = 64;
-                ret->digest_s = 20;
-                break;
             case SHA224:
                 mdef = &maid_hmac_sha224;
                 hdef = &maid_sha224;
@@ -195,15 +189,6 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
         }
     }
 }
-
-const struct maid_kdf_def maid_hkdf_sha1 =
-{
-    .new     = hkdf_new,
-    .del     = hkdf_del,
-    .renew   = hkdf_renew,
-    .hash    = hkdf_hash,
-    .version = SHA1
-};
 
 const struct maid_kdf_def maid_hkdf_sha224 =
 {

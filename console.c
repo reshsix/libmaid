@@ -310,7 +310,6 @@ usage(char *ctx)
         fprintf(stderr, "maid mac [algorithm] [key] < message\n"
                         "Authenticates a message\n\n"
                         "Algorithms:\n"
-                        "    hmac-sha1        (key:  64)\n"
                         "    hmac-sha224      (key:  64)\n"
                         "    hmac-sha256      (key:  64)\n"
                         "    hmac-sha384      (key: 128)\n"
@@ -335,7 +334,6 @@ usage(char *ctx)
         fprintf(stderr, "maid hash [algorithm] < message\n"
                         "Hashes a message\n\n"
                         "Algorithms:\n"
-                        "    sha1      \n"
                         "    sha224    \n"
                         "    sha256    \n"
                         "    sha384    \n"
@@ -479,12 +477,7 @@ mac(int argc, char *argv[])
         const struct maid_mac_def *def = NULL;
 
         ret = true;
-        if (strcmp(argv[1], "hmac-sha1") == 0)
-        {
-            key_s = 64;
-            def   = &maid_hmac_sha1;
-        }
-        else if (strcmp(argv[1], "hmac-sha224") == 0)
+        if (strcmp(argv[1], "hmac-sha224") == 0)
         {
             key_s = 64;
             def   = &maid_hmac_sha224;
@@ -646,9 +639,7 @@ hash(int argc, char *argv[])
 
         const struct maid_hash_def *def = NULL;
 
-        if (strcmp(argv[1], "sha1") == 0)
-            def = &maid_sha1;
-        else if (strcmp(argv[1], "sha224") == 0)
+        if (strcmp(argv[1], "sha224") == 0)
             def = &maid_sha224;
         else if (strcmp(argv[1], "sha256") == 0)
             def = &maid_sha256;
@@ -1273,9 +1264,7 @@ test(int argc, char *argv[])
         TEST(maid_test_chacha)
         TEST(maid_test_poly1305)
         TEST(maid_test_chacha20poly1305)
-        TEST(maid_test_sha1)
         TEST(maid_test_sha2)
-        TEST(maid_test_hmac_sha1)
         TEST(maid_test_hmac_sha2)
         TEST(maid_test_curve25519)
         TEST(maid_test_edwards25519)
