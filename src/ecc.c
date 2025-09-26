@@ -59,8 +59,14 @@ maid_ecc_del(struct maid_ecc *c)
     {
         if (c->context)
         {
-            c->def.free(c->context, c->r0);
-            c->def.free(c->context, c->r1);
+            if (c->r0)
+                c->def.free(c->context, c->r0);
+            if (c->r1)
+                c->def.free(c->context, c->r1);
+            if (c->r2)
+                c->def.free(c->context, c->r2);
+            if (c->r3)
+                c->def.free(c->context, c->r3);
         }
         c->def.del(c->context);
     }

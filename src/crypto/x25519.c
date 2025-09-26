@@ -57,6 +57,13 @@ struct curve25519
 static void *
 curve25519_del(void *ctx)
 {
+    if (ctx)
+    {
+        struct curve25519 *c = ctx;
+        if (c->p)
+            maid_mp_mov(c->words, c->p, NULL);
+        free(c->p);
+    }
     free(ctx);
     return NULL;
 }
@@ -413,7 +420,7 @@ struct x25519
     maid_mp_word *s;
 };
 
-extern void *
+static void *
 x25519_del(void *x25519)
 {
     if (x25519)
@@ -432,7 +439,7 @@ x25519_del(void *x25519)
     return NULL;
 }
 
-extern void *
+static void *
 x25519_new(void)
 {
     struct x25519 *ret = calloc(1, sizeof(struct x25519));
@@ -450,14 +457,14 @@ x25519_new(void)
     return ret;
 }
 
-extern bool
+static bool
 x25519_pubgen(void *x25519, const u8 *private, u8 *public)
 {
     struct x25519 *x = x25519;
     return maid_ecc_pubgen(x->c, private, public);
 }
 
-extern bool
+static bool
 x25519_secgen(void *x25519, const u8 *private, const u8 *public, u8 *buffer)
 {
     bool ret = false;

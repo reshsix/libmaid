@@ -653,7 +653,7 @@ struct ed25519
     maid_ecc_point *public, *point2;
 };
 
-extern void *
+static void *
 ed25519_del(void *ed25519)
 {
     struct ed25519 *ed = ed25519;
@@ -679,7 +679,7 @@ ed25519_del(void *ed25519)
     return NULL;
 }
 
-extern void *
+static void *
 ed25519_new(u8 version, void *pub, void *prv)
 {
     struct ed25519 *ret = calloc(1, sizeof(struct ed25519));
@@ -763,14 +763,14 @@ ed25519_new(u8 version, void *pub, void *prv)
     return ret;
 }
 
-extern size_t
+static size_t
 ed25519_size(void *ed)
 {
     (void)ed;
     return 64;
 }
 
-extern bool
+static bool
 ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
 {
     bool ret = true;
@@ -819,7 +819,7 @@ ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
     return ret;
 }
 
-extern bool
+static bool
 ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
 {
     bool ret = true;
