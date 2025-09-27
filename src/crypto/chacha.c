@@ -206,7 +206,7 @@ const struct maid_stream_def maid_chacha20 =
 /* Maid AEAD definitions */
 
 static void
-chacha20poly1305_init(struct maid_stream_def def,
+chacha20poly1305_init(const struct maid_stream_def *def,
                       const u8 *key, const u8 *nonce,
                       maid_stream **st, maid_mac **m,
                       bool renew)
@@ -224,7 +224,7 @@ chacha20poly1305_init(struct maid_stream_def def,
         maid_stream_xor(*st, ekey, sizeof(ekey));
 
         if (!renew)
-            *m = maid_mac_new(maid_poly1305, ekey);
+            *m = maid_mac_new(&maid_poly1305, ekey);
         else if (*m)
             maid_mac_renew(*m, ekey);
 
@@ -236,7 +236,7 @@ const struct maid_aead_def maid_chacha20poly1305 =
 {
     .init  = chacha20poly1305_init,
     .mode  = maid_stream_xor,
-    .s_def = maid_chacha20,
+    .s_def = &maid_chacha20,
 
     .m_def  = &maid_poly1305,
     .s_big  = false,
@@ -271,7 +271,7 @@ chacha20_rng_new(u8 version, const u8 *entropy)
     (void)version;
     if (ret)
     {
-        ret->st = maid_stream_new(maid_chacha20, entropy, &(entropy[32]), 0);
+        ret->st = maid_stream_new(&maid_chacha20, entropy, &(entropy[32]), 0);
         if (!(ret->st))
             ret = chacha20_rng_del(ret);
     }

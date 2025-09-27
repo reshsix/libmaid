@@ -33,7 +33,7 @@ struct maid_kex_def
 /* External interface */
 
 typedef struct maid_kex maid_kex;
-maid_kex *maid_kex_new(struct maid_kex_def def);
+maid_kex *maid_kex_new(const struct maid_kex_def *def);
 maid_kex *maid_kex_del(maid_kex *x);
 bool maid_kex_pubgen(maid_kex *x, const u8 *private, u8 *public);
 bool maid_kex_secgen(maid_kex *x, const u8 *private,

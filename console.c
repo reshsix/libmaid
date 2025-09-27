@@ -446,7 +446,7 @@ stream(int argc, char *argv[])
         if (ret && get_data(argv[2], key, key_s, false) &&
                    get_data(argv[3],  iv, iv_s,  false))
         {
-            void *ctx = maid_stream_new(*def_s, key, iv, 0);
+            void *ctx = maid_stream_new(def_s, key, iv, 0);
             if (ctx)
                 run_filter(ctx, filter_stream);
             else
@@ -557,7 +557,7 @@ mac(int argc, char *argv[])
 
         if (ret && get_data(argv[2], key, key_s, false))
         {
-            maid_mac *ctx = maid_mac_new(*def, key);
+            maid_mac *ctx = maid_mac_new(def, key);
 
             if (ctx)
                 run_filter(ctx, filter_mac);
@@ -601,7 +601,7 @@ rng(int argc, char *argv[])
 
         if (ret && get_data(argv[2], entropy, entropy_s, false))
         {
-            maid_rng *ctx = maid_rng_new(*def, entropy);
+            maid_rng *ctx = maid_rng_new(def, entropy);
 
             if (ctx)
             {
@@ -672,7 +672,7 @@ hash(int argc, char *argv[])
 
         if (ret)
         {
-            maid_hash *ctx = maid_hash_new(*def);
+            maid_hash *ctx = maid_hash_new(def);
 
             if (ctx)
                 run_filter(ctx, filter_hash);
@@ -721,7 +721,7 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
         if (ret && get_data(argv[2], key, key_s, false) &&
                    get_data(argv[3],  iv, iv_s,  false))
         {
-            maid_aead *ctx = maid_aead_new(*def, key, iv);
+            maid_aead *ctx = maid_aead_new(def, key, iv);
             if (!ctx)
             {
                 fprintf(stderr, "Out of memory\n");
@@ -872,9 +872,9 @@ sign_verify(int argc, char *argv[], bool verify)
             if (ret)
             {
                 if (!verify)
-                    ctx = maid_sign_new(*sign_d, NULL, pub);
+                    ctx = maid_sign_new(sign_d, NULL, pub);
                 else
-                    ctx = maid_sign_new(*sign_d, pub, NULL);
+                    ctx = maid_sign_new(sign_d, pub, NULL);
 
                 if (!ctx)
                 {
@@ -937,7 +937,7 @@ exchange_secret(int argc, char *argv[], bool secret)
         maid_kex *ctx = NULL;
         if (strcmp(argv[1], "x25519") == 0)
         {
-            ctx   = maid_kex_new(maid_x25519);
+            ctx   = maid_kex_new(&maid_x25519);
             key_s = 32;
         }
         else
@@ -1023,7 +1023,7 @@ keygen(int argc, char *argv[])
         maid_rng *gen = NULL;
         if (ret && get_data(argv[3], entropy, entropy_s, false))
         {
-            gen = maid_rng_new(*def, entropy);
+            gen = maid_rng_new(def, entropy);
             if (!gen)
             {
                 fprintf(stderr, "Out of memory\n");
@@ -1036,7 +1036,7 @@ keygen(int argc, char *argv[])
             switch (type)
             {
                 case 1:;
-                    maid_ecc *ed25519 = maid_ecc_new(maid_edwards25519);
+                    maid_ecc *ed25519 = maid_ecc_new(&maid_edwards25519);
                     if (ed25519)
                     {
                         u8 key[32] = {0};
@@ -1093,7 +1093,7 @@ pubgen(int argc, char *argv[])
             switch (type)
             {
                 case 1:;
-                    maid_ecc *ed25519 = maid_ecc_new(maid_edwards25519);
+                    maid_ecc *ed25519 = maid_ecc_new(&maid_edwards25519);
                     if (ed25519)
                     {
                         u8 pub[32] = {0};

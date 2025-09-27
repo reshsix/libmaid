@@ -35,7 +35,7 @@ struct maid_stream_def
 /* External interface */
 
 typedef struct maid_stream maid_stream;
-maid_stream *maid_stream_new(struct maid_stream_def def,
+maid_stream *maid_stream_new(const struct maid_stream_def *def,
                              const u8 *restrict key,
                              const u8 *restrict nonce,
                              u64 counter);

@@ -130,7 +130,7 @@ hmac_new(u8 version, const u8 *key)
 
         if (def)
         {
-            ret->hash   = maid_hash_new(*def);
+            ret->hash   = maid_hash_new(def);
             ret->key    = calloc(1, ret->bytes);
             ret->prefix = calloc(1, ret->bytes);
             ret->buffer = calloc(1, ret->bytes);

@@ -35,7 +35,8 @@ struct maid_sign_def
 /* External interface */
 
 typedef struct maid_sign maid_sign;
-maid_sign *maid_sign_new(struct maid_sign_def def, void *pub, void *priv);
+maid_sign *maid_sign_new(const struct maid_sign_def *def,
+                         void *pub, void *priv);
 maid_sign *maid_sign_del(maid_sign *s);
 size_t maid_sign_size(maid_sign *s);
 bool maid_sign_generate(maid_sign *s, const u8 *data, size_t size, u8 *sign);

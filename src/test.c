@@ -444,8 +444,8 @@ test_mp_prime(size_t words, maid_rng *g)
 }
 
 static bool
-test_stream(struct maid_stream_def def, char *key, char *nonce, u32 counter,
-            char *input, char *output)
+test_stream(const struct maid_stream_def *def, char *key, char *nonce,
+            u32 counter, char *input, char *output)
 {
     bool ret = true;
 
@@ -475,7 +475,7 @@ test_stream(struct maid_stream_def def, char *key, char *nonce, u32 counter,
 }
 
 static bool
-test_mac(struct maid_mac_def def, char *key, char *input, char *tag)
+test_mac(const struct maid_mac_def *def, char *key, char *input, char *tag)
 {
     bool ret = true;
 
@@ -506,7 +506,7 @@ test_mac(struct maid_mac_def def, char *key, char *input, char *tag)
 }
 
 static bool
-test_aead(struct maid_aead_def def, char *key, char *nonce,
+test_aead(const struct maid_aead_def *def, char *key, char *nonce,
           char *ad, char *input, char *output, char *tag, bool decrypt)
 {
     bool ret = true;
@@ -545,7 +545,7 @@ test_aead(struct maid_aead_def def, char *key, char *nonce,
 }
 
 static bool
-test_hash(struct maid_hash_def def, char *input, char *output)
+test_hash(struct maid_hash_def *def, char *input, char *output)
 {
     bool ret = true;
 
@@ -575,7 +575,7 @@ test_hash(struct maid_hash_def def, char *input, char *output)
 
 
 static bool
-test_rng(struct maid_rng_def def, char *entropy, char *output)
+test_rng(const struct maid_rng_def *def, char *entropy, char *output)
 {
     bool ret = true;
 
@@ -619,7 +619,7 @@ test_ecc(struct maid_ecc_def def, size_t words, char *base, char *inf,
 
     if (ret)
     {
-        maid_ecc *c = maid_ecc_new(def);
+        maid_ecc *c = maid_ecc_new(&def);
         maid_ecc_point *r0 = maid_ecc_alloc(c);
         maid_ecc_point *r1 = maid_ecc_alloc(c);
         maid_ecc_point *r2 = maid_ecc_alloc(c);
@@ -799,7 +799,7 @@ maid_test_mp(void)
 
     /* Generators */
     u8 entropy[44] = {0};
-    maid_rng *g = maid_rng_new(maid_chacha20_rng, entropy);
+    maid_rng *g = maid_rng_new(&maid_chacha20_rng, entropy);
 
     ret -= test_mp_random(words, g, 2, 7);
     ret -= test_mp_random2(words, g, sa, sb, 2, 7);
@@ -916,8 +916,8 @@ maid_test_chacha(void)
     int counters[] = {1, 0, 1, 1, 2, 0, 1, 42, 0, 0, 0};
 
     for (u8 i = 0; i < 11; i++)
-        ret -= test_stream(maid_chacha20, keys[i], nonces[i], counters[i],
-                                datas[i], ciphers[i]);
+        ret -= test_stream(&maid_chacha20, keys[i], nonces[i], counters[i],
+                           datas[i], ciphers[i]);
 
     return ret;
 }
@@ -1016,7 +1016,7 @@ maid_test_poly1305(void)
                     "13000000000000000000000000000000"};
 
     for (u8 i = 0; i < 11; i++)
-        ret -= test_mac(maid_poly1305, keys[i], datas[i], tags[i]);
+        ret -= test_mac(&maid_poly1305, keys[i], datas[i], tags[i]);
 
     return ret;
 }
@@ -1073,7 +1073,7 @@ maid_test_chacha20poly1305(void)
     bool modes[] = {false, true};
 
     for (u8 i = 0; i < 2; i++)
-        ret -= test_aead(maid_chacha20poly1305, keys[i], nonces[i],
+        ret -= test_aead(&maid_chacha20poly1305, keys[i], nonces[i],
                          ads[i], inputs[i], outputs[i], tags[i], modes[i]);
 
     return ret;
@@ -1129,8 +1129,8 @@ maid_test_sha2(void)
 
     for (u8 i = 0; i < 2; i++)
     {
-        ret -= test_hash(defs256[i], input0, outputs0[i]);
-        ret -= test_hash(defs256[i], input1, outputs1[i]);
+        ret -= test_hash(&defs256[i], input0, outputs0[i]);
+        ret -= test_hash(&defs256[i], input1, outputs1[i]);
     }
 
     struct maid_hash_def defs512[] = {maid_sha384,     maid_sha512,
@@ -1138,8 +1138,8 @@ maid_test_sha2(void)
 
     for (u8 i = 0; i < 4; i++)
     {
-        ret -= test_hash(defs512[i], input0, outputs0[i + 2]);
-        ret -= test_hash(defs512[i], input2, outputs2[i + 0]);
+        ret -= test_hash(&defs512[i], input0, outputs0[i + 2]);
+        ret -= test_hash(&defs512[i], input2, outputs2[i + 0]);
     }
 
     return ret;
@@ -1180,12 +1180,12 @@ maid_test_hmac_sha2(void)
                     "9f9126c3d9c3c330d760425ca8a217e3"
                     "1feae31bfe70196ff81642b868402eab"};
 
-    ret -= test_mac(maid_hmac_sha224,     keys[0], data, tags[0]);
-    ret -= test_mac(maid_hmac_sha256,     keys[0], data, tags[1]);
-    ret -= test_mac(maid_hmac_sha384,     keys[1], data, tags[2]);
-    ret -= test_mac(maid_hmac_sha512,     keys[1], data, tags[3]);
-    ret -= test_mac(maid_hmac_sha512_224, keys[1], data, tags[4]);
-    ret -= test_mac(maid_hmac_sha512_256, keys[1], data, tags[5]);
+    ret -= test_mac(&maid_hmac_sha224,     keys[0], data, tags[0]);
+    ret -= test_mac(&maid_hmac_sha256,     keys[0], data, tags[1]);
+    ret -= test_mac(&maid_hmac_sha384,     keys[1], data, tags[2]);
+    ret -= test_mac(&maid_hmac_sha512,     keys[1], data, tags[3]);
+    ret -= test_mac(&maid_hmac_sha512_224, keys[1], data, tags[4]);
+    ret -= test_mac(&maid_hmac_sha512_256, keys[1], data, tags[5]);
 
     return ret;
 }

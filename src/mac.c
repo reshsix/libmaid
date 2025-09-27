@@ -23,7 +23,7 @@
 
 struct maid_mac
 {
-    struct maid_mac_def def;
+    const struct maid_mac_def *def;
     void *ctx;
 
     u8 *buffer;
@@ -36,7 +36,7 @@ maid_mac_del(maid_mac *m)
 {
     if (m)
     {
-        m->def.del(m->ctx);
+        m->def->del(m->ctx);
         free(m->buffer);
     }
     free(m);
@@ -45,7 +45,7 @@ maid_mac_del(maid_mac *m)
 }
 
 extern struct maid_mac *
-maid_mac_new(struct maid_mac_def def, const u8 *key)
+maid_mac_new(const struct maid_mac_def *def, const u8 *key)
 {
     struct maid_mac *ret = NULL;
     if (key)
@@ -53,10 +53,9 @@ maid_mac_new(struct maid_mac_def def, const u8 *key)
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_mac_def));
-
-        ret->ctx = def.new(def.version, key);
-        ret->buffer = calloc(1, def.state_s);
+        ret->def = def;
+        ret->ctx = def->new(def->version, key);
+        ret->buffer = calloc(1, def->state_s);
         if (!(ret->ctx && ret->buffer))
             ret = maid_mac_del(ret);
     }
@@ -69,11 +68,11 @@ maid_mac_renew(struct maid_mac *m, const u8 *key)
 {
     if (m)
     {
-        m->def.renew(m->ctx, key);
+        m->def->renew(m->ctx, key);
 
         m->buffer_c = 0;
         m->finished = false;
-        maid_mem_clear(m->buffer, m->def.state_s);
+        maid_mem_clear(m->buffer, m->def->state_s);
     }
 }
 
@@ -84,15 +83,15 @@ maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
     {
         while (size)
         {
-            u8 empty = m->def.state_s - m->buffer_c;
+            u8 empty = m->def->state_s - m->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
             memcpy(&(m->buffer[m->buffer_c]), buffer, copy);
             m->buffer_c += copy;
-            if (m->buffer_c < m->def.state_s)
+            if (m->buffer_c < m->def->state_s)
                 break;
 
-            m->def.update(m->ctx, m->buffer, m->def.state_s);
+            m->def->update(m->ctx, m->buffer, m->def->state_s);
             m->buffer_c = 0;
 
             buffer = &(buffer[copy]);
@@ -109,14 +108,14 @@ maid_mac_digest(struct maid_mac *m, u8 *output)
     if (m && output && !(m->finished))
     {
         if (m->buffer_c)
-            m->def.update(m->ctx, m->buffer, m->buffer_c);
+            m->def->update(m->ctx, m->buffer, m->buffer_c);
 
-        m->def.digest(m->ctx, output);
+        m->def->digest(m->ctx, output);
         m->buffer_c = 0;
 
         m->finished = true;
 
-        ret = m->def.digest_s;
+        ret = m->def->digest_s;
     }
 
     return ret;

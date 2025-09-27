@@ -110,8 +110,8 @@ hkdf_new(u8 version, const void *params, size_t output_s)
         if (output_s <= (255 * ret->digest_s))
         {
             u8 empty[128] = {0};
-            ret->prf  = maid_mac_new(*mdef, empty);
-            ret->hash = maid_hash_new(*hdef);
+            ret->prf  = maid_mac_new(mdef, empty);
+            ret->hash = maid_hash_new(hdef);
             if (ret->prf && ret->hash)
             {
                 memcpy(&(ret->prm), params, sizeof(struct maid_hkdf_params));

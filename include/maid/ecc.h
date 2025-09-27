@@ -68,7 +68,7 @@ struct maid_ecc_def
 
 /* External interface */
 
-maid_ecc *maid_ecc_new(struct maid_ecc_def def);
+maid_ecc *maid_ecc_new(const struct maid_ecc_def *def);
 maid_ecc *maid_ecc_del(maid_ecc *c);
 
 maid_ecc_point *maid_ecc_alloc(maid_ecc *c);

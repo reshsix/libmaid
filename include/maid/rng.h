@@ -35,7 +35,7 @@ struct maid_rng_def
 /* External interface */
 
 typedef struct maid_rng maid_rng;
-maid_rng *maid_rng_new(struct maid_rng_def def, const u8 *entropy);
+maid_rng *maid_rng_new(const struct maid_rng_def *def, const u8 *entropy);
 maid_rng *maid_rng_del(maid_rng *g);
 void maid_rng_renew(maid_rng *g, const u8 *entropy);
 void maid_rng_generate(maid_rng *g, u8 *buffer, size_t size);

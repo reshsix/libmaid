@@ -23,7 +23,7 @@
 
 struct maid_stream
 {
-    struct maid_stream_def def;
+    const struct maid_stream_def *def;
     void *ctx;
 
     u8 *buffer;
@@ -36,10 +36,10 @@ maid_stream_del(maid_stream *st)
 {
     if (st)
     {
-        st->def.del(st->ctx);
+        st->def->del(st->ctx);
 
         if (st->buffer)
-            maid_mem_clear(st->buffer, st->def.state_s);
+            maid_mem_clear(st->buffer, st->def->state_s);
         free(st->buffer);
     }
     free(st);
@@ -48,7 +48,7 @@ maid_stream_del(maid_stream *st)
 }
 
 extern struct maid_stream *
-maid_stream_new(struct maid_stream_def def,
+maid_stream_new(const struct maid_stream_def *def,
                 const u8 *restrict key,
                 const u8 *restrict nonce,
                 u64 counter)
@@ -59,10 +59,9 @@ maid_stream_new(struct maid_stream_def def,
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_stream_def));
-
-        ret->ctx = def.new(def.version, key, nonce, counter);
-        ret->buffer = calloc(1, def.state_s);
+        ret->def = def;
+        ret->ctx = def->new(def->version, key, nonce, counter);
+        ret->buffer = calloc(1, def->state_s);
 
         if (!(ret->ctx && ret->buffer))
             ret = maid_stream_del(ret);
@@ -77,10 +76,10 @@ maid_stream_renew(struct maid_stream *st, const u8 *restrict key,
 {
     if (st)
     {
-        st->def.renew(st->ctx, key, nonce, counter);
+        st->def->renew(st->ctx, key, nonce, counter);
         st->buffer_c = 0;
         st->initialized = false;
-        maid_mem_clear(st->buffer, st->def.state_s);
+        maid_mem_clear(st->buffer, st->def->state_s);
     }
 }
 
@@ -91,7 +90,7 @@ maid_stream_xor(struct maid_stream *st, u8 *buffer, size_t size)
     {
         while (size)
         {
-            size_t aval = (st->initialized) ? st->def.state_s -
+            size_t aval = (st->initialized) ? st->def->state_s -
                                               st->buffer_c: 0;
             if (aval >= size)
             {
@@ -106,7 +105,7 @@ maid_stream_xor(struct maid_stream *st, u8 *buffer, size_t size)
                 buffer = &(buffer[aval]);
                 size -= aval;
 
-                st->def.generate(st->ctx, st->buffer);
+                st->def->generate(st->ctx, st->buffer);
                 st->buffer_c = 0;
                 st->initialized = true;
             }

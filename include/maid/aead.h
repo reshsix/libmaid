@@ -25,11 +25,11 @@
 
 struct maid_aead_def
 {
-    void (*init)(struct maid_stream_def, const u8 *, const u8 *,
+    void (*init)(const struct maid_stream_def *, const u8 *, const u8 *,
                  maid_stream **, maid_mac **, bool);
     void (*mode)(maid_stream *, u8 *, size_t);
 
-    struct maid_stream_def s_def;
+    const struct maid_stream_def *s_def;
     const struct maid_mac_def *m_def;
 
     bool s_bits, s_big;
@@ -38,7 +38,7 @@ struct maid_aead_def
 /* External interface */
 
 typedef struct maid_aead maid_aead;
-maid_aead *maid_aead_new(struct maid_aead_def def,
+maid_aead *maid_aead_new(const struct maid_aead_def *def,
                          const u8 *restrict key,
                          const u8 *restrict nonce);
 maid_aead *maid_aead_del(maid_aead *ae);

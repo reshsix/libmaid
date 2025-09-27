@@ -83,7 +83,7 @@ edwards25519_new(void)
         ret->p = calloc(ret->words, sizeof(maid_mp_word));
         ret->x = calloc(ret->words, sizeof(maid_mp_word));
         ret->y = calloc(ret->words, sizeof(maid_mp_word));
-        ret->hash = maid_hash_new(maid_sha512);
+        ret->hash = maid_hash_new(&maid_sha512);
         if (!(ret->words && ret->d && ret->p && ret->x && ret->y && ret->hash))
             ret = edwards25519_del(ret);
     }
@@ -689,8 +689,8 @@ ed25519_new(u8 version, void *pub, void *prv)
     {
         /* Allocation */
         ret->words  = maid_mp_words(256);
-        ret->ecc    = maid_ecc_new(maid_edwards25519);
-        ret->hash   = maid_hash_new(maid_sha512);
+        ret->ecc    = maid_ecc_new(&maid_edwards25519);
+        ret->hash   = maid_hash_new(&maid_sha512);
         ret->point  = maid_ecc_alloc(ret->ecc);
         ret->modulo = calloc(ret->words * 2, sizeof(maid_mp_word));
         if (!(ret->words && ret->ecc && ret->hash &&

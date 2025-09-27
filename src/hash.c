@@ -23,7 +23,7 @@
 
 struct maid_hash
 {
-    struct maid_hash_def def;
+    const struct maid_hash_def *def;
     void *ctx;
 
     u8 *buffer;
@@ -36,7 +36,7 @@ maid_hash_del(maid_hash *m)
 {
     if (m)
     {
-        m->def.del(m->ctx);
+        m->def->del(m->ctx);
         free(m->buffer);
     }
     free(m);
@@ -45,18 +45,17 @@ maid_hash_del(maid_hash *m)
 }
 
 extern struct maid_hash *
-maid_hash_new(struct maid_hash_def def)
+maid_hash_new(const struct maid_hash_def *def)
 {
     struct maid_hash *ret = calloc(1, sizeof(struct maid_hash));
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_hash_def));
-
-        if (def.new)
+        ret->def = def;
+        if (def->new)
         {
-            ret->ctx = def.new(def.version);
-            ret->buffer = calloc(1, def.state_s);
+            ret->ctx = def->new(def->version);
+            ret->buffer = calloc(1, def->state_s);
         }
         if (!(ret->ctx && ret->buffer))
             ret = maid_hash_del(ret);
@@ -70,11 +69,11 @@ maid_hash_renew(struct maid_hash *m)
 {
     if (m)
     {
-        m->def.renew(m->ctx);
+        m->def->renew(m->ctx);
 
         m->buffer_c = 0;
         m->finished = false;
-        maid_mem_clear(m->buffer, m->def.state_s);
+        maid_mem_clear(m->buffer, m->def->state_s);
     }
 }
 
@@ -85,15 +84,15 @@ maid_hash_update(struct maid_hash *m, const u8 *buffer, size_t size)
     {
         while (size)
         {
-            u8 empty = m->def.state_s - m->buffer_c;
+            u8 empty = m->def->state_s - m->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
             memcpy(&(m->buffer[m->buffer_c]), buffer, copy);
             m->buffer_c += copy;
-            if (m->buffer_c < m->def.state_s)
+            if (m->buffer_c < m->def->state_s)
                 break;
 
-            m->def.update(m->ctx, m->buffer, m->def.state_s);
+            m->def->update(m->ctx, m->buffer, m->def->state_s);
             m->buffer_c = 0;
 
             buffer = &(buffer[copy]);
@@ -110,14 +109,14 @@ maid_hash_digest(struct maid_hash *m, u8 *output)
     if (m && output && !(m->finished))
     {
         if (m->buffer_c)
-            m->def.update(m->ctx, m->buffer, m->buffer_c);
+            m->def->update(m->ctx, m->buffer, m->buffer_c);
 
-        m->def.digest(m->ctx, output);
+        m->def->digest(m->ctx, output);
         m->buffer_c = 0;
 
         m->finished = true;
 
-        ret = m->def.digest_s;
+        ret = m->def->digest_s;
     }
 
     return ret;

@@ -37,7 +37,7 @@ struct maid_hash_def
 /* External interface */
 
 typedef struct maid_hash maid_hash;
-maid_hash *maid_hash_new(struct maid_hash_def def);
+maid_hash *maid_hash_new(const struct maid_hash_def *def);
 maid_hash *maid_hash_del(maid_hash *m);
 void maid_hash_renew(maid_hash *m);
 void maid_hash_update(maid_hash *m, const u8 *buffer, size_t size);

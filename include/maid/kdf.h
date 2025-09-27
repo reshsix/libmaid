@@ -34,7 +34,7 @@ struct maid_kdf_def
 /* External interface */
 
 typedef struct maid_kdf maid_kdf;
-maid_kdf *maid_kdf_new(struct maid_kdf_def def,
+maid_kdf *maid_kdf_new(const struct maid_kdf_def *def,
                        const void *params, size_t output_s);
 maid_kdf *maid_kdf_del(maid_kdf *p);
 void maid_kdf_renew(maid_kdf *p, const void *params);

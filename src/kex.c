@@ -22,19 +22,19 @@
 
 struct maid_kex
 {
-    struct maid_kex_def def;
+    const struct maid_kex_def *def;
     void *context;
 };
 
 extern struct maid_kex *
-maid_kex_new(struct maid_kex_def def)
+maid_kex_new(const struct maid_kex_def *def)
 {
     struct maid_kex *ret = calloc(1, sizeof(struct maid_kex));
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_kex_def));
-        ret->context = def.new();
+        ret->def = def;
+        ret->context = def->new();
         if (!(ret->context))
             ret = maid_kex_del(ret);
     }
@@ -46,7 +46,7 @@ extern struct maid_kex *
 maid_kex_del(struct maid_kex *x)
 {
     if (x)
-        x->def.del(x->context);
+        x->def->del(x->context);
     free(x);
 
     return NULL;
@@ -58,7 +58,7 @@ maid_kex_pubgen(struct maid_kex *x, const u8 *private, u8 *public)
     bool ret = false;
 
     if (x && private && public)
-        ret = x->def.pubgen(x->context, private, public);
+        ret = x->def->pubgen(x->context, private, public);
 
     return ret;
 }
@@ -70,7 +70,7 @@ maid_kex_secgen(struct maid_kex *x, const u8 *private,
     bool ret = false;
 
     if (x && private && public && buffer)
-        ret = x->def.secgen(x->context, private, public, buffer);
+        ret = x->def->secgen(x->context, private, public, buffer);
 
     return ret;
 }

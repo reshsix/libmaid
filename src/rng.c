@@ -23,7 +23,7 @@
 
 struct maid_rng
 {
-    struct maid_rng_def def;
+    const struct maid_rng_def *def;
     void *ctx;
 
     u8 *buffer;
@@ -36,10 +36,10 @@ maid_rng_del(struct maid_rng *g)
 {
     if (g)
     {
-        g->def.del(g->ctx);
+        g->def->del(g->ctx);
 
         if (g->buffer)
-            maid_mem_clear(g->buffer, g->def.state_s);
+            maid_mem_clear(g->buffer, g->def->state_s);
         free(g->buffer);
     }
     free(g);
@@ -48,7 +48,7 @@ maid_rng_del(struct maid_rng *g)
 }
 
 extern struct maid_rng *
-maid_rng_new(struct maid_rng_def def, const u8 *entropy)
+maid_rng_new(const struct maid_rng_def *def, const u8 *entropy)
 {
     struct maid_rng *ret = NULL;
     if (entropy)
@@ -56,10 +56,10 @@ maid_rng_new(struct maid_rng_def def, const u8 *entropy)
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_rng_def));
-        ret->ctx = def.new(def.version, entropy);
+        ret->def = def;
+        ret->ctx = def->new(def->version, entropy);
 
-        ret->buffer = calloc(1, def.state_s);
+        ret->buffer = calloc(1, def->state_s);
         if (!(ret->ctx && ret->buffer))
             ret = maid_rng_del(ret);
     }
@@ -72,11 +72,11 @@ maid_rng_renew(struct maid_rng *g, const u8 *entropy)
 {
     if (g)
     {
-        g->def.renew(g->ctx, entropy);
+        g->def->renew(g->ctx, entropy);
 
         g->buffer_c = 0;
         g->initialized = false;
-        maid_mem_clear(g->buffer, g->def.state_s);
+        maid_mem_clear(g->buffer, g->def->state_s);
     }
 }
 
@@ -87,7 +87,7 @@ maid_rng_generate(struct maid_rng *g, u8 *buffer, size_t size)
     {
         while (size)
         {
-            size_t aval = (g->initialized) ? g->def.state_s -
+            size_t aval = (g->initialized) ? g->def->state_s -
                                              g->buffer_c: 0;
             if (aval >= size)
             {
@@ -102,7 +102,7 @@ maid_rng_generate(struct maid_rng *g, u8 *buffer, size_t size)
                 buffer = &(buffer[aval]);
                 size -= aval;
 
-                g->def.generate(g->ctx, g->buffer);
+                g->def->generate(g->ctx, g->buffer);
                 g->buffer_c = 0;
                 g->initialized = true;
             }

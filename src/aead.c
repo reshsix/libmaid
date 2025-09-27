@@ -28,7 +28,7 @@ struct maid_aead
 {
     u8 step, *buffer;
 
-    struct maid_aead_def def;
+    const struct maid_aead_def *def;
     maid_stream *s_ctx;
     maid_mac *m_ctx;
 
@@ -43,7 +43,7 @@ maid_aead_del(struct maid_aead *ae)
         maid_stream_del(ae->s_ctx);
         maid_mac_del(ae->m_ctx);
 
-        maid_mem_clear(ae->buffer, ae->def.m_def->state_s);
+        maid_mem_clear(ae->buffer, ae->def->m_def->state_s);
         free(ae->buffer);
     }
     free(ae);
@@ -52,7 +52,7 @@ maid_aead_del(struct maid_aead *ae)
 }
 
 extern struct maid_aead *
-maid_aead_new(struct maid_aead_def def,
+maid_aead_new(const struct maid_aead_def *def,
               const u8 *restrict key,
               const u8 *restrict nonce)
 {
@@ -62,14 +62,14 @@ maid_aead_new(struct maid_aead_def def,
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_aead_def));
+        ret->def = def;
 
         bool initialized = false;
-        def.init(def.s_def, key, nonce,
-                 &(ret->s_ctx), &(ret->m_ctx), false);
+        def->init(def->s_def, key, nonce,
+                  &(ret->s_ctx), &(ret->m_ctx), false);
         initialized = (ret->s_ctx && ret->m_ctx);
 
-        ret->buffer = calloc(1, def.m_def->state_s);
+        ret->buffer = calloc(1, def->m_def->state_s);
         if (!(initialized && ret->buffer))
             ret = maid_aead_del(ret);
     }
@@ -83,13 +83,13 @@ maid_aead_renew(struct maid_aead *ae, const u8 *restrict key,
 {
     if (ae)
     {
-        ae->def.init(ae->def.s_def, key, nonce,
-                     &(ae->s_ctx), &(ae->m_ctx), true);
+        ae->def->init(ae->def->s_def, key, nonce,
+                      &(ae->s_ctx), &(ae->m_ctx), true);
 
         ae->step = 0;
         ae->s_ad = 0;
         ae->s_ct = 0;
-        maid_mem_clear(ae->buffer, ae->def.m_def->state_s);
+        maid_mem_clear(ae->buffer, ae->def->m_def->state_s);
     }
 }
 
@@ -111,20 +111,20 @@ maid_aead_crypt(struct maid_aead *ae, u8 *buffer, size_t size, bool decrypt)
         ae->step = 1;
 
         /* Additional data padding */
-        size_t m_state = ae->def.m_def->state_s;
+        size_t m_state = ae->def->m_def->state_s;
         if (ae->s_ad % m_state)
             maid_mac_update(ae->m_ctx, ae->buffer,
                             m_state - (ae->s_ad % m_state));
 
         if (!decrypt)
         {
-            ae->def.mode(ae->s_ctx, buffer, size);
+            ae->def->mode(ae->s_ctx, buffer, size);
             maid_mac_update(ae->m_ctx, buffer, size);
         }
         else
         {
             maid_mac_update(ae->m_ctx, buffer, size);
-            ae->def.mode(ae->s_ctx, buffer, size);
+            ae->def->mode(ae->s_ctx, buffer, size);
         }
         ae->s_ct += size;
     }
@@ -136,20 +136,20 @@ maid_aead_digest(struct maid_aead *ae, u8 *output)
     if (ae && output)
     {
         ae->step = 2;
-        size_t size = ae->def.m_def->state_s;
+        size_t size = ae->def->m_def->state_s;
 
         /* Ciphertext padding */
         if (ae->s_ct % size)
             maid_mac_update(ae->m_ctx, ae->buffer, size - (ae->s_ct % 16));
 
-        if (ae->def.s_bits)
+        if (ae->def->s_bits)
         {
             ae->s_ad *= 8;
             ae->s_ct *= 8;
         }
 
         size_t length = size / 2;
-        if (!(ae->def.s_big))
+        if (!(ae->def->s_big))
         {
             for (u8 i = 0; i < length; i++)
             {

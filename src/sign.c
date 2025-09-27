@@ -22,12 +22,12 @@
 
 struct maid_sign
 {
-    struct maid_sign_def def;
+    const struct maid_sign_def *def;
     void *context;
 };
 
 extern struct maid_sign *
-maid_sign_new(struct maid_sign_def def, void *pub, void *priv)
+maid_sign_new(const struct maid_sign_def *def, void *pub, void *priv)
 {
     struct maid_sign *ret = NULL;
     if (pub || priv)
@@ -35,8 +35,8 @@ maid_sign_new(struct maid_sign_def def, void *pub, void *priv)
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_sign_def));
-        ret->context = def.new(def.version, pub, priv);
+        ret->def = def;
+        ret->context = def->new(def->version, pub, priv);
         if (!(ret->context))
             ret = maid_sign_del(ret);
     }
@@ -48,7 +48,7 @@ extern struct maid_sign *
 maid_sign_del(struct maid_sign *s)
 {
     if (s && s->context)
-        s->def.del(s->context);
+        s->def->del(s->context);
     free(s);
 
     return NULL;
@@ -60,7 +60,7 @@ maid_sign_size(struct maid_sign *s)
     size_t ret = 0;
 
     if (s)
-        ret = s->def.size(s->context);
+        ret = s->def->size(s->context);
 
     return ret;
 }
@@ -71,7 +71,7 @@ maid_sign_generate(struct maid_sign *s, const u8 *data, size_t size, u8 *sign)
     bool ret = false;
 
     if (s && sign)
-        ret = s->def.generate(s->context, data, size, sign);
+        ret = s->def->generate(s->context, data, size, sign);
 
     return ret;
 }
@@ -83,7 +83,7 @@ maid_sign_verify(struct maid_sign *s,
     bool ret = false;
 
     if (s && sign)
-        ret = s->def.verify(s->context, data, size, sign);
+        ret = s->def->verify(s->context, data, size, sign);
 
     return ret;
 }

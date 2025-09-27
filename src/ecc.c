@@ -23,7 +23,7 @@
 
 struct maid_ecc
 {
-    struct maid_ecc_def def;
+    const struct maid_ecc_def *def;
     void *context;
 
     size_t words;
@@ -31,20 +31,19 @@ struct maid_ecc
 };
 
 extern struct maid_ecc *
-maid_ecc_new(struct maid_ecc_def def)
+maid_ecc_new(const struct maid_ecc_def *def)
 {
     struct maid_ecc *ret = calloc(1, sizeof(struct maid_ecc));
 
     if (ret)
     {
-        memcpy(&(ret->def), &def, sizeof(struct maid_ecc_def));
-
-        ret->context = def.new();
-        if (ret->context && (ret->r0 = def.alloc(ret->context))
-                         && (ret->r1 = def.alloc(ret->context))
-                         && (ret->r2 = def.alloc(ret->context))
-                         && (ret->r3 = def.alloc(ret->context)))
-            ret->words = maid_mp_words(def.bits);
+        ret->def = def;
+        ret->context = def->new();
+        if (ret->context && (ret->r0 = def->alloc(ret->context))
+                         && (ret->r1 = def->alloc(ret->context))
+                         && (ret->r2 = def->alloc(ret->context))
+                         && (ret->r3 = def->alloc(ret->context)))
+            ret->words = maid_mp_words(def->bits);
         else
             ret = maid_ecc_del(ret);
     }
@@ -60,15 +59,15 @@ maid_ecc_del(struct maid_ecc *c)
         if (c->context)
         {
             if (c->r0)
-                c->def.free(c->context, c->r0);
+                c->def->free(c->context, c->r0);
             if (c->r1)
-                c->def.free(c->context, c->r1);
+                c->def->free(c->context, c->r1);
             if (c->r2)
-                c->def.free(c->context, c->r2);
+                c->def->free(c->context, c->r2);
             if (c->r3)
-                c->def.free(c->context, c->r3);
+                c->def->free(c->context, c->r3);
         }
-        c->def.del(c->context);
+        c->def->del(c->context);
     }
     free(c);
 
@@ -81,7 +80,7 @@ maid_ecc_alloc(struct maid_ecc *c)
     maid_ecc_point *ret = NULL;
 
     if (c)
-        ret = c->def.alloc(c->context);
+        ret = c->def->alloc(c->context);
 
     return ret;
 }
@@ -92,7 +91,7 @@ maid_ecc_free(struct maid_ecc *c, struct maid_ecc_point *p)
     maid_ecc_point *ret = NULL;
 
     if (c)
-        ret = c->def.free(c->context, p);
+        ret = c->def->free(c->context, p);
 
     return ret;
 }
@@ -101,7 +100,7 @@ extern void
 maid_ecc_base(struct maid_ecc *c, struct maid_ecc_point *p)
 {
     if (c && p)
-        c->def.base(c->context, p);
+        c->def->base(c->context, p);
 }
 
 extern void
@@ -109,7 +108,7 @@ maid_ecc_copy(struct maid_ecc *c, struct maid_ecc_point *p,
               const struct maid_ecc_point *q)
 {
     if (c && p)
-        c->def.copy(c->context, p, q);
+        c->def->copy(c->context, p, q);
 }
 
 extern void
@@ -117,7 +116,7 @@ maid_ecc_swap(struct maid_ecc *c, struct maid_ecc_point *p,
               struct maid_ecc_point *q, bool swap)
 {
     if (c && p && q)
-        c->def.swap(c->context, p, q, swap);
+        c->def->swap(c->context, p, q, swap);
 }
 
 extern bool
@@ -126,7 +125,7 @@ maid_ecc_encode(struct maid_ecc *c, u8 *buffer, const struct maid_ecc_point *p)
     bool ret = false;
 
     if (c && buffer && p)
-        ret = c->def.encode(c->context, buffer, p);
+        ret = c->def->encode(c->context, buffer, p);
 
     return ret;
 }
@@ -137,7 +136,7 @@ maid_ecc_decode(struct maid_ecc *c, const u8 *buffer, struct maid_ecc_point *p)
     bool ret = false;
 
     if (c && buffer && p)
-        ret = c->def.decode(c->context, buffer, p);
+        ret = c->def->decode(c->context, buffer, p);
 
     return ret;
 }
@@ -149,7 +148,7 @@ maid_ecc_cmp(struct maid_ecc *c, const struct maid_ecc_point *p,
     bool ret = false;
 
     if (c && p && q)
-        ret = c->def.cmp(c->context, p, q);
+        ret = c->def->cmp(c->context, p, q);
 
     return ret;
 }
@@ -158,15 +157,15 @@ extern void
 maid_ecc_dbl(struct maid_ecc *c, struct maid_ecc_point *p)
 {
     if (c && p)
-        c->def.dbl(c->context, p);
+        c->def->dbl(c->context, p);
 }
 
 extern void
 maid_ecc_add(struct maid_ecc *c, struct maid_ecc_point *p,
              const struct maid_ecc_point *q)
 {
-    if (c && p && q && !(c->def.flags & MAID_ECC_DIFF_ADD))
-        c->def.add(c->context, p, q);
+    if (c && p && q && !(c->def->flags & MAID_ECC_DIFF_ADD))
+        c->def->add(c->context, p, q);
 }
 
 static void
@@ -174,10 +173,10 @@ ladder_add(maid_ecc *c, struct maid_ecc_point *p,
            const struct maid_ecc_point *q,
            const struct maid_ecc_point *org)
 {
-    if (c->def.flags & MAID_ECC_DIFF_ADD)
-        c->def.add2(c->context, p, q, org);
+    if (c->def->flags & MAID_ECC_DIFF_ADD)
+        c->def->add2(c->context, p, q, org);
     else
-        c->def.add(c->context, p, q);
+        c->def->add(c->context, p, q);
 }
 
 extern void
@@ -203,33 +202,33 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
             bit = ((s) ? s[e] : ((e == 0) ? 0x1 : 0x0)) & (1ULL << f);
             started |= bit;
 
-            if (c->def.flags & MAID_ECC_LADDER_AD)
+            if (c->def->flags & MAID_ECC_LADDER_AD)
             {
-                if (c->def.flags & MAID_ECC_NO_CLAMP)
-                    c->def.swap(c->context, c->r0, c->r2, !started);
+                if (c->def->flags & MAID_ECC_NO_CLAMP)
+                    c->def->swap(c->context, c->r0, c->r2, !started);
 
-                c->def.swap(c->context, c->r0, c->r1, !bit);
+                c->def->swap(c->context, c->r0, c->r1, !bit);
 
                 ladder_add(c, c->r0, c->r1, p);
-                c->def.dbl(c->context, c->r1);
+                c->def->dbl(c->context, c->r1);
 
-                c->def.swap(c->context, c->r0, c->r1, !bit);
+                c->def->swap(c->context, c->r0, c->r1, !bit);
 
-                if (c->def.flags & MAID_ECC_NO_CLAMP)
-                    c->def.swap(c->context, c->r0, c->r2, !started);
+                if (c->def->flags & MAID_ECC_NO_CLAMP)
+                    c->def->swap(c->context, c->r0, c->r2, !started);
             }
             else
             {
-                if (c->def.flags & MAID_ECC_NO_CLAMP)
-                    c->def.swap(c->context, c->r0, c->r3, !started);
+                if (c->def->flags & MAID_ECC_NO_CLAMP)
+                    c->def->swap(c->context, c->r0, c->r3, !started);
 
-                c->def.dbl(c->context, c->r0);
-                c->def.swap(c->context, c->r0, c->r2, !bit);
+                c->def->dbl(c->context, c->r0);
+                c->def->swap(c->context, c->r0, c->r2, !bit);
                 ladder_add(c, c->r0, c->r1, p);
-                c->def.swap(c->context, c->r0, c->r2, !bit);
+                c->def->swap(c->context, c->r0, c->r2, !bit);
 
-                if (c->def.flags & MAID_ECC_NO_CLAMP)
-                    c->def.swap(c->context, c->r0, c->r3, !started);
+                if (c->def->flags & MAID_ECC_NO_CLAMP)
+                    c->def->swap(c->context, c->r0, c->r3, !started);
             }
         }
         bit = false;
@@ -244,7 +243,7 @@ maid_ecc_size(struct maid_ecc *c, size_t *public_s, size_t *private_s)
     size_t ret = 0;
 
     if (c)
-        ret = c->def.size(c->context, public_s, private_s);
+        ret = c->def->size(c->context, public_s, private_s);
 
     return ret;
 }
@@ -255,7 +254,7 @@ maid_ecc_flags(struct maid_ecc *c)
     u32 ret = 0;
 
     if (c)
-        ret = c->def.flags;
+        ret = c->def->flags;
 
     return ret;
 }
@@ -266,7 +265,7 @@ maid_ecc_keygen(struct maid_ecc *c, u8 *private, maid_rng *g)
     bool ret = false;
 
     if (c && private && g)
-        ret = c->def.keygen(c->context, private, g);
+        ret = c->def->keygen(c->context, private, g);
 
     return ret;
 }
@@ -280,7 +279,7 @@ maid_ecc_pubgen(struct maid_ecc *c, const u8 *private, u8 *public)
     {
         maid_ecc_point *p = maid_ecc_alloc(c);
         maid_mp_word s[c->words];
-        if (c->def.scalar(c->context, private, s))
+        if (c->def->scalar(c->context, private, s))
         {
             maid_ecc_base(c, p);
             maid_ecc_mul(c, p, s);
@@ -299,7 +298,7 @@ maid_ecc_scalar(struct maid_ecc *c, const u8 *private, maid_mp_word *s)
     bool ret = false;
 
     if (c && private && s)
-        ret = c->def.scalar(c->context, private, s);
+        ret = c->def->scalar(c->context, private, s);
 
     return ret;
 }
@@ -309,5 +308,5 @@ maid_ecc_debug(struct maid_ecc *c, const char *name,
                const struct maid_ecc_point *a)
 {
     if (c)
-        c->def.debug(c->context, name, a);
+        c->def->debug(c->context, name, a);
 }

@@ -447,7 +447,7 @@ x25519_new(void)
     if (ret)
     {
         ret->words = maid_mp_words(256);
-        ret->c = maid_ecc_new(maid_curve25519);
+        ret->c = maid_ecc_new(&maid_curve25519);
         ret->p = maid_ecc_alloc(ret->c);
         ret->s = calloc(ret->words, sizeof(maid_mp_word));
         if (!(ret->words && ret->c && ret->p && ret->s))
