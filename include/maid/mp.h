@@ -33,6 +33,13 @@
 
 typedef u64 maid_mp_word;
 
+#define MAID_MP_WORDS(bits) \
+    (((bits) + (sizeof(maid_mp_word) * 8) - 1) / (sizeof(maid_mp_word) * 8))
+#define MAID_MP_SCALAR(name, bits) \
+    maid_mp_word name[MAID_MP_WORDS(bits)]
+#define MAID_MP_BYTES(bits) \
+    (MAID_MP_WORDS(bits) * sizeof(maid_mp_word))
+
 size_t maid_mp_words(size_t bits);
 
 void maid_mp_read(size_t words, maid_mp_word *a, const u8 *addr, bool big);

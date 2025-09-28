@@ -59,81 +59,38 @@ doubleround(u32 *block)
 
 /* Maid stream definitions */
 
-enum
-{
-    CHACHA20_128, CHACHA20_256, CHACHA20_IETF
-};
-
 struct chacha
 {
-    u8 ks, ns, *key, *nonce;
+    u8 key[32], nonce[12];
     u64 counter;
 };
-
-static void *
-chacha_del(void *ctx)
-{
-    if (ctx)
-    {
-        struct chacha *ch = ctx;
-
-        maid_mem_clear(ch->key, ch->ks);
-        free(ch->key);
-
-        maid_mem_clear(ch->nonce, ch->ns);
-        free(ch->nonce);
-    }
-    free(ctx);
-
-    return NULL;
-}
 
 static void *
 chacha_new(u8 version, const u8 *restrict key,
            const u8 *restrict nonce, u64 counter)
 {
+    /* IETF version */
+
     struct chacha *ret = calloc(1, sizeof(struct chacha));
 
     if (ret)
     {
-        switch (version)
-        {
-            case CHACHA20_128:
-                ret->ks = 16;
-                ret->ns = 8;
-                break;
-
-            case CHACHA20_256:
-                ret->ks = 32;
-                ret->ns = 8;
-                break;
-
-            case CHACHA20_IETF:
-                ret->ks = 32;
-                ret->ns = 12;
-                break;
-
-            default:
-                ret = chacha_del(ret);
-                break;
-        }
-    }
-
-    if (ret)
-    {
-        ret->key = calloc(1, ret->ks);
-        ret->nonce = calloc(1, ret->ns);
-        if (ret->key && ret->nonce)
-        {
-            memcpy(ret->key,     key, ret->ks);
-            memcpy(ret->nonce, nonce, ret->ns);
-            ret->counter = counter;
-        }
-        else
-            ret = chacha_del(ret);
+        memcpy(ret->key,     key, sizeof(ret->key));
+        memcpy(ret->nonce, nonce, sizeof(ret->nonce));
+        ret->counter = counter;
     }
 
     return ret;
+}
+
+static void *
+chacha_del(void *ctx)
+{
+    if (ctx)
+        maid_mem_clear(ctx, sizeof(struct chacha));
+    free(ctx);
+
+    return NULL;
 }
 
 static void
@@ -145,9 +102,9 @@ chacha_renew(void *ctx, const u8 *restrict key,
         struct chacha *ch = ctx;
 
         if (key)
-            memcpy(ch->key, key, ch->ks);
+            memcpy(ch->key, key, sizeof(ch->key));
         if (nonce)
-            memcpy(ch->nonce, nonce, ch->ns);
+            memcpy(ch->nonce, nonce, sizeof(ch->nonce));
         ch->counter = counter;
     }
 }
@@ -159,21 +116,12 @@ chacha_generate(void *ctx, u8 *out)
     {
         struct chacha *ch = ctx;
 
-        if (ch->ks == 32)
-        {
-            strcpy((char*)out, "expand 32-byte k");
-            memcpy(&(out[16]), ch->key, 32);
-        }
-        else
-        {
-            strcpy((char*)out, "expand 16-byte k");
-            memcpy(&(out[16]), ch->key, 16);
-            memcpy(&(out[32]), ch->key, 16);
-        }
+        strcpy((char*)out, "expand 32-byte k");
+        memcpy(&(out[16]), ch->key, 32);
 
-        u8 cs = (sizeof(u32) * 4) - ch->ns;
+        u8 cs = (sizeof(u32) * 4) - sizeof(ch->nonce);
         maid_mem_write(&(out[48]), 0, cs, false, ch->counter);
-        memcpy(&(out[48 + cs]), ch->nonce, ch->ns);
+        memcpy(&(out[48 + cs]), ch->nonce, sizeof(ch->nonce));
 
         u32 tmp[16] = {0};
         for (u8 i = 0; i < 16; i++)
@@ -200,7 +148,6 @@ const struct maid_stream_def maid_chacha20 =
     .renew    = chacha_renew,
     .generate = chacha_generate,
     .state_s  = 64,
-    .version  = CHACHA20_IETF
 };
 
 /* Maid AEAD definitions */

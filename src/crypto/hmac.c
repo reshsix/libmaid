@@ -37,7 +37,7 @@ struct hmac
     size_t hash_s;
 
     size_t bytes;
-    u8 *key, *prefix, *buffer;
+    u8 key[128], prefix[128], buffer[128];
 };
 
 static void
@@ -68,17 +68,7 @@ hmac_del(void *ctx)
     if (ctx)
     {
         struct hmac *h = ctx;
-
         maid_hash_del(h->hash);
-
-        maid_mem_clear(h->key,    h->bytes);
-        maid_mem_clear(h->prefix, h->bytes);
-        maid_mem_clear(h->buffer, h->bytes);
-
-        free(h->key);
-        free(h->prefix);
-        free(h->buffer);
-
         maid_mem_clear(ctx, sizeof(struct hmac));
     }
     free(ctx);
@@ -129,14 +119,9 @@ hmac_new(u8 version, const u8 *key)
         }
 
         if (def)
-        {
-            ret->hash   = maid_hash_new(def);
-            ret->key    = calloc(1, ret->bytes);
-            ret->prefix = calloc(1, ret->bytes);
-            ret->buffer = calloc(1, ret->bytes);
-        }
+            ret->hash = maid_hash_new(def);
 
-        if (ret->hash && ret->key && ret->prefix && ret->buffer)
+        if (ret->hash)
             hmac_init(ret, key);
         else
             ret = hmac_del(ret);

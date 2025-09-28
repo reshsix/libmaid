@@ -26,12 +26,10 @@
 
 struct poly1305
 {
-    /* Amount of words */
-    size_t words;
-    /* Accumulator */
-    maid_mp_word *acc;
-    /* R and S key parts */
-    maid_mp_word *r, *s;
+    /* 256 bits, to handle multiplication */
+    MAID_MP_SCALAR(acc, 256);
+    MAID_MP_SCALAR(r, 256);
+    MAID_MP_SCALAR(s, 256);
 };
 
 static void
@@ -40,7 +38,7 @@ poly1305_init(void *ctx, const u8 *key)
     if (ctx)
     {
         struct poly1305 *p = ctx;
-        size_t words = maid_mp_words(128);
+        size_t words = MAID_MP_WORDS(128);
 
         /* R and S initialization */
         maid_mp_read(words, p->r, key,        false);
@@ -51,7 +49,7 @@ poly1305_init(void *ctx, const u8 *key)
                                      0xfc, 0xff, 0xff, 0x0f,
                                      0xfc, 0xff, 0xff, 0x0f,
                                      0xfc, 0xff, 0xff, 0x0f};
-        maid_mp_word cl[p->words];
+        maid_mp_word cl[words];
         maid_mp_mov(words, cl, NULL);
         maid_mp_read(words, cl, clamp, false);
         maid_mp_and(words, p->r, cl);
@@ -62,18 +60,7 @@ static void *
 poly1305_del(void *ctx)
 {
     if (ctx)
-    {
-        struct poly1305 *p = ctx;
-        maid_mem_clear(p->acc,     p->words * sizeof(maid_mp_word));
-        maid_mem_clear(p->r,       p->words * sizeof(maid_mp_word));
-        maid_mem_clear(p->s,       p->words * sizeof(maid_mp_word));
-
-        free(p->acc);
-        free(p->r);
-        free(p->s);
-
         maid_mem_clear(ctx, sizeof(struct poly1305));
-    }
     free(ctx);
 
     return NULL;
@@ -87,23 +74,7 @@ poly1305_new(u8 version, const u8 *key)
     struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
 
     if (ret)
-    {
-        /* 256 bits, to handle multiplication */
-        ret->words = maid_mp_words(256);
-
-        ret->acc = calloc(ret->words,     sizeof(maid_mp_word));
-        ret->r   = calloc(ret->words,     sizeof(maid_mp_word));
-        ret->s   = calloc(ret->words,     sizeof(maid_mp_word));
-
-        maid_mp_mov(ret->words, ret->acc, NULL);
-        maid_mp_mov(ret->words, ret->r,   NULL);
-        maid_mp_mov(ret->words, ret->s,   NULL);
-
-        if (key && ret->acc && ret->r && ret->s)
-            poly1305_init(ret, key);
-        else
-            ret = poly1305_del(ret);
-    }
+        poly1305_init(ret, key);
 
     return ret;
 }
@@ -117,7 +88,7 @@ poly1305_renew(void *ctx, const u8 *key)
         if (key)
             poly1305_init(p, key);
 
-        maid_mem_clear(p->acc,     p->words * sizeof(maid_mp_word));
+        maid_mem_clear(p->acc, MAID_MP_BYTES(256));
     }
 }
 
@@ -132,11 +103,12 @@ poly1305_update(void *ctx, u8 *block, size_t size)
     if (ctx && block)
     {
         struct poly1305 *p = ctx;
+        size_t words = MAID_MP_WORDS(256);
 
         /* Read prime data as number */
-        maid_mp_word pr[p->words];
-        maid_mp_mov(p->words, pr, NULL);
-        maid_mp_read(p->words, pr, prime, false);
+        maid_mp_word pr[words];
+        maid_mp_mov(words, pr, NULL);
+        maid_mp_read(words, pr, prime, false);
 
         /* Read data into buffer (256 bits) */
         u8 buf[32] = {0};
@@ -146,17 +118,17 @@ poly1305_update(void *ctx, u8 *block, size_t size)
         buf[size] |= 1;
 
         /* Read buffer as number */
-        maid_mp_word tmp[p->words];
-        maid_mp_read(p->words, tmp, buf, false);
+        maid_mp_word tmp[words];
+        maid_mp_read(words, tmp, buf, false);
         maid_mem_clear(buf, sizeof(buf));
 
         /* Adds block to the accumulator */
-        maid_mp_add(p->words, p->acc, tmp);
+        maid_mp_add(words, p->acc, tmp);
         maid_mem_clear(tmp, sizeof(tmp));
         /* Multiplies accumulator by r */
-        maid_mp_mul(p->words, p->acc, p->r);
+        maid_mp_mul(words, p->acc, p->r);
         /* Reduction by prime */
-        maid_mp_mod(p->words, p->acc, pr);
+        maid_mp_mod(words, p->acc, pr);
     }
 }
 
@@ -168,9 +140,9 @@ poly1305_digest(void *ctx, u8 *output)
         struct poly1305 *p = ctx;
 
         /* Adds s to the accumulator */
-        maid_mp_add(p->words, p->acc, p->s);
+        maid_mp_add(MAID_MP_WORDS(256), p->acc, p->s);
         /* Exports 128 bits */
-        maid_mp_write(maid_mp_words(128), p->acc, output, false);
+        maid_mp_write(MAID_MP_WORDS(128), p->acc, output, false);
     }
 }
 
