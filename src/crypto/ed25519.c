@@ -261,7 +261,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
             maid_mp_shr(words, buf, 3);
 
             /* x = x^buf */
-            maid_mp_expmod2(words, x, buf, c->p, true);
+            maid_mp_expmod(words, x, buf, c->p, true);
 
             /* buf = vx^2 */
             maid_mp_mov(words, buf, x);
@@ -286,7 +286,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                     maid_mp_sub(words, buf, I);
                     maid_mp_shr(words, buf, 2);
                     I[0] = 2;
-                    maid_mp_expmod2(words, I, buf, c->p, false);
+                    maid_mp_expmod(words, I, buf, c->p, false);
 
                     /* x *= I */
                     maid_mp_mulmod(words, x, I, c->p);

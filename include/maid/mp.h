@@ -40,8 +40,6 @@ typedef u64 maid_mp_word;
 #define MAID_MP_BYTES(bits) \
     (MAID_MP_WORDS(bits) * sizeof(maid_mp_word))
 
-size_t maid_mp_words(size_t bits);
-
 void maid_mp_read(size_t words, maid_mp_word *a, const u8 *addr, bool big);
 void maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big);
 
@@ -79,19 +77,10 @@ void maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod);
 void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod);
+bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod);
 void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod, bool constant);
-bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod);
-void maid_mp_expmod2(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                     const maid_mp_word *mod, bool constant);
 
 void maid_mp_cswap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap);
-
-#include <maid/rng.h>
-void maid_mp_random(size_t words, maid_mp_word *a, maid_rng *g, size_t bits);
-void maid_mp_random2(size_t words, maid_mp_word *a, maid_rng *g,
-                     const maid_mp_word *low, const maid_mp_word *high);
-void maid_mp_prime(size_t words, maid_mp_word *a, maid_rng *g,
-                   size_t bits, size_t safety);
 
 #endif

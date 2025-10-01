@@ -260,36 +260,6 @@ test_mp_mulmod(size_t words, char *a, char *b, char *m, char *r)
 }
 
 static bool
-test_mp_expmod(size_t words,
-               void (*f)(size_t, maid_mp_word *, const maid_mp_word *,
-                         const maid_mp_word *, bool),
-               char *a, char *b, char *m, char *r)
-{
-    bool ret = true;
-
-    TEST_IMPORT_MP(words, am, ab, a)
-    TEST_IMPORT_MP(words, bm, bb, b)
-    TEST_IMPORT_MP(words, mm, mb, m)
-    TEST_IMPORT_MP(words, rm, rb, r)
-
-    size_t size = words * sizeof(maid_mp_word);
-    if (ret)
-    {
-        f(words, am, bm, mm, false);
-        ret &= maid_mem_cmp(am, rm, size);
-    }
-
-    if (ret)
-    {
-        TEST_REIMPORT_MP(words, am, ab);
-        f(words, am, bm, mm, true);
-        ret &= maid_mem_cmp(am, rm, size);
-    }
-
-    return ret;
-}
-
-static bool
 test_mp_invmod(size_t words, char *a, char *n, char *m, char *r)
 {
     bool ret = true;
@@ -313,132 +283,28 @@ test_mp_invmod(size_t words, char *a, char *n, char *m, char *r)
 }
 
 static bool
-test_mp_random(size_t words, maid_rng *g, u8 exp, u8 exp2)
+test_mp_expmod(size_t words, char *a, char *b, char *m, char *r)
 {
     bool ret = true;
 
-    size_t bits = sizeof(maid_mp_word) * 8;
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, bm, bb, b)
+    TEST_IMPORT_MP(words, mm, mb, m)
+    TEST_IMPORT_MP(words, rm, rb, r)
 
-    /* Limit = middle / 2^exp */
-    size_t middle = (words * bits) / 2;
-    size_t limit = middle >> exp;
-    size_t low  = middle - limit;
-    size_t high = middle + limit;
-
-    TEST_EMPTY_MP(words, rm)
-    for (size_t i = 0; i < (1ULL << exp2); i++)
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
     {
-        maid_mp_random(words, rm, g, words * bits);
-
-        size_t iset = 0;
-        for (size_t i = 0; i < words; i++)
-            for (u8 j = 0; j < bits; j++)
-                if (rm[i] & (1ULL << j))
-                    iset++;
-
-        if (iset <= low || iset >= high)
-        {
-            ret = false;
-            break;
-        }
-    }
-
-    return ret;
-}
-
-static bool
-test_mp_random2(size_t words, maid_rng *g,
-                char *low, char *high, u8 exp, u8 exp2)
-{
-    bool ret = true;
-
-    TEST_IMPORT_MP(words, lm, lb, low)
-    TEST_IMPORT_MP(words, hm, hb, high)
-    TEST_EMPTY_MP(words, rm)
-    TEST_EMPTY_MP(words, am)
-
-    for (size_t i = 0; i < (1ULL << exp2); i++)
-    {
-        maid_mp_random2(words, rm, g, lm, hm);
-
-        if (maid_mp_cmp(words, rm, lm) > 0 ||
-            maid_mp_cmp(words, rm, hm) < 0)
-        {
-            ret = false;
-            break;
-        }
-
-        /* Average of the results */
-        maid_mp_shr(words, rm, exp2);
-        maid_mp_add(words, am, rm);
+        maid_mp_expmod(words, am, bm, mm, false);
+        ret &= maid_mem_cmp(am, rm, size);
     }
 
     if (ret)
     {
-        /* Middle value */
-        TEST_EMPTY_MP(words, mm)
-        maid_mp_shr(words, lm, 1);
-        maid_mp_shr(words, hm, 1);
-        maid_mp_add(words, mm, hm);
-        maid_mp_add(words, mm, lm);
-
-        /* Limit value */
-        TEST_EMPTY_MP(words, im)
-        maid_mp_mov(words, im, mm);
-        maid_mp_shr(words, im, exp);
-
-        /* New lowest */
-        maid_mp_mov(words, lm, mm);
-        maid_mp_sub(words, lm, im);
-
-        /* New highest */
-        maid_mp_mov(words, hm, mm);
-        maid_mp_add(words, hm, im);
-
-        /* Checks if the average is smaller than the lowest,
-         * or higher than the highest (unless it overflows) */
-        if (maid_mp_cmp(words, am, lm) > 0 ||
-            (maid_mp_cmp(words, am, hm) < 0 &&
-             maid_mp_cmp(words, hm, im) < 0))
-            ret = false;
+        TEST_REIMPORT_MP(words, am, ab);
+        maid_mp_expmod(words, am, bm, mm, true);
+        ret &= maid_mem_cmp(am, rm, size);
     }
-
-    return ret;
-}
-
-static bool
-test_mp_prime(size_t words, maid_rng *g)
-{
-    bool ret = true;
-
-    TEST_EMPTY_MP(words, am)
-    TEST_EMPTY_MP(words, bm)
-
-    size_t bits = (sizeof(maid_mp_word) * words * 8) / 2;
-    maid_mp_prime(words, am, g, bits, 16);
-    maid_mp_prime(words, bm, g, bits, 16);
-
-    TEST_EMPTY_MP(words, cm)
-    /* c = ab */
-    maid_mp_mov(words, cm, am);
-    maid_mp_mul(words, cm, bm);
-
-    TEST_EMPTY_MP(words, dm)
-    TEST_EMPTY_MP(words, om)
-    /* b = tot(ab) */
-    maid_mp_mov(words, dm, am);
-    om[0] = 1;
-    maid_mp_sub(words, bm, om);
-    maid_mp_sub(words, dm, om);
-    maid_mp_mul(words, bm, dm);
-
-    /* 2^tot(ab) % ab = 1 */
-    om[0] = 2;
-    maid_mp_expmod(words, om, bm, cm, false);
-    maid_mp_mov(words, cm, NULL);
-    cm[0] = 1;
-    if (maid_mp_cmp(words, om, cm) != 0)
-        ret = false;
 
     return ret;
 }
@@ -733,9 +599,9 @@ maid_test_mem(void)
 extern u8
 maid_test_mp(void)
 {
-    u8 ret = 26;
+    u8 ret = 22;
 
-    size_t words = maid_mp_words(256);
+    size_t words = MAID_MP_WORDS(256);
     ret -= (words == 4);
 
     char *sa = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
@@ -790,22 +656,10 @@ maid_test_mp(void)
 
     ret -= test_mp_mulmod(words, sa, sb, sc,
            "0000000000000000000000000000ba47a813183a1a03729a545e69650ea7ec62");
-    ret -= test_mp_expmod(words, maid_mp_expmod, sa, sb, sc,
-           "00000000000000000000000000007960d37277127c408fae6d25702001a96c32");
     ret -= test_mp_invmod(words, sa, sb, sc,
            "00000000000000000000000000007823344d5d3621c25936272b9a68c0bcdd99");
-    ret -= test_mp_expmod(words, maid_mp_expmod2, sa, sb, sc,
+    ret -= test_mp_expmod(words, sa, sb, sc,
            "00000000000000000000000000007960d37277127c408fae6d25702001a96c32");
-
-    /* Generators */
-    u8 entropy[44] = {0};
-    maid_rng *g = maid_rng_new(&maid_chacha20_rng, entropy);
-
-    ret -= test_mp_random(words, g, 2, 7);
-    ret -= test_mp_random2(words, g, sa, sb, 2, 7);
-    ret -= test_mp_prime(words, g);
-
-    maid_rng_del(g);
 
     return ret;
 }
@@ -1193,7 +1047,7 @@ maid_test_hmac_sha2(void)
 extern u8
 maid_test_curve25519(void)
 {
-    return 1 - test_ecc(maid_curve25519, maid_mp_words(256),
+    return 1 - test_ecc(maid_curve25519, MAID_MP_WORDS(256),
                         "09000000000000000000000000000000"
                         "00000000000000000000000000000000",
                         "00000000000000000000000000000000"
@@ -1211,7 +1065,7 @@ maid_test_curve25519(void)
 extern u8
 maid_test_edwards25519(void)
 {
-    return 1 - test_ecc(maid_edwards25519, maid_mp_words(256),
+    return 1 - test_ecc(maid_edwards25519, MAID_MP_WORDS(256),
                         "58666666666666666666666666666666"
                         "66666666666666666666666666666666",
                         "01000000000000000000000000000000"

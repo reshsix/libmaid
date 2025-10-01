@@ -25,8 +25,6 @@ struct maid_ecc
 {
     const struct maid_ecc_def *def;
     void *context;
-
-    size_t words;
     maid_ecc_point *r0, *r1, *r2, *r3;
 };
 
@@ -39,12 +37,10 @@ maid_ecc_new(const struct maid_ecc_def *def)
     {
         ret->def = def;
         ret->context = def->new();
-        if (ret->context && (ret->r0 = def->alloc(ret->context))
-                         && (ret->r1 = def->alloc(ret->context))
-                         && (ret->r2 = def->alloc(ret->context))
-                         && (ret->r3 = def->alloc(ret->context)))
-            ret->words = maid_mp_words(def->bits);
-        else
+        if (!(ret->context && (ret->r0 = def->alloc(ret->context))
+                           && (ret->r1 = def->alloc(ret->context))
+                           && (ret->r2 = def->alloc(ret->context))
+                           && (ret->r3 = def->alloc(ret->context))))
             ret = maid_ecc_del(ret);
     }
 
@@ -189,7 +185,7 @@ maid_ecc_mul(struct maid_ecc *c, struct maid_ecc_point *p,
         maid_ecc_copy(c, c->r1, p);
         maid_ecc_copy(c, c->r2, NULL);
 
-        size_t words = c->words;
+        size_t words = MAID_MP_WORDS(c->def->bits);
         size_t maid_mp_bits = sizeof(maid_mp_word) * 8;
 
         volatile bool bit = false, started = false;
@@ -277,15 +273,17 @@ maid_ecc_pubgen(struct maid_ecc *c, const u8 *private, u8 *public)
 
     if (c && private && public)
     {
+        size_t words = MAID_MP_WORDS(c->def->bits);
+
         maid_ecc_point *p = maid_ecc_alloc(c);
-        maid_mp_word s[c->words];
+        maid_mp_word s[words];
         if (c->def->scalar(c->context, private, s))
         {
             maid_ecc_base(c, p);
             maid_ecc_mul(c, p, s);
             ret = maid_ecc_encode(c, public, p);
         }
-        maid_mp_mov(c->words, s, NULL);
+        maid_mp_mov(words, s, NULL);
         maid_ecc_free(c, p);
     }
 
