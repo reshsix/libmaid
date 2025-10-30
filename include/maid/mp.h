@@ -31,7 +31,7 @@
 
 /* External functions */
 
-typedef u64 maid_mp_word;
+typedef uint_fast16_t maid_mp_word;
 
 #define MAID_MP_WORDS(bits) \
     (((bits) + (sizeof(maid_mp_word) * 8) - 1) / (sizeof(maid_mp_word) * 8))
@@ -53,6 +53,7 @@ void maid_mp_xor(size_t words, maid_mp_word *a, const maid_mp_word *b);
 s8 maid_mp_cmp(size_t words, const maid_mp_word *a, const maid_mp_word *b);
 
 void maid_mp_mov(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_swap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap);
 
 void maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b);
@@ -68,9 +69,6 @@ void maid_mp_div(size_t words, maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_mod(size_t words, maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b);
 
-void maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
-                  const maid_mp_word *b);
-
 void maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod);
 void maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
@@ -79,8 +77,6 @@ void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
                     const maid_mp_word *mod);
 bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod);
 void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod, bool constant);
-
-void maid_mp_cswap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap);
+                    const maid_mp_word *mod);
 
 #endif

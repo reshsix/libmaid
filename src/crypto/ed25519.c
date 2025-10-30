@@ -168,10 +168,10 @@ edwards25519_swap(void *ctx, struct maid_ecc_point *p,
     struct edwards25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
 
-    maid_mp_cswap(words, p->x, q->x, swap);
-    maid_mp_cswap(words, p->y, q->y, swap);
-    maid_mp_cswap(words, p->z, q->z, swap);
-    maid_mp_cswap(words, p->t, q->t, swap);
+    maid_mp_swap(words, p->x, q->x, swap);
+    maid_mp_swap(words, p->y, q->y, swap);
+    maid_mp_swap(words, p->z, q->z, swap);
+    maid_mp_swap(words, p->t, q->t, swap);
 }
 
 static bool
@@ -261,7 +261,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
             maid_mp_shr(words, buf, 3);
 
             /* x = x^buf */
-            maid_mp_expmod(words, x, buf, c->p, true);
+            maid_mp_expmod(words, x, buf, c->p);
 
             /* buf = vx^2 */
             maid_mp_mov(words, buf, x);
@@ -286,7 +286,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                     maid_mp_sub(words, buf, I);
                     maid_mp_shr(words, buf, 2);
                     I[0] = 2;
-                    maid_mp_expmod(words, I, buf, c->p, false);
+                    maid_mp_expmod(words, I, buf, c->p);
 
                     /* x *= I */
                     maid_mp_mulmod(words, x, I, c->p);

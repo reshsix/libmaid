@@ -176,6 +176,32 @@ maid_mp_mov(size_t words, maid_mp_word *a, const maid_mp_word *b)
 }
 
 extern void
+maid_mp_swap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap)
+{
+    if (words && a && b)
+    {
+        MAID_ALLOC_MP(mask, 1)
+        MAID_ALLOC_MP(tmp,  1)
+
+        /* mask = 0 - bit */
+        tmp[0] = swap;
+        maid_mp_sub(words, mask, tmp);
+
+        /* tmp = (a ^ b) & mask */
+        maid_mp_mov(words, tmp, a);
+        maid_mp_xor(words, tmp, b);
+        maid_mp_and(words, tmp, mask);
+
+        /* a ^= tmp, b ^= tmp */
+        maid_mp_xor(words, a, tmp);
+        maid_mp_xor(words, b, tmp);
+
+        MAID_CLEAR_MP(mask)
+        MAID_CLEAR_MP(tmp)
+    }
+}
+
+extern void
 maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
@@ -321,22 +347,7 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
         if (halve)
             words /= 2;
 
-        /* Uses a lot of space to improve calculations */
-        #if defined(__SIZEOF_INT128__)
-        unsigned __int128 results[words];
-        #else
-        MAID_ALLOC_MP(x, 1)
-        MAID_ALLOC_MP(y, 1)
-        MAID_ALLOC_MP(z, 1)
-        MAID_ALLOC_MP(w, 1)
-
-        MAID_ALLOC_MP(xz, 1)
-        MAID_ALLOC_MP(xw, 1)
-        MAID_ALLOC_MP(yz, 1)
-        MAID_ALLOC_MP(yw, 1)
-
-        MAID_ALLOC_MP(org,  1)
-        #endif
+        /* Uses a bit of space to improve calculations */
         MAID_ALLOC_MP(low,  1)
         MAID_ALLOC_MP(high, 1)
 
@@ -344,67 +355,50 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
 
-        #if !defined(__SIZEOF_INT128__)
-        const size_t       half = maid_mp_bits / 2;
-        const maid_mp_word mask = maid_mp_max >> half;
-
-        /* Splits the values into high and low parts */
-        for (size_t i = 0; i < words; i++)
-            x[i] = tmp[i] >> half;
-        for (size_t i = 0; i < words; i++)
-            y[i] = tmp[i] & mask;
-        for (size_t i = 0; i < words; i++)
-            z[i] = ((b) ? b[i] : (i == 0)) >> half;
-        for (size_t i = 0; i < words; i++)
-            w[i] = ((b) ? b[i] : (i == 0)) & mask;
-        #endif
-
         for (size_t i = 0; i < words; i++)
         {
             #if defined(__SIZEOF_INT128__)
             for (size_t j = 0; j < words; j++)
-                results[j] = tmp[i];
-            for (size_t j = 0; j < words; j++)
-                results[j] *= ((b) ? b[j] : (j == 0));
-            for (size_t j = 0; j < words; j++)
-                low[j] = results[j];
-            for (size_t j = 0; j < words; j++)
-                high[j] = results[j] >> 64;
+            {
+                volatile unsigned __int128 x = tmp[i];
+                x *= ((b) ? b[j] : (j == 0));
+
+                low[j]  = x;
+                high[j] = x >> 64;
+            }
             #else
-            /* Does the intermediary multiplications */
+            const size_t       half = maid_mp_bits / 2;
+            const maid_mp_word mask = maid_mp_max >> half;
+
+            volatile maid_mp_word x = tmp[i] >> half;
+            volatile maid_mp_word y = tmp[i] & mask;
             for (size_t j = 0; j < words; j++)
             {
-                xz[j] = x[i] * z[j];
-                xw[j] = x[i] * w[j];
-                yz[j] = y[i] * z[j];
-                yw[j] = y[i] * w[j];
+                volatile maid_mp_word z = ((b) ? b[j] : (j == 0)) >> half;
+                volatile maid_mp_word w = ((b) ? b[j] : (j == 0)) & mask;
+
+                /* Does the intermediary multiplications */
+                volatile maid_mp_word xz = x * z;
+                volatile maid_mp_word xw = x * w;
+                volatile maid_mp_word yz = y * z;
+                volatile maid_mp_word yw = y * w;
+
+                /* Calculates low part of the words */
+                low[j] = yw;
+
+                volatile maid_mp_word org = low[j];
+                low[j] += xw << half;
+                high[j] = (low[j] < org);
+
+                org      = low[j];
+                low[j]  += yz << half;
+                high[j] += (low[j] < org);
+
+                /* Calculates high part of the words */
+                high[j] += xz;
+                high[j] += xw >> half;
+                high[j] += yz >> half;
             }
-
-            /* Calculates low part of the words */
-            for (size_t j = 0; j < words; j++)
-                low[j] = yw[j];
-
-            for (size_t j = 0; j < words; j++)
-                org[j] = low[j];
-            for (size_t j = 0; j < words; j++)
-                low[j] += xw[j] << half;
-            for (size_t j = 0; j < words; j++)
-                high[j] = (low[j] < org[j]);
-
-            for (size_t j = 0; j < words; j++)
-                org[j] = low[j];
-            for (size_t j = 0; j < words; j++)
-                low[j] += yz[j] << half;
-            for (size_t j = 0; j < words; j++)
-                high[j] += (low[j] < org[j]);
-
-            /* Calculates high part of the words */
-            for (size_t j = 0; j < words; j++)
-                high[j] += xz[j];
-            for (size_t j = 0; j < words; j++)
-                high[j] += xw[j] >> half;
-            for (size_t j = 0; j < words; j++)
-                high[j] += yz[j] >> half;
             #endif
 
             /* Adds words to the total */
@@ -429,21 +423,6 @@ maid_mp_mul_long(size_t words, maid_mp_word *a,
         MAID_CLEAR_MP(tmp);
         MAID_CLEAR_MP(tmp2);
 
-        #if defined(__SIZEOF_INT128__)
-        maid_mem_clear(results, sizeof(results));
-        #else
-        MAID_CLEAR_MP(x);
-        MAID_CLEAR_MP(y);
-        MAID_CLEAR_MP(z);
-        MAID_CLEAR_MP(w);
-
-        MAID_CLEAR_MP(xz);
-        MAID_CLEAR_MP(xw);
-        MAID_CLEAR_MP(yz);
-        MAID_CLEAR_MP(yw);
-
-        MAID_CLEAR_MP(org);
-        #endif
         MAID_CLEAR_MP(low);
         MAID_CLEAR_MP(high);
     }
@@ -541,6 +520,7 @@ maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
     {
         MAID_ALLOC_MP(tmp,  1)
         MAID_ALLOC_MP(tmp2, 1)
+        MAID_ALLOC_MP(tmp3, 1)
 
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
@@ -568,17 +548,14 @@ maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
             bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1ULL << d);
 
             maid_mp_mov(words, tmp2, a);
-            if (msb && i == 0)
-                maid_mp_mul(words, a, tmp);
-            else if (msb && ii < (msb - 1))
-                maid_mp_mul(words, a, tmp2);
-            else
-                maid_mp_mul(words, a, NULL);
 
-            if (bit)
-                maid_mp_mul(words, a, tmp);
-            else
-                maid_mp_mul(words, a, NULL);
+            maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
+            maid_mp_mul(words, a, (i == 0) ? tmp : tmp2);
+            maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
+
+            maid_mp_swap(words, a, tmp3, !bit);
+            maid_mp_mul(words, a, tmp);
+            maid_mp_swap(words, a, tmp3, !bit);
         }
 
         msb = 0;
@@ -586,25 +563,7 @@ maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
         MAID_CLEAR_MP(tmp)
         MAID_CLEAR_MP(tmp2)
-    }
-}
-
-extern void
-maid_mp_div2(size_t words, maid_mp_word *a, maid_mp_word *rem,
-             const maid_mp_word *b)
-{
-    if (words && a && rem)
-    {
-        MAID_ALLOC_MP(tmp, 1)
-
-        maid_mp_mov(words, rem, a);
-        maid_mp_div(words, a,   b);
-        maid_mp_mov(words, tmp, a);
-
-        maid_mp_mul(words, tmp, b);
-        maid_mp_sub(words, rem, tmp);
-
-        MAID_CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp3)
     }
 }
 
@@ -676,10 +635,7 @@ maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         maid_mp_mov(words, &(b2[words]),   NULL);
         maid_mp_mov(words, &(mod2[words]), NULL);
 
-        if (b)
-            maid_mp_mul_long(words * 2, a2, b2, true);
-        else
-            maid_mp_mul_long(words * 2, a2, NULL, true);
+        maid_mp_mul_long(words * 2, a2, b2, true);
 
         maid_mp_mod(words * 2, a2, mod2);
         maid_mp_mov(words, a, a2);
@@ -861,12 +817,13 @@ maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
 
 extern void
 maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-               const maid_mp_word *mod, bool constant)
+               const maid_mp_word *mod)
 {
     if (words && a && mod)
     {
         MAID_ALLOC_MP(tmp,  1)
         MAID_ALLOC_MP(tmp2, 1)
+        MAID_ALLOC_MP(tmp3, 1)
 
         maid_mp_mov(words, tmp, a);
         maid_mp_mov(words, a, NULL);
@@ -894,17 +851,14 @@ maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
             bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1ULL << d);
 
             maid_mp_mov(words, tmp2, a);
-            if (msb && i == 0)
-                maid_mp_mulmod(words, a, tmp, mod);
-            else if (msb && ii < (msb - 1))
-                maid_mp_mulmod(words, a, tmp2, mod);
-            else if (constant)
-                maid_mp_mulmod(words, a, NULL, mod);
 
-            if (bit)
-                maid_mp_mulmod(words, a, tmp, mod);
-            else if (constant)
-                maid_mp_mulmod(words, a, NULL, mod);
+            maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
+            maid_mp_mulmod(words, a, (i == 0) ? tmp : tmp2, mod);
+            maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
+
+            maid_mp_swap(words,  a, tmp3, !bit);
+            maid_mp_mulmod(words, a, tmp,  mod);
+            maid_mp_swap(words,  a, tmp3, !bit);
         }
 
         msb = 0;
@@ -912,31 +866,6 @@ maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 
         MAID_CLEAR_MP(tmp)
         MAID_CLEAR_MP(tmp2)
-    }
-}
-
-extern void
-maid_mp_cswap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap)
-{
-    if (words && a && b)
-    {
-        MAID_ALLOC_MP(mask, 1)
-        MAID_ALLOC_MP(tmp,  1)
-
-        /* mask = 0 - bit */
-        tmp[0] = swap;
-        maid_mp_sub(words, mask, tmp);
-
-        /* tmp = (a ^ b) & mask */
-        maid_mp_mov(words, tmp, a);
-        maid_mp_xor(words, tmp, b);
-        maid_mp_and(words, tmp, mask);
-
-        /* a ^= tmp, b ^= tmp */
-        maid_mp_xor(words, a, tmp);
-        maid_mp_xor(words, b, tmp);
-
-        MAID_CLEAR_MP(mask)
-        MAID_CLEAR_MP(tmp)
+        MAID_CLEAR_MP(tmp3)
     }
 }

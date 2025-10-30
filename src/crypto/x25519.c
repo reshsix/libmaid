@@ -133,8 +133,8 @@ curve25519_swap(void *ctx, struct maid_ecc_point *p,
     struct curve25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
 
-    maid_mp_cswap(words, p->x, q->x, swap);
-    maid_mp_cswap(words, p->z, q->z, swap);
+    maid_mp_swap(words, p->x, q->x, swap);
+    maid_mp_swap(words, p->z, q->z, swap);
 }
 
 static bool

@@ -208,38 +208,6 @@ test_mp_s(size_t words, void (*f)(size_t, maid_mp_word *, size_t),
 }
 
 static bool
-test_mp_div2(size_t words, char *a, char *b, char *r, char *m)
-{
-    bool ret = true;
-
-    TEST_IMPORT_MP(words, am, ab, a)
-    TEST_IMPORT_MP(words, bm, bb, b)
-    TEST_IMPORT_MP(words, rm, rb, r)
-    TEST_IMPORT_MP(words, mm, mb, m)
-    TEST_EMPTY_MP(words, mm2)
-
-    size_t size = words * sizeof(maid_mp_word);
-    if (ret)
-    {
-        maid_mp_div2(words, am, mm2, bm);
-        ret &= maid_mem_cmp(am, rm,  size) &&
-               maid_mem_cmp(mm, mm2, size);
-    }
-
-    if (ret)
-    {
-        TEST_REIMPORT_MP(words, am, ab);
-        maid_mp_mov(words, rm,  am);
-        maid_mp_mov(words, mm2, bm);
-        maid_mp_div2(words, am, mm2, NULL);
-        ret &= maid_mem_cmp(am, rm,  size);
-               maid_mem_cmp(bm, mm2, size);
-    }
-
-    return ret;
-}
-
-static bool
 test_mp_mulmod(size_t words, char *a, char *b, char *m, char *r)
 {
     bool ret = true;
@@ -295,14 +263,7 @@ test_mp_expmod(size_t words, char *a, char *b, char *m, char *r)
     size_t size = words * sizeof(maid_mp_word);
     if (ret)
     {
-        maid_mp_expmod(words, am, bm, mm, false);
-        ret &= maid_mem_cmp(am, rm, size);
-    }
-
-    if (ret)
-    {
-        TEST_REIMPORT_MP(words, am, ab);
-        maid_mp_expmod(words, am, bm, mm, true);
+        maid_mp_expmod(words, am, bm, mm);
         ret &= maid_mem_cmp(am, rm, size);
     }
 
@@ -599,10 +560,9 @@ maid_test_mem(void)
 extern u8
 maid_test_mp(void)
 {
-    u8 ret = 22;
+    u8 ret = 20;
 
     size_t words = MAID_MP_WORDS(256);
-    ret -= (words == 4);
 
     char *sa = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
                "11b1d0dec0d1f1eddeadbea7cafebe7a";
@@ -649,10 +609,6 @@ maid_test_mp(void)
            "0000000000000000000000000000c692e50b7de98c6b00f5181bf3dc2ec8afb4");
     ret -= test_mp_a(words, maid_mp_exp, sc, sa, false,
            "4e0e63adabf8dc0f6b299b04688b3f0f053bc6ae96423face4bf8e604e95df31");
-
-    ret -= test_mp_div2(words, sa, sc,
-           "000000000000000000000000000000000000f32be2eeb4f644355ea6504049ca",
-           "0000000000000000000000000000c692e50b7de98c6b00f5181bf3dc2ec8afb4");
 
     ret -= test_mp_mulmod(words, sa, sb, sc,
            "0000000000000000000000000000ba47a813183a1a03729a545e69650ea7ec62");
