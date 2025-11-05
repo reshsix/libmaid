@@ -53,10 +53,11 @@ struct maid_ecc_point
 struct edwards25519
 {
     MAID_MP_SCALAR(d, 256);
-    MAID_MP_SCALAR(p, 256);
     MAID_MP_SCALAR(x, 256);
     MAID_MP_SCALAR(y, 256);
     maid_hash *hash;
+    maid_mp_mod *mod;
+    maid_mp_word *modf;
 };
 
 static void *
@@ -81,16 +82,16 @@ edwards25519_new(void)
     if (ret)
     {
         ret->hash = maid_hash_new(&maid_sha512);
-        if (!(ret->hash))
+        ret->mod  = maid_mp_mersenne(MAID_MP_WORDS(256), 255, 19, true);
+        if (ret->hash && ret->mod)
+            ret->modf = maid_mp_fullmod(ret->mod);
+        else
             ret = edwards25519_del(ret);
     }
 
     if (ret && !(import_mp(MAID_MP_WORDS(256), ret->d,
                        "52036cee2b6ffe738cc740797779e898"
                        "00700a4d4141d8ab75eb4dca135978a3") &&
-                 import_mp(MAID_MP_WORDS(256), ret->p,
-                       "7fffffffffffffffffffffffffffffff"
-                       "ffffffffffffffffffffffffffffffed") &&
                  import_mp(MAID_MP_WORDS(256), ret->x,
                        "216936d3cd6e53fec0a4e231fdd6dc5c"
                        "692cc7609525a7b2c9562d608f25d51a") &&
@@ -133,7 +134,7 @@ edwards25519_base(void *ctx, struct maid_ecc_point *p)
     p->z[0] = 1;
 
     maid_mp_mov(words, p->t, c->x);
-    maid_mp_mulmod(words, p->t, c->y, c->p);
+    maid_mp_mulmod(words, p->t, c->y, c->mod);
 }
 
 static void
@@ -185,7 +186,7 @@ edwards25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 
     /* buf = Z^-1 */
     maid_mp_mov(words, buf, p->z);
-    ret = maid_mp_invmod(words, buf, c->p);
+    ret = maid_mp_invmod(words, buf, c->mod);
     if (ret)
     {
         MAID_ALLOC_MP(x, 1)
@@ -193,10 +194,10 @@ edwards25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 
         /* x = X * Z^-1 mod p */
         maid_mp_mov(words, x, p->x);
-        maid_mp_mulmod(words, x, buf, c->p);
+        maid_mp_mulmod(words, x, buf, c->mod);
         /* y = Y * Z^-1 mod p */
         maid_mp_mov(words, y, p->y);
-        maid_mp_mulmod(words, y, buf, c->p);
+        maid_mp_mulmod(words, y, buf, c->mod);
         /* buffer = ((x & 1) << 255) | y */
         maid_mp_write(words, y, buffer, false);
         buffer[31] |= (x[0] & 1) << 7;
@@ -226,7 +227,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
     maid_mp_read(words, y, buffer, false);
     volatile bool xp = y[xi] & xj;
     y[xi] &= ~xj;
-    ret = (maid_mp_cmp(words, y, c->p) > 0);
+    ret = (maid_mp_cmp(words, y, c->modf) > 0);
 
     if (ret)
     {
@@ -238,42 +239,42 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
         buf[0] = 1;
         /* u = y^2 - 1 */
         maid_mp_mov(words, u, y);
-        maid_mp_mulmod(words, u, y, c->p);
-        maid_mp_submod(words, u, buf, c->p);
+        maid_mp_mulmod(words, u, y, c->mod);
+        maid_mp_submod(words, u, buf, c->mod);
         /* v = dy^2 + 1 */
         maid_mp_mov(words, v, c->d);
-        maid_mp_mulmod(words, v, y, c->p);
-        maid_mp_mulmod(words, v, y, c->p);
-        maid_mp_addmod(words, v, buf, c->p);
+        maid_mp_mulmod(words, v, y, c->mod);
+        maid_mp_mulmod(words, v, y, c->mod);
+        maid_mp_addmod(words, v, buf, c->mod);
 
         /* x = u/v ^ (p + 3)/8 */
         maid_mp_mov(words, x, v);
-        ret = maid_mp_invmod(words, x, c->p);
+        ret = maid_mp_invmod(words, x, c->mod);
         if (ret)
         {
             /* x = u/v */
-            maid_mp_mulmod(words, x, u, c->p);
+            maid_mp_mulmod(words, x, u, c->mod);
 
             /* buf = (p + 3) / 8 */
             maid_mp_mov(words, buf, NULL);
             buf[0] = 3;
-            maid_mp_add(words, buf, c->p);
+            maid_mp_add(words, buf, c->modf);
             maid_mp_shr(words, buf, 3);
 
             /* x = x^buf */
-            maid_mp_expmod(words, x, buf, c->p);
+            maid_mp_expmod(words, x, buf, c->mod);
 
             /* buf = vx^2 */
             maid_mp_mov(words, buf, x);
-            maid_mp_mulmod(words, buf, x, c->p);
-            maid_mp_mulmod(words, buf, v, c->p);
+            maid_mp_mulmod(words, buf, x, c->mod);
+            maid_mp_mulmod(words, buf, v, c->mod);
 
             /* If x is not a square root */
             if (maid_mp_cmp(words, buf, u) != 0)
             {
                 /* v = -u */
                 maid_mp_mov(words, v, NULL);
-                maid_mp_submod(words, v, u, c->p);
+                maid_mp_submod(words, v, u, c->mod);
 
                 /* xI might be */
                 if (maid_mp_cmp(words, buf, v) == 0)
@@ -282,14 +283,14 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
 
                     /* I = 2 ^ ((p - 1)/4) */
                     I[0] = 1;
-                    maid_mp_mov(words, buf, c->p);
+                    maid_mp_mov(words, buf, c->modf);
                     maid_mp_sub(words, buf, I);
                     maid_mp_shr(words, buf, 2);
                     I[0] = 2;
-                    maid_mp_expmod(words, I, buf, c->p);
+                    maid_mp_expmod(words, I, buf, c->mod);
 
                     /* x *= I */
-                    maid_mp_mulmod(words, x, I, c->p);
+                    maid_mp_mulmod(words, x, I, c->mod);
 
                     MAID_CLEAR_MP(I)
                 }
@@ -307,7 +308,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                 if (maid_mp_cmp(words, buf, x) != 0)
                 {
                     maid_mp_mov(words, buf, x);
-                    maid_mp_mov(words, x, c->p);
+                    maid_mp_mov(words, x, c->modf);
                     maid_mp_sub(words, x, buf);
                 }
                 else
@@ -323,7 +324,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
             maid_mp_mov(words, p->z, NULL);
             p->z[0] = 1;
             maid_mp_mov(words, p->t, x);
-            maid_mp_mulmod(words, p->t, y, c->p);
+            maid_mp_mulmod(words, p->t, y, c->mod);
         }
 
         MAID_CLEAR_MP(u)
@@ -355,21 +356,21 @@ edwards25519_cmp(void *ctx, const struct maid_ecc_point *a,
     /* Inverse Z calculation */
     maid_mp_mov(words, zi,  a->z);
     maid_mp_mov(words, zi2, b->z);
-    ret &= maid_mp_invmod(words, zi,  c->p);
-    ret &= maid_mp_invmod(words, zi2, c->p);
+    ret &= maid_mp_invmod(words, zi,  c->mod);
+    ret &= maid_mp_invmod(words, zi2, c->mod);
 
     /* X comparison */
     maid_mp_mov(words, buf,  a->x);
     maid_mp_mov(words, buf2, b->x);
-    maid_mp_mulmod(words, buf,  zi,  c->p);
-    maid_mp_mulmod(words, buf2, zi2, c->p);
+    maid_mp_mulmod(words, buf,  zi,  c->mod);
+    maid_mp_mulmod(words, buf2, zi2, c->mod);
     ret &= (maid_mp_cmp(words, buf, buf2) == 0);
 
     /* Y comparison */
     maid_mp_mov(words, buf,  a->y);
     maid_mp_mov(words, buf2, b->y);
-    maid_mp_mulmod(words, buf,  zi,  c->p);
-    maid_mp_mulmod(words, buf2, zi2, c->p);
+    maid_mp_mulmod(words, buf,  zi,  c->mod);
+    maid_mp_mulmod(words, buf2, zi2, c->mod);
     ret &= (maid_mp_cmp(words, buf, buf2) == 0);
 
     MAID_CLEAR_MP(buf)
@@ -400,43 +401,43 @@ edwards25519_dbl(void *ctx, struct maid_ecc_point *a)
 
     /* A = X1^2 */
     maid_mp_mov(words, ta, a->x);
-    maid_mp_mulmod(words, ta, a->x, c->p);
+    maid_mp_mulmod(words, ta, a->x, c->mod);
     /* B = Y1^2 */
     maid_mp_mov(words, tb, a->y);
-    maid_mp_mulmod(words, tb, a->y, c->p);
+    maid_mp_mulmod(words, tb, a->y, c->mod);
     /* C *= 2 * Z1^2 */
     maid_mp_mov(words, buf, a->z);
-    maid_mp_mulmod(words, buf, a->z, c->p);
-    maid_mp_addmod(words, tc, buf, c->p);
-    maid_mp_addmod(words, tc, buf, c->p);
+    maid_mp_mulmod(words, buf, a->z, c->mod);
+    maid_mp_addmod(words, tc, buf, c->mod);
+    maid_mp_addmod(words, tc, buf, c->mod);
     /* H = A + B */
     maid_mp_mov(words, th, ta);
-    maid_mp_addmod(words, th, tb, c->p);
+    maid_mp_addmod(words, th, tb, c->mod);
     /* E = H - (X1 + Y1)^2 */
     maid_mp_mov(words, buf, a->x);
-    maid_mp_addmod(words, buf, a->y, c->p);
+    maid_mp_addmod(words, buf, a->y, c->mod);
     maid_mp_mov(words, buf2, buf);
-    maid_mp_mulmod(words, buf, buf2, c->p);
+    maid_mp_mulmod(words, buf, buf2, c->mod);
     maid_mp_mov(words, te, th);
-    maid_mp_submod(words, te, buf, c->p);
+    maid_mp_submod(words, te, buf, c->mod);
     /* G = A - B */
     maid_mp_mov(words, tg, ta);
-    maid_mp_submod(words, tg, tb, c->p);
+    maid_mp_submod(words, tg, tb, c->mod);
     /* F = C + G */
     maid_mp_mov(words, tf, tc);
-    maid_mp_addmod(words, tf, tg, c->p);
+    maid_mp_addmod(words, tf, tg, c->mod);
     /* X3 = E * F */
     maid_mp_mov(words, a->x, te);
-    maid_mp_mulmod(words, a->x, tf, c->p);
+    maid_mp_mulmod(words, a->x, tf, c->mod);
     /* Y3 = G * H */
     maid_mp_mov(words, a->y, tg);
-    maid_mp_mulmod(words, a->y, th, c->p);
+    maid_mp_mulmod(words, a->y, th, c->mod);
     /* T3 = E * H */
     maid_mp_mov(words, a->t, te);
-    maid_mp_mulmod(words, a->t, th, c->p);
+    maid_mp_mulmod(words, a->t, th, c->mod);
     /* Z3 = F * G */
     maid_mp_mov(words, a->z, tf);
-    maid_mp_mulmod(words, a->z, tg, c->p);
+    maid_mp_mulmod(words, a->z, tg, c->mod);
 
     MAID_CLEAR_MP(ta)
     MAID_CLEAR_MP(tb)
@@ -470,53 +471,53 @@ edwards25519_add(void *ctx, struct maid_ecc_point *a,
 
     /* A = (Y1 - X1) */
     maid_mp_mov(words, buf, a->y);
-    maid_mp_submod(words, buf, a->x, c->p);
+    maid_mp_submod(words, buf, a->x, c->mod);
     maid_mp_mov(words, ta, buf);
     /* A *= (Y2 - X2) */
     maid_mp_mov(words, buf, b->y);
-    maid_mp_submod(words, buf, b->x, c->p);
-    maid_mp_mulmod(words, ta, buf, c->p);
+    maid_mp_submod(words, buf, b->x, c->mod);
+    maid_mp_mulmod(words, ta, buf, c->mod);
     /* B = (Y1 + X1) */
     maid_mp_mov(words, buf, a->y);
-    maid_mp_addmod(words, buf, a->x, c->p);
+    maid_mp_addmod(words, buf, a->x, c->mod);
     maid_mp_mov(words, tb, buf);
     /* B *= (Y2 + X2) */
     maid_mp_mov(words, buf, b->y);
-    maid_mp_addmod(words, buf, b->x, c->p);
-    maid_mp_mulmod(words, tb, buf, c->p);
+    maid_mp_addmod(words, buf, b->x, c->mod);
+    maid_mp_mulmod(words, tb, buf, c->mod);
     /* C = T1 * 2 * d * T2 */
     maid_mp_mov(words, tc, a->t);
-    maid_mp_addmod(words, tc, a->t, c->p);
-    maid_mp_mulmod(words, tc, c->d, c->p);
-    maid_mp_mulmod(words, tc, b->t, c->p);
+    maid_mp_addmod(words, tc, a->t, c->mod);
+    maid_mp_mulmod(words, tc, c->d, c->mod);
+    maid_mp_mulmod(words, tc, b->t, c->mod);
     /* D = Z1 * 2 * Z2 */
     maid_mp_mov(words, td, a->z);
-    maid_mp_addmod(words, td, a->z, c->p);
-    maid_mp_mulmod(words, td, b->z, c->p);
+    maid_mp_addmod(words, td, a->z, c->mod);
+    maid_mp_mulmod(words, td, b->z, c->mod);
     /* E = B - A */
     maid_mp_mov(words, te, tb);
-    maid_mp_submod(words, te, ta, c->p);
+    maid_mp_submod(words, te, ta, c->mod);
     /* F = D - C */
     maid_mp_mov(words, tf, td);
-    maid_mp_submod(words, tf, tc, c->p);
+    maid_mp_submod(words, tf, tc, c->mod);
     /* G = D + C */
     maid_mp_mov(words, tg, td);
-    maid_mp_addmod(words, tg, tc, c->p);
+    maid_mp_addmod(words, tg, tc, c->mod);
     /* H = B + A */
     maid_mp_mov(words, th, tb);
-    maid_mp_addmod(words, th, ta, c->p);
+    maid_mp_addmod(words, th, ta, c->mod);
     /* X3 = E * F */
     maid_mp_mov(words, a->x, te);
-    maid_mp_mulmod(words, a->x, tf, c->p);
+    maid_mp_mulmod(words, a->x, tf, c->mod);
     /* Y3 = G * H */
     maid_mp_mov(words, a->y, tg);
-    maid_mp_mulmod(words, a->y, th, c->p);
+    maid_mp_mulmod(words, a->y, th, c->mod);
     /* T3 = E * H */
     maid_mp_mov(words, a->t, te);
-    maid_mp_mulmod(words, a->t, th, c->p);
+    maid_mp_mulmod(words, a->t, th, c->mod);
     /* Z3 = F * G */
     maid_mp_mov(words, a->z, tf);
-    maid_mp_mulmod(words, a->z, tg, c->p);
+    maid_mp_mulmod(words, a->z, tg, c->mod);
 
     MAID_CLEAR_MP(ta)
     MAID_CLEAR_MP(tb)
@@ -609,7 +610,8 @@ struct ed25519
     maid_ecc *ecc;
     maid_hash *hash;
     struct maid_ecc_point point;
-    MAID_MP_SCALAR(modulo, 512);
+    maid_mp_mod *mod;
+    maid_mp_word *modf;
     u8 pubenc[32];
 
     /* Used in generation */
@@ -696,9 +698,17 @@ ed25519_new(u8 version, void *pub, void *prv)
         /* Copy curve order (modulo) */
         if (ret)
         {
-            if (!(import_mp(MAID_MP_WORDS(256), ret->modulo,
-                            "10000000000000000000000000000000"
-                            "14def9dea2f79cd65812631a5cf5d3ed")))
+            maid_mp_word c[MAID_MP_WORDS(512)];
+            if (import_mp(MAID_MP_WORDS(512), c,
+                          "00000000000000000000000000000000"
+                          "00000000000000000000000000000000"
+                          "00000000000000000000000000000000"
+                          "14def9dea2f79cd65812631a5cf5d3ed"))
+                ret->mod = maid_mp_mersenne2(MAID_MP_WORDS(512), 252, c, false);
+
+            if (ret->mod)
+                ret->modf = maid_mp_fullmod(ret->mod);
+            else
                 ret = ed25519_del(ret);
         }
     }
@@ -731,7 +741,7 @@ ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
         maid_hash_update(ed->hash, data, size);
         maid_hash_digest(ed->hash, hash);
         maid_mp_read(words * 2, r, hash, false);
-        maid_mp_mod(words * 2, r, ed->modulo);
+        maid_mp_redmod(words * 2, r, ed->mod);
 
         /* First part of the signature (R = rB) */
         maid_ecc_base(ed->ecc, &(ed->point));
@@ -746,11 +756,11 @@ ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
         maid_hash_update(ed->hash, data, size);
         maid_hash_digest(ed->hash, hash);
         maid_mp_read(words * 2, k, hash, false);
-        maid_mp_mod(words * 2, k, ed->modulo);
+        maid_mp_redmod(words * 2, k, ed->mod);
 
         /* Second part of the signature (s = (r + ka) % modulo) */
-        maid_mp_mulmod(words, k, ed->scalar, ed->modulo);
-        maid_mp_addmod(words, k, r, ed->modulo);
+        maid_mp_mulmod(words, k, ed->scalar, ed->mod);
+        maid_mp_addmod(words, k, r, ed->mod);
         maid_mp_write(words, k, &(sign[32]), false);
 
         /* Cleaning up */
@@ -780,7 +790,7 @@ ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
         /* s decoding */
         maid_mp_word s[words];
         maid_mp_read(words, s, &(sign[32]), false);
-        ret &= (maid_mp_cmp(words, s, ed->modulo) > 0);
+        ret &= (maid_mp_cmp(words, s, ed->modf) > 0);
 
         maid_mp_word k[words * 2];
         /* k = SHA512(R public data) % modulo */
@@ -791,7 +801,7 @@ ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
         maid_hash_update(ed->hash, data, size);
         maid_hash_digest(ed->hash, hash);
         maid_mp_read(words * 2, k, hash, false);
-        maid_mp_mod(words * 2, k, ed->modulo);
+        maid_mp_redmod(words * 2, k, ed->mod);
 
         /* point2 = R + kP */
         maid_ecc_copy(ed->ecc, &(ed->point2), &(ed->public));

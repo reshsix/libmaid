@@ -30,6 +30,8 @@ struct poly1305
     MAID_MP_SCALAR(acc, 256);
     MAID_MP_SCALAR(r, 256);
     MAID_MP_SCALAR(s, 256);
+
+    maid_mp_mod *mod;
 };
 
 static void
@@ -74,7 +76,13 @@ poly1305_new(u8 version, const u8 *key)
     struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
 
     if (ret)
-        poly1305_init(ret, key);
+    {
+        ret->mod = maid_mp_mersenne(MAID_MP_WORDS(256), 130, 5, true);
+        if (ret->mod)
+            poly1305_init(ret, key);
+        else
+            ret = poly1305_del(ret);
+    }
 
     return ret;
 }
@@ -95,20 +103,10 @@ poly1305_renew(void *ctx, const u8 *key)
 static void
 poly1305_update(void *ctx, u8 *block, size_t size)
 {
-    /* 2^130 - 5 little endian (256 bits) */
-    static const u8 prime[32] =
-        {0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03};
-
     if (ctx && block)
     {
         struct poly1305 *p = ctx;
         size_t words = MAID_MP_WORDS(256);
-
-        /* Read prime data as number */
-        maid_mp_word pr[words];
-        maid_mp_mov(words, pr, NULL);
-        maid_mp_read(words, pr, prime, false);
 
         /* Read data into buffer (256 bits) */
         u8 buf[32] = {0};
@@ -128,7 +126,7 @@ poly1305_update(void *ctx, u8 *block, size_t size)
         /* Multiplies accumulator by r */
         maid_mp_mul(words, p->acc, p->r);
         /* Reduction by prime */
-        maid_mp_mod(words, p->acc, pr);
+        maid_mp_redmod(words, p->acc, p->mod);
     }
 }
 
@@ -148,11 +146,11 @@ poly1305_digest(void *ctx, u8 *output)
 
 const struct maid_mac_def maid_poly1305 =
 {
-    .new = poly1305_new,
-    .del = poly1305_del,
-    .renew = poly1305_renew,
-    .update = poly1305_update,
-    .digest = poly1305_digest,
-    .state_s = 16,
+    .new      = poly1305_new,
+    .del      = poly1305_del,
+    .renew    = poly1305_renew,
+    .update   = poly1305_update,
+    .digest   = poly1305_digest,
+    .state_s  = 16,
     .digest_s = 16,
 };

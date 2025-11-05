@@ -55,28 +55,30 @@ s8 maid_mp_cmp(size_t words, const maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_mov(size_t words, maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_swap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap);
 
-void maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b);
-void maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b);
-
 void maid_mp_shl(size_t words, maid_mp_word *a, u64 shift);
 void maid_mp_shr(size_t words, maid_mp_word *a, u64 shift);
-
 void maid_mp_sal(size_t words, maid_mp_word *a, u64 shift);
 void maid_mp_sar(size_t words, maid_mp_word *a, u64 shift);
 
+void maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b);
+void maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b);
 void maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b);
-void maid_mp_div(size_t words, maid_mp_word *a, const maid_mp_word *b);
-void maid_mp_mod(size_t words, maid_mp_word *a, const maid_mp_word *b);
-void maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b);
 
+typedef struct maid_mp_mod maid_mp_mod;
+maid_mp_mod *maid_mp_mersenne(size_t words, size_t k,
+                              maid_mp_word c, bool minus);
+maid_mp_mod *maid_mp_mersenne2(size_t words, size_t k,
+                               const maid_mp_word *c, bool minus);
+maid_mp_word *maid_mp_fullmod(const maid_mp_mod *mod);
+void maid_mp_redmod(size_t words, maid_mp_word *a, const maid_mp_mod *mod);
 void maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod);
+                    const maid_mp_mod *mod);
 void maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod);
+                    const maid_mp_mod *mod);
 void maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod);
-bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod);
+                    const maid_mp_mod *mod);
+bool maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_mod *mod);
 void maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-                    const maid_mp_word *mod);
+                    const maid_mp_mod *mod);
 
 #endif

@@ -202,62 +202,6 @@ maid_mp_swap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap)
 }
 
 extern void
-maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
-{
-    if (words && a)
-    {
-        volatile u8 carry = 0;
-
-        for (size_t i = 0; i < words; i++)
-        {
-            #if defined(__x86_64__) || defined(_M_X64)
-            carry = _addcarry_u64(carry, a[i], b ? b[i] : 0,
-                                  (unsigned long long *)&(a[i]));
-            #else
-            volatile maid_mp_word val = (b ? b[i] : 0);
-
-            a[i] += val;
-            a[i] += carry;
-            carry = (carry) ? (a[i] <= val) : (a[i] < val);
-
-            val = 0;
-            #endif
-        }
-
-        carry = 0;
-    }
-}
-
-extern void
-maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b)
-{
-    if (words && a)
-    {
-        volatile u8 borrow = 0;
-
-        for (size_t i = 0; i < words; i++)
-        {
-            #if defined(__x86_64__) || defined(_M_X64)
-            borrow = _subborrow_u64(borrow, a[i], b ? b[i] : 0,
-                                    (unsigned long long *)&(a[i]));
-            #else
-            volatile maid_mp_word org = a[i];
-            volatile maid_mp_word val = (b ? b[i] : 0);
-
-            a[i] -= val;
-            a[i] -= borrow;
-            borrow = (borrow) ? (a[i] >= org) : (a[i] > org);
-
-            org = 0;
-            val = 0;
-            #endif
-        }
-
-        borrow = 0;
-    }
-}
-
-extern void
 maid_mp_shl(size_t words, maid_mp_word *a, size_t shift)
 {
     if (words && a)
@@ -330,6 +274,62 @@ maid_mp_sar(size_t words, maid_mp_word *a, size_t shift)
         maid_mem_clear(x, sizeof(x));
 
         fill = 0x0;
+    }
+}
+
+extern void
+maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
+{
+    if (words && a)
+    {
+        volatile u8 carry = 0;
+
+        for (size_t i = 0; i < words; i++)
+        {
+            #if defined(__x86_64__) || defined(_M_X64)
+            carry = _addcarry_u64(carry, a[i], b ? b[i] : 0,
+                                  (unsigned long long *)&(a[i]));
+            #else
+            volatile maid_mp_word val = (b ? b[i] : 0);
+
+            a[i] += val;
+            a[i] += carry;
+            carry = (carry) ? (a[i] <= val) : (a[i] < val);
+
+            val = 0;
+            #endif
+        }
+
+        carry = 0;
+    }
+}
+
+extern void
+maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b)
+{
+    if (words && a)
+    {
+        volatile u8 borrow = 0;
+
+        for (size_t i = 0; i < words; i++)
+        {
+            #if defined(__x86_64__) || defined(_M_X64)
+            borrow = _subborrow_u64(borrow, a[i], b ? b[i] : 0,
+                                    (unsigned long long *)&(a[i]));
+            #else
+            volatile maid_mp_word org = a[i];
+            volatile maid_mp_word val = (b ? b[i] : 0);
+
+            a[i] -= val;
+            a[i] -= borrow;
+            borrow = (borrow) ? (a[i] >= org) : (a[i] > org);
+
+            org = 0;
+            val = 0;
+            #endif
+        }
+
+        borrow = 0;
     }
 }
 
@@ -434,132 +434,168 @@ maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b)
     maid_mp_mul_long(words, a, b, false);
 }
 
-extern void
-maid_mp_div(size_t words, maid_mp_word *a, const maid_mp_word *b)
+struct maid_mp_mod
 {
-    if (words && a)
+    size_t words;
+
+    size_t k;
+    maid_mp_word *c;
+    size_t cs;
+    bool minus;
+
+    maid_mp_word *full;
+};
+
+extern struct maid_mp_mod *
+maid_mp_mersenne(size_t words, size_t k, maid_mp_word c, bool minus)
+{
+    struct maid_mp_mod *ret = calloc(1, sizeof(struct maid_mp_mod));
+
+    if (ret)
     {
-        MAID_ALLOC_MP(tmp,  1)
-        MAID_ALLOC_MP(tmp2, 1)
+        ret->words = words * 2;
+        ret->cs    = 1;
 
-        maid_mp_mov(words, tmp, a);
-        maid_mp_mov(words, a, NULL);
-
-        for (size_t i = 0; i < words * maid_mp_bits; i++)
+        ret->c    = calloc(ret->words, sizeof(maid_mp_word));
+        ret->full = calloc(ret->words, sizeof(maid_mp_word));
+        if (ret->c && ret->full)
         {
-            size_t ii = (words * maid_mp_bits) - i - 1;
+            ret->k     = k;
+            ret->c[0]  = c;
+            ret->minus = minus;
 
+            ret->full[k / maid_mp_bits] = 1ULL << (k % maid_mp_bits);
+            if (minus)
+                maid_mp_sub(ret->words, ret->full, ret->c);
+            else
+                maid_mp_add(ret->words, ret->full, ret->c);
+        }
+        else
+        {
+            free(ret->c);
+            free(ret->full);
+            free(ret);
+            ret = NULL;
+        }
+    }
+
+    return ret;
+}
+
+extern struct maid_mp_mod *
+maid_mp_mersenne2(size_t words, size_t k, const maid_mp_word *c, bool minus)
+{
+    struct maid_mp_mod *ret = NULL;
+    if (c)
+        ret = calloc(1, sizeof(struct maid_mp_mod));
+
+    if (ret)
+    {
+        ret->words = words * 2;
+        ret->cs    = ret->words;
+        while (ret->cs)
+        {
+            if (c[ret->cs - 1] == 0)
+                ret->cs--;
+            else
+                break;
+        }
+
+        ret->c    = calloc(ret->words, sizeof(maid_mp_word));
+        ret->full = calloc(ret->words, sizeof(maid_mp_word));
+        if (ret->c && ret->full)
+        {
+            ret->k = k;
+            maid_mp_mov(ret->words, ret->c, c);
+            ret->minus = minus;
+
+            ret->full[k / maid_mp_bits] = 1ULL << (k % maid_mp_bits);
+            if (minus)
+                maid_mp_sub(ret->words, ret->full, ret->c);
+            else
+                maid_mp_add(ret->words, ret->full, ret->c);
+        }
+        else
+        {
+            free(ret->c);
+            free(ret->full);
+            free(ret);
+            ret = NULL;
+        }
+    }
+
+    return ret;
+}
+
+extern maid_mp_word *
+maid_mp_fullmod(const struct maid_mp_mod *mod)
+{
+    maid_mp_word *ret = NULL;
+
+    if (mod)
+        ret = mod->full;
+
+    return ret;
+}
+
+extern void
+maid_mp_redmod(size_t words, maid_mp_word *a, const struct maid_mp_mod *mod)
+{
+    if (words && a && mod)
+    {
+        size_t words2 = words + mod->cs + 1;
+        maid_mp_word tmp [words2];
+        maid_mp_word tmp2[words2];
+        maid_mp_word tmp3[words2];
+        for (u8 i = 0; i < ((mod->minus) ? 2 : 4); i++)
+        {
+            maid_mem_clear(tmp,  sizeof(tmp));
+            maid_mem_clear(tmp2, sizeof(tmp2));
+            maid_mem_clear(tmp3, sizeof(tmp3));
+
+            /* Low part mask */
+            tmp[mod->k / maid_mp_bits] |= 1ULL << (mod->k % maid_mp_bits);
+            tmp2[0] = 1;
+            maid_mp_sub(words, tmp, tmp2);
+
+            /* High part mask */
             maid_mp_mov(words, tmp2, tmp);
-            maid_mp_shr(words, tmp2, ii);
+            maid_mp_not(words, tmp2);
 
-            volatile bool sub = true;
-            if (b)
-            {
-                sub = (maid_mp_cmp(words, b, tmp2) >= 0);
-                maid_mp_mov(words, tmp2, b);
-            }
+            /* Masking */
+            maid_mp_and(words, tmp,  a);
+            maid_mp_and(words, tmp2, a);
+            maid_mp_shr(words, tmp2, mod->k);
+
+            /* Folding */
+            maid_mp_mul(words, tmp2, mod->c);
+            if (mod->minus)
+                maid_mp_add(words, tmp2, tmp);
             else
             {
-                /* Does the same stuff, except with b = 1 */
-                volatile bool none = false;
-                for (size_t j = 0; j < words; j++)
-                {
-                    size_t jj = words - j - 1;
-                    if (tmp2[jj] < ((jj == 0) ? 0x01 : 0x00))
-                    {
-                        if (sub)
-                            sub = false;
-                        else
-                            none = false;
-                    }
-                }
-                (void)none;
-
-                for (size_t j = 0; j < words; j++)
-                    tmp2[j] = (j == 0) ? 0x01 : 0x00;
+                maid_mp_mov(words, tmp3, mod->full);
+                maid_mp_sub(words, tmp3, tmp);
+                maid_mp_add(words, tmp2, tmp3);
             }
-
-            maid_mp_shl(words, tmp2, ii);
-            maid_mp_sub(words, tmp, (sub) ? tmp2 : NULL);
-
-            size_t c = ii / maid_mp_bits;
-            u8     d = ii % maid_mp_bits;
-
-            volatile maid_mp_word value = (sub) ? (1ULL << d) : 0;
-            a[c] |= value;
-            value = 0;
-
-            sub = false;
+            maid_mp_mov(words, a, tmp2);
         }
 
-        MAID_CLEAR_MP(tmp)
-        MAID_CLEAR_MP(tmp2)
-    }
-}
+        /* Correction */
+        maid_mp_mov(words2, tmp, NULL);
+        maid_mp_mov(words, tmp, mod->full);
 
-extern void
-maid_mp_mod(size_t words, maid_mp_word *a, const maid_mp_word *b)
-{
-    if (words && a)
-    {
-        MAID_ALLOC_MP(tmp, 1)
-
-        maid_mp_mov(words, tmp, a);
-        maid_mp_div(words, tmp, b);
-        maid_mp_mul(words, tmp, b);
-        maid_mp_sub(words, a, tmp);
-
-        MAID_CLEAR_MP(tmp)
-    }
-}
-
-extern void
-maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
-{
-    if (words && a)
-    {
-        MAID_ALLOC_MP(tmp,  1)
-        MAID_ALLOC_MP(tmp2, 1)
-        MAID_ALLOC_MP(tmp3, 1)
-
-        maid_mp_mov(words, tmp, a);
-        maid_mp_mov(words, a, NULL);
-        a[0] = 0x1;
-
-        maid_mp_mov(words, tmp2, NULL);
-
-        volatile size_t msb = 0;
-        volatile bool bit = false;
-
-        for (size_t i = 0; i < words * maid_mp_bits; i++)
+        volatile bool sub = false;
+        for (u8 i = 0; i < 1; i++)
         {
-            size_t c = i / maid_mp_bits;
-            u8     d = i % maid_mp_bits;
-            bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1ULL << d);
-            msb = (bit) ? i : msb;
+            sub = maid_mp_cmp(words2, tmp2, tmp) < 0;
+            maid_mp_swap(words2, tmp2, tmp3, !sub);
+            maid_mp_sub(words2, tmp2, tmp);
+            maid_mp_swap(words2, tmp2, tmp3, !sub);
         }
+        sub = false;
 
-        for (size_t i = 0; i < words * maid_mp_bits; i++)
-        {
-            size_t ii = (words * maid_mp_bits) - i - 1;
-
-            size_t c = ii / maid_mp_bits;
-            u8     d = ii % maid_mp_bits;
-            bit = ((b) ? b[c] : ((c == 0) ? 0x1 : 0x0)) & (1ULL << d);
-
-            maid_mp_mov(words, tmp2, a);
-
-            maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
-            maid_mp_mul(words, a, (i == 0) ? tmp : tmp2);
-            maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
-
-            maid_mp_swap(words, a, tmp3, !bit);
-            maid_mp_mul(words, a, tmp);
-            maid_mp_swap(words, a, tmp3, !bit);
-        }
-
-        msb = 0;
-        bit = false;
+        /* Result */
+        maid_mp_mov(words, a, tmp2);
 
         MAID_CLEAR_MP(tmp)
         MAID_CLEAR_MP(tmp2)
@@ -569,36 +605,29 @@ maid_mp_exp(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
 extern void
 maid_mp_addmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-               const maid_mp_word *mod)
+               const struct maid_mp_mod *mod)
 {
     if (words && a && mod)
     {
-        MAID_ALLOC_MP(a2,   2)
-        MAID_ALLOC_MP(b2,   2)
-        MAID_ALLOC_MP(mod2, 2)
+        MAID_ALLOC_MP(a2, 2)
+        MAID_ALLOC_MP(b2, 2)
 
-        maid_mp_mov(words, a2,   a);
-        maid_mp_mov(words, b2,   b);
-        maid_mp_mov(words, mod2, mod);
-
-        maid_mp_mov(words, &(a2[words]),   NULL);
-        maid_mp_mov(words, &(b2[words]),   NULL);
-        maid_mp_mov(words, &(mod2[words]), NULL);
+        maid_mp_mov(words, a2, a);
+        maid_mp_mov(words, b2, b);
 
         maid_mp_add(words + 1, a2, b2);
 
-        maid_mp_mod(words + 1, a2, mod2);
+        maid_mp_redmod(words + 1, a2, mod);
         maid_mp_mov(words, a, a2);
 
         MAID_CLEAR_MP(a2)
         MAID_CLEAR_MP(b2)
-        MAID_CLEAR_MP(mod2)
     }
 }
 
 extern void
 maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-               const maid_mp_word *mod)
+               const struct maid_mp_mod *mod)
 {
     if (words && a && mod)
     {
@@ -606,8 +635,8 @@ maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
         MAID_ALLOC_MP(buf2, 1)
 
         maid_mp_mov(words, buf, b);
-        maid_mp_mod(words, buf, mod);
-        maid_mp_mov(words, buf2, mod);
+        maid_mp_redmod(words, buf, mod);
+        maid_mp_mov(words, buf2, mod->full);
         maid_mp_sub(words, buf2, buf);
 
         maid_mp_addmod(words, a, buf2, mod);
@@ -619,30 +648,25 @@ maid_mp_submod(size_t words, maid_mp_word *a, const maid_mp_word *b,
 
 extern void
 maid_mp_mulmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-               const maid_mp_word *mod)
+               const struct maid_mp_mod *mod)
 {
     if (words && a && mod)
     {
-        MAID_ALLOC_MP(a2,   2)
-        MAID_ALLOC_MP(b2,   2)
-        MAID_ALLOC_MP(mod2, 2)
+        MAID_ALLOC_MP(a2, 2)
+        MAID_ALLOC_MP(b2, 2)
 
-        maid_mp_mov(words, a2,   a);
-        maid_mp_mov(words, b2,   b);
-        maid_mp_mov(words, mod2, mod);
-
-        maid_mp_mov(words, &(a2[words]),   NULL);
-        maid_mp_mov(words, &(b2[words]),   NULL);
-        maid_mp_mov(words, &(mod2[words]), NULL);
+        maid_mp_mov(words, a2, a);
+        maid_mp_mov(words, b2, b);
+        maid_mp_redmod(words, a2, mod);
+        maid_mp_redmod(words, b2, mod);
 
         maid_mp_mul_long(words * 2, a2, b2, true);
+        maid_mp_redmod(words * 2, a2, mod);
 
-        maid_mp_mod(words * 2, a2, mod2);
         maid_mp_mov(words, a, a2);
 
         MAID_CLEAR_MP(a2)
         MAID_CLEAR_MP(b2)
-        MAID_CLEAR_MP(mod2)
     }
 }
 
@@ -683,13 +707,9 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
             }
         }
 
-        maid_mp_mov(words, &(oa[words]), NULL);
-        maid_mp_mov(words, &(ob[words]), NULL);
         maid_mp_mov(words, oa, a);
         maid_mp_mov(words, ob, b);
 
-        maid_mp_mov(words, &(a2[words]), NULL);
-        maid_mp_mov(words, &(b2[words]), NULL);
         maid_mp_mov(words, a2, a);
         maid_mp_mov(words, b2, b);
         maid_mp_word *x = a;
@@ -697,10 +717,6 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
         a = a2;
         b = b2;
 
-        maid_mp_mov(words * 2, u, NULL);
-        maid_mp_mov(words * 2, v, NULL);
-        maid_mp_mov(words * 2, s, NULL);
-        maid_mp_mov(words * 2, t, NULL);
         u[0] = 0x1;
         t[0] = 0x1;
 
@@ -719,8 +735,8 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
                 maid_mp_add(words * 2, u, (even) ? ob : NULL);
                 maid_mp_sub(words * 2, v, (even) ? oa : NULL);
             }
-            maid_mp_sar(words * 2, u, (even) ? 1 : 0);
-            maid_mp_sar(words * 2, v, (even) ? 1 : 0);
+            maid_mp_sar(words * 2, u, even);
+            maid_mp_sar(words * 2, v, even);
         }
 
         for (size_t i = 0; i < steps * 2; i++)
@@ -731,21 +747,15 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
             bool both   = (((s[0] & 0x1) | (t[0] & 0x1)) == 0);
             bool larger = (cmp < 0);
 
-            maid_mp_sar(words * 2, b, (diff & even) ? 1 : 0);
+            maid_mp_sar(words * 2, b, (diff & even));
             maid_mp_add(words * 2, s, (diff & even & !both) ? ob : NULL);
             maid_mp_sub(words * 2, t, (diff & even & !both) ? oa : NULL);
-            maid_mp_sar(words * 2, s, (diff & even) ? 1 : 0);
-            maid_mp_sar(words * 2, t, (diff & even) ? 1 : 0);
+            maid_mp_sar(words * 2, s, (diff & even));
+            maid_mp_sar(words * 2, t, (diff & even));
 
-            maid_mp_mov(words * 2, tmp, a);
-            maid_mp_mov(words * 2, a, b);
-            maid_mp_mov(words * 2, (diff & !even & larger) ? b : a, tmp);
-            maid_mp_mov(words * 2, tmp, u);
-            maid_mp_mov(words * 2, u, s);
-            maid_mp_mov(words * 2, (diff & !even & larger) ? s : u, tmp);
-            maid_mp_mov(words * 2, tmp, v);
-            maid_mp_mov(words * 2, v, t);
-            maid_mp_mov(words * 2, (diff & !even & larger) ? t : v, tmp);
+            maid_mp_swap(words * 2, a, b, (diff & !even & larger));
+            maid_mp_swap(words * 2, u, s, (diff & !even & larger));
+            maid_mp_swap(words * 2, v, t, (diff & !even & larger));
 
             maid_mp_sub(words * 2, b, (diff & !even & !larger) ? a : NULL);
             maid_mp_sub(words * 2, s, (diff & !even & !larger) ? u : NULL);
@@ -778,7 +788,7 @@ maid_mp_egcd(size_t words, maid_mp_word *a, maid_mp_word *b,
 }
 
 extern bool
-maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
+maid_mp_invmod(size_t words, maid_mp_word *a, const struct maid_mp_mod *mod)
 {
     bool ret = false;
 
@@ -792,7 +802,7 @@ maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
         MAID_ALLOC_MP(gcd, 1)
 
         maid_mp_mov(words, a2, a);
-        maid_mp_mov(words, b, mod);
+        maid_mp_mov(words, b, mod->full);
         maid_mp_egcd(words, a2, b, gcd, (bool*)&xs, (bool*)&ys);
 
         maid_mp_mov(words, b, NULL);
@@ -801,7 +811,7 @@ maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
         {
            ret = true;
            maid_mp_mov(words, a, a2);
-           maid_mp_add(words, a, xs ? mod : NULL);
+           maid_mp_add(words, a, xs ? mod->full : NULL);
         }
 
         xs = false;
@@ -817,7 +827,7 @@ maid_mp_invmod(size_t words, maid_mp_word *a, const maid_mp_word *mod)
 
 extern void
 maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
-               const maid_mp_word *mod)
+               const struct maid_mp_mod *mod)
 {
     if (words && a && mod)
     {
@@ -857,7 +867,7 @@ maid_mp_expmod(size_t words, maid_mp_word *a, const maid_mp_word *b,
             maid_mp_swap(words, a, tmp3, !(msb && ii <= (msb - 1)));
 
             maid_mp_swap(words,  a, tmp3, !bit);
-            maid_mp_mulmod(words, a, tmp,  mod);
+            maid_mp_mulmod(words, a, tmp, mod);
             maid_mp_swap(words,  a, tmp3, !bit);
         }
 

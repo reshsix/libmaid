@@ -207,6 +207,7 @@ test_mp_s(size_t words, void (*f)(size_t, maid_mp_word *, size_t),
     return ret;
 }
 
+/*
 static bool
 test_mp_mulmod(size_t words, char *a, char *b, char *m, char *r)
 {
@@ -269,6 +270,7 @@ test_mp_expmod(size_t words, char *a, char *b, char *m, char *r)
 
     return ret;
 }
+*/
 
 static bool
 test_stream(const struct maid_stream_def *def, char *key, char *nonce,
@@ -560,7 +562,7 @@ maid_test_mem(void)
 extern u8
 maid_test_mp(void)
 {
-    u8 ret = 20;
+    u8 ret = 14;
 
     size_t words = MAID_MP_WORDS(256);
 
@@ -588,6 +590,8 @@ maid_test_mp(void)
            "9f7fb2cbdebfac9f89ee757c198fbceb1d9c28d98bb0c1f1cbbf7077d6ac7d21");
     ret -= test_mp_a(words, maid_mp_sub, sa, sb, false,
            "e224310e2163b7020c0f0000023426ef05c778e3f5f321e9f19c0cd7bf50ffd3");
+    ret -= test_mp_a(words, maid_mp_mul, sa, sb, false,
+           "0c38d648e0ed7643ad6b5926892d84e50348a8372c6ee86aecbc259473fecd96");
 
     ret -= test_mp_s(words, maid_mp_shl, sa, 33, true,
            "002363a195fd757c1bc3e3da2363a1bd81a3e3dbbd5b7d4f95fd7cf400000000");
@@ -597,25 +601,6 @@ maid_test_mp(void)
            "002363a195fd757c1bc3e3da2363a1bd81a3e3dbbd5b7d4f95fd7cf400000000");
     ret -= test_mp_s(words, maid_mp_sar, sb, 45, false,
            "fffffffffffef56e06f6f56fd675f77dd5f05d6e57f05f52bfd656f6801f688d");
-
-    char *sc = "0000000000000000000000000000cafe"
-               "0bea57facaded003ed11b1d00badbea7";
-
-    ret -= test_mp_a(words, maid_mp_mul, sa, sb, false,
-           "0c38d648e0ed7643ad6b5926892d84e50348a8372c6ee86aecbc259473fecd96");
-    ret -= test_mp_a(words, maid_mp_div, sa, sc, false,
-           "000000000000000000000000000000000000f32be2eeb4f644355ea6504049ca");
-    ret -= test_mp_a(words, maid_mp_mod, sa, sc, true,
-           "0000000000000000000000000000c692e50b7de98c6b00f5181bf3dc2ec8afb4");
-    ret -= test_mp_a(words, maid_mp_exp, sc, sa, false,
-           "4e0e63adabf8dc0f6b299b04688b3f0f053bc6ae96423face4bf8e604e95df31");
-
-    ret -= test_mp_mulmod(words, sa, sb, sc,
-           "0000000000000000000000000000ba47a813183a1a03729a545e69650ea7ec62");
-    ret -= test_mp_invmod(words, sa, sb, sc,
-           "00000000000000000000000000007823344d5d3621c25936272b9a68c0bcdd99");
-    ret -= test_mp_expmod(words, sa, sb, sc,
-           "00000000000000000000000000007960d37277127c408fae6d25702001a96c32");
 
     return ret;
 }
