@@ -48,7 +48,7 @@ $(FOLDERS):
 OBJS = crypto/chacha.o crypto/poly1305.o \
        crypto/hmac.o crypto/sha.o crypto/blake2.o \
 	   crypto/hkdf.o crypto/ed25519.o crypto/x25519.o \
-       mem.o mp.o stream.o mac.o aead.o rng.o hash.o kdf.o \
+       mem.o mp.o ff.o stream.o mac.o aead.o rng.o hash.o kdf.o \
 	   ecc.o sign.o kex.o test.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)

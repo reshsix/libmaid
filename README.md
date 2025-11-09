@@ -45,6 +45,7 @@ available
 | [Type aliases](docs/types.md)       |
 | [Memory utils](docs/mem.md)         |
 | [Multiprecision](docs/mp.md)        |
+| [Finite fields](docs/ff.md)         |
 |                                     |
 | [Stream ciphers](docs/stream.md)    |
 | [MACs](docs/mac.md)                 |

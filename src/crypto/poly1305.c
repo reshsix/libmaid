@@ -18,8 +18,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/mem.h>
+#include <maid/ff.h>
 #include <maid/mp.h>
+#include <maid/mem.h>
 #include <maid/mac.h>
 
 /* Maid MAC definition */
@@ -31,7 +32,7 @@ struct poly1305
     MAID_MP_SCALAR(r, 256);
     MAID_MP_SCALAR(s, 256);
 
-    maid_mp_mod *mod;
+    maid_ff *ff;
 };
 
 static void
@@ -62,7 +63,11 @@ static void *
 poly1305_del(void *ctx)
 {
     if (ctx)
-        maid_mem_clear(ctx, sizeof(struct poly1305));
+    {
+        struct poly1305 *p = ctx;
+        maid_ff_del(p->ff);
+        maid_mem_clear(p, sizeof(struct poly1305));
+    }
     free(ctx);
 
     return NULL;
@@ -77,8 +82,8 @@ poly1305_new(u8 version, const u8 *key)
 
     if (ret)
     {
-        ret->mod = maid_mp_mersenne(MAID_MP_WORDS(256), 130, 5, true);
-        if (ret->mod)
+        ret->ff = maid_ff_new(MAID_FF_1305);
+        if (ret->ff)
             poly1305_init(ret, key);
         else
             ret = poly1305_del(ret);
@@ -96,7 +101,7 @@ poly1305_renew(void *ctx, const u8 *key)
         if (key)
             poly1305_init(p, key);
 
-        maid_mem_clear(p->acc, MAID_MP_BYTES(256));
+        maid_mem_clear(p->acc, MAID_MP_BYTES(MAID_MP_WORDS(256)));
     }
 }
 
@@ -126,7 +131,7 @@ poly1305_update(void *ctx, u8 *block, size_t size)
         /* Multiplies accumulator by r */
         maid_mp_mul(words, p->acc, p->r);
         /* Reduction by prime */
-        maid_mp_redmod(words, p->acc, p->mod);
+        maid_ff_mod(words, p->acc, p->ff);
     }
 }
 
