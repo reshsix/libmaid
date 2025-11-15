@@ -15,8 +15,8 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_TYPES_H
-#define MAID_TYPES_H
+#ifndef DEF_TYPES_H
+#define DEF_TYPES_H
 
 #include <stddef.h>
 #include <stdint.h>

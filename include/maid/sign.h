@@ -18,18 +18,19 @@
 #ifndef MAID_SIGN_H
 #define MAID_SIGN_H
 
-#include <maid/types.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 /* Internal interface */
 
 struct maid_sign_def
 {
-    void * (*new)(u8, void *, void *);
+    void * (*new)(uint8_t, void *, void *);
     void * (*del)(void *);
     size_t (*size)(void *);
-    bool (*generate)(void *, const u8 *, size_t, u8 *);
-    bool (*verify)(void *, const u8 *, size_t, const u8 *);
-    u8 version;
+    bool (*generate)(void *, const uint8_t *, size_t, uint8_t *);
+    bool (*verify)(void *, const uint8_t *, size_t, const uint8_t *);
+    uint8_t version;
 };
 
 /* External interface */
@@ -39,9 +40,10 @@ maid_sign *maid_sign_new(const struct maid_sign_def *def,
                          void *pub, void *priv);
 maid_sign *maid_sign_del(maid_sign *s);
 size_t maid_sign_size(maid_sign *s);
-bool maid_sign_generate(maid_sign *s, const u8 *data, size_t size, u8 *sign);
-bool maid_sign_verify(maid_sign *s,
-                      const u8 *data, size_t size, const u8 *sign);
+bool maid_sign_generate(maid_sign *s, const uint8_t *data,
+                        size_t size, uint8_t *sign);
+bool maid_sign_verify(maid_sign *s, const uint8_t *data,
+                      size_t size, const uint8_t *sign);
 
 /* External algorithms */
 

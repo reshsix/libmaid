@@ -20,6 +20,8 @@
 
 #include <maid/kex.h>
 
+#include <internal/types.h>
+
 struct maid_kex
 {
     const struct maid_kex_def *def;

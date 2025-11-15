@@ -18,8 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/mem.h>
 #include <maid/kdf.h>
+#include <maid/mem.h>
+
+#include <internal/types.h>
 
 struct maid_kdf
 {
@@ -28,11 +30,11 @@ struct maid_kdf
 };
 
 extern struct maid_kdf *
-maid_kdf_del(maid_kdf *p)
+maid_kdf_del(maid_kdf *k)
 {
-    if (p)
-        p->def->del(p->ctx);
-    free(p);
+    if (k)
+        k->def->del(k->ctx);
+    free(k);
 
     return NULL;
 }
@@ -57,16 +59,16 @@ maid_kdf_new(const struct maid_kdf_def *def,
 }
 
 extern void
-maid_kdf_renew(struct maid_kdf *p, const void *params)
+maid_kdf_renew(struct maid_kdf *k, const void *params)
 {
-    if (p)
-        p->def->renew(p->ctx, params);
+    if (k)
+        k->def->renew(k->ctx, params);
 }
 
 extern void
-maid_kdf_hash(struct maid_kdf *p, const u8 *data, size_t data_s,
+maid_kdf_hash(struct maid_kdf *k, const u8 *data, size_t data_s,
               const u8 *salt, size_t salt_s, u8 *output)
 {
-    if (p)
-        p->def->hash(p->ctx, data, data_s, salt, salt_s, output);
+    if (k)
+        k->def->hash(k->ctx, data, data_s, salt, salt_s, output);
 }

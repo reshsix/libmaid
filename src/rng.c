@@ -21,6 +21,8 @@
 #include <maid/mem.h>
 #include <maid/rng.h>
 
+#include <internal/types.h>
+
 struct maid_rng
 {
     const struct maid_rng_def *def;

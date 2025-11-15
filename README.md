@@ -42,7 +42,6 @@ available
 
 | Reference                           |
 |:------------------------------------|
-| [Type aliases](docs/types.md)       |
 | [Memory utils](docs/mem.md)         |
 | [Multiprecision](docs/mp.md)        |
 | [Finite fields](docs/ff.md)         |

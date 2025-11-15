@@ -21,6 +21,9 @@
 
 #include <maid/ecc.h>
 
+#include <internal/mp.h>
+#include <internal/types.h>
+
 struct maid_ecc
 {
     const struct maid_ecc_def *def;
@@ -244,7 +247,7 @@ maid_ecc_size(struct maid_ecc *c, size_t *public_s, size_t *private_s)
     return ret;
 }
 
-extern u32
+extern u8
 maid_ecc_flags(struct maid_ecc *c)
 {
     u32 ret = 0;

@@ -18,30 +18,30 @@
 #ifndef MAID_HASH_H
 #define MAID_HASH_H
 
-#include <maid/types.h>
+#include <stdint.h>
 
 /* Internal interface */
 
 struct maid_hash_def
 {
-    void * (*new)(u8);
+    void * (*new)(uint8_t);
     void * (*del)(void *);
     void (*renew)(void *);
-    void (*update)(void *, u8 *, size_t);
-    void (*digest)(void *, u8 *);
+    void (*update)(void *, uint8_t *, size_t);
+    void (*digest)(void *, uint8_t *);
     size_t state_s;
     size_t digest_s;
-    u8 version;
+    uint8_t version;
 };
 
 /* External interface */
 
 typedef struct maid_hash maid_hash;
 maid_hash *maid_hash_new(const struct maid_hash_def *def);
-maid_hash *maid_hash_del(maid_hash *m);
-void maid_hash_renew(maid_hash *m);
-void maid_hash_update(maid_hash *m, const u8 *buffer, size_t size);
-size_t maid_hash_digest(maid_hash *m, u8 *output);
+maid_hash *maid_hash_del(maid_hash *h);
+void maid_hash_renew(maid_hash *h);
+void maid_hash_update(maid_hash *h, const uint8_t *buffer, size_t size);
+size_t maid_hash_digest(maid_hash *h, uint8_t *output);
 
 /* External algorithms */
 
@@ -52,8 +52,8 @@ extern const struct maid_hash_def maid_sha512;
 extern const struct maid_hash_def maid_sha512_224;
 extern const struct maid_hash_def maid_sha512_256;
 
-struct maid_hash_def maid_blake2s(u8 digest_s);
-struct maid_hash_def maid_blake2b(u8 digest_s);
+struct maid_hash_def maid_blake2s(uint8_t digest_s);
+struct maid_hash_def maid_blake2b(uint8_t digest_s);
 extern const struct maid_hash_def maid_blake2s_128;
 extern const struct maid_hash_def maid_blake2s_160;
 extern const struct maid_hash_def maid_blake2s_224;

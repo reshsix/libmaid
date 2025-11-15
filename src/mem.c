@@ -17,9 +17,9 @@
 
 #include <string.h>
 
-#include <maid/types.h>
-
 #include <maid/mem.h>
+
+#include <internal/types.h>
 
 extern u64
 maid_mem_read(const void *addr, size_t index, size_t size, bool big)

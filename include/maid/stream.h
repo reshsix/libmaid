@@ -18,31 +18,31 @@
 #ifndef MAID_STREAM_H
 #define MAID_STREAM_H
 
-#include <maid/types.h>
+#include <stdint.h>
 
 /* Internal interface */
 
 struct maid_stream_def
 {
-    void * (*new)(u8, const u8 *, const u8 *, const u64);
+    void * (*new)(uint8_t, const uint8_t *, const uint8_t *, const uint64_t);
     void * (*del)(void *);
-    void (*renew)(void *, const u8 *, const u8 *, const u64);
-    void (*generate)(void *, u8 *);
+    void (*renew)(void *, const uint8_t *, const uint8_t *, const uint64_t);
+    void (*generate)(void *, uint8_t *);
     size_t state_s;
-    u8 version;
+    uint8_t version;
 };
 
 /* External interface */
 
 typedef struct maid_stream maid_stream;
 maid_stream *maid_stream_new(const struct maid_stream_def *def,
-                             const u8 *restrict key,
-                             const u8 *restrict nonce,
-                             u64 counter);
+                             const uint8_t *restrict key,
+                             const uint8_t *restrict nonce,
+                             uint64_t counter);
 maid_stream *maid_stream_del(maid_stream *st);
-void maid_stream_renew(maid_stream *st, const u8 *restrict key,
-                       const u8 *restrict nonce, u64 counter);
-void maid_stream_xor(maid_stream *st, u8 *buffer, size_t size);
+void maid_stream_renew(maid_stream *st, const uint8_t *restrict key,
+                       const uint8_t *restrict nonce, uint64_t counter);
+void maid_stream_xor(maid_stream *st, uint8_t *buffer, size_t size);
 
 /* External algorithms */
 

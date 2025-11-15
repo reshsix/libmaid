@@ -15,33 +15,24 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_RNG_H
-#define MAID_RNG_H
+#ifndef DEF_MP_H
+#define DEF_MP_H
 
-#include <stdint.h>
+#define MAID_MP_ALLOC(name, length) \
+    maid_mp_word name[words * length]; \
+    maid_mp_mov(words * length, name, NULL);
+#define MAID_MP_CLEAR(name) \
+    maid_mem_clear(name, sizeof(name));
 
-/* Internal interface */
-
-struct maid_rng_def
-{
-    void * (*new)(uint8_t, const uint8_t *);
-    void * (*del)(void *);
-    void (*renew)(void *, const uint8_t *);
-    void (*generate)(void *, uint8_t *);
-    size_t state_s;
-    uint8_t version;
-};
-
-/* External interface */
-
-typedef struct maid_rng maid_rng;
-maid_rng *maid_rng_new(const struct maid_rng_def *def, const uint8_t *entropy);
-maid_rng *maid_rng_del(maid_rng *g);
-void maid_rng_renew(maid_rng *g, const uint8_t *entropy);
-void maid_rng_generate(maid_rng *g, uint8_t *buffer, size_t size);
-
-/* External algorithms */
-
-extern const struct maid_rng_def maid_chacha20_rng;
+#define MAID_MP_WORDS(bits) \
+    (((bits) + (sizeof(maid_mp_word) * 8) - 1) / (sizeof(maid_mp_word) * 8))
+#define MAID_MP_BITS(words) \
+    (sizeof(maid_mp_word) * 8 * (words))
+#define MAID_MP_BYTES(words) \
+    (sizeof(maid_mp_word) * (words))
+#define MAID_MP_SCALAR(name, bits) \
+    maid_mp_word name[MAID_MP_WORDS(bits)]
+#define MAID_MP_MAX \
+    ((maid_mp_word)(-1))
 
 #endif

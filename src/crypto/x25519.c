@@ -21,12 +21,14 @@
 
 #include <maid/ff.h>
 #include <maid/mp.h>
+#include <maid/ecc.h>
+#include <maid/kex.h>
 #include <maid/mem.h>
 #include <maid/hash.h>
-
-#include <maid/ecc.h>
 #include <maid/sign.h>
-#include <maid/kex.h>
+
+#include <internal/mp.h>
+#include <internal/types.h>
 
 /* Curve25519 curve definition */
 
@@ -75,9 +77,9 @@ curve25519_new(void)
 static void *
 curve25519_free(void *ctx, struct maid_ecc_point *p)
 {
-    struct curve25519 *c = ctx;
+    (void)ctx;
 
-    if (ctx && p)
+    if (p)
         maid_mem_clear(p, sizeof(struct maid_ecc_point));
     free(p);
 
@@ -87,13 +89,14 @@ curve25519_free(void *ctx, struct maid_ecc_point *p)
 static void *
 curve25519_alloc(void *ctx)
 {
+    (void)ctx;
     return calloc(1, sizeof(struct maid_ecc_point));
 }
 
 static void
 curve25519_base(void *ctx, struct maid_ecc_point *p)
 {
-    struct curve25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     maid_mp_mov(words, p->x, NULL);
@@ -106,7 +109,7 @@ static void
 curve25519_copy(void *ctx, struct maid_ecc_point *p,
                 const struct maid_ecc_point *q)
 {
-    struct curve25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     if (q)
@@ -126,7 +129,7 @@ static void
 curve25519_swap(void *ctx, struct maid_ecc_point *p,
                 struct maid_ecc_point *q, bool swap)
 {
-    struct curve25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     maid_mp_swap(words, p->x, q->x, swap);
@@ -140,7 +143,7 @@ curve25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 
     struct curve25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
-    MAID_ALLOC_MP(buf, 1)
+    MAID_MP_ALLOC(buf, 1)
 
     maid_mp_mov(words, buf, p->z);
     ret = maid_ff_inv(words, buf, c->ff);
@@ -150,7 +153,7 @@ curve25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
         maid_mp_write(words, buf, buffer, false);
     }
 
-    MAID_CLEAR_MP(buf)
+    MAID_MP_CLEAR(buf)
 
     return ret;
 }
@@ -162,7 +165,7 @@ curve25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
 
     struct curve25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
-    MAID_ALLOC_MP(buf, 1)
+    MAID_MP_ALLOC(buf, 1)
 
     maid_mp_read(words, buf, buffer, false);
     ret = (maid_mp_cmp(words, buf, c->prime) > 0);
@@ -173,7 +176,7 @@ curve25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
         p->z[0] = 1;
     }
 
-    MAID_CLEAR_MP(buf)
+    MAID_MP_CLEAR(buf)
 
     return ret;
 }
@@ -187,10 +190,10 @@ curve25519_cmp(void *ctx, const struct maid_ecc_point *a,
     struct curve25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
 
-    MAID_ALLOC_MP(buf, 1)
-    MAID_ALLOC_MP(buf2, 1)
-    MAID_ALLOC_MP(zi, 1)
-    MAID_ALLOC_MP(zi2, 1)
+    MAID_MP_ALLOC(buf, 1)
+    MAID_MP_ALLOC(buf2, 1)
+    MAID_MP_ALLOC(zi, 1)
+    MAID_MP_ALLOC(zi2, 1)
 
     /* Inverse Z calculation */
     maid_mp_mov(words, zi,  a->z);
@@ -205,10 +208,10 @@ curve25519_cmp(void *ctx, const struct maid_ecc_point *a,
     maid_ff_mul(words, buf2, zi2, c->ff);
     ret &= (maid_mp_cmp(words, buf, buf2) == 0);
 
-    MAID_CLEAR_MP(buf)
-    MAID_CLEAR_MP(buf2)
-    MAID_CLEAR_MP(zi)
-    MAID_CLEAR_MP(zi2)
+    MAID_MP_CLEAR(buf)
+    MAID_MP_CLEAR(buf2)
+    MAID_MP_CLEAR(zi)
+    MAID_MP_CLEAR(zi2)
 
     return ret;
 }
@@ -219,10 +222,10 @@ curve25519_dbl(void *ctx, struct maid_ecc_point *a)
     struct curve25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
 
-    MAID_ALLOC_MP(aa,  1)
-    MAID_ALLOC_MP(bb,  1)
-    MAID_ALLOC_MP(cc,  1)
-    MAID_ALLOC_MP(buf, 1)
+    MAID_MP_ALLOC(aa,  1)
+    MAID_MP_ALLOC(bb,  1)
+    MAID_MP_ALLOC(cc,  1)
+    MAID_MP_ALLOC(buf, 1)
 
     /* AA = (X + Z)^2 */
     maid_mp_mov(words, buf, a->x);
@@ -251,10 +254,10 @@ curve25519_dbl(void *ctx, struct maid_ecc_point *a)
     maid_ff_add(words, a->z, bb, c->ff);
     maid_ff_mul(words, a->z, cc, c->ff);
 
-    MAID_CLEAR_MP(aa)
-    MAID_CLEAR_MP(bb)
-    MAID_CLEAR_MP(cc)
-    MAID_CLEAR_MP(buf)
+    MAID_MP_CLEAR(aa)
+    MAID_MP_CLEAR(bb)
+    MAID_MP_CLEAR(cc)
+    MAID_MP_CLEAR(buf)
 }
 
 static void
@@ -266,9 +269,9 @@ curve25519_add2(void *ctx, struct maid_ecc_point *a,
     size_t words = MAID_MP_WORDS(256);
 
     /* Differential addition, only works with the ladder */
-    MAID_ALLOC_MP(ad,  1)
-    MAID_ALLOC_MP(bc,  1)
-    MAID_ALLOC_MP(buf, 1)
+    MAID_MP_ALLOC(ad,  1)
+    MAID_MP_ALLOC(bc,  1)
+    MAID_MP_ALLOC(buf, 1)
 
     /* AD = (X1 + Z1) * (X2 - Z2) */
     maid_mp_mov(words, ad, a->x);
@@ -298,15 +301,15 @@ curve25519_add2(void *ctx, struct maid_ecc_point *a,
     maid_ff_mul(words, a->z, buf, c->ff);
     maid_ff_mul(words, a->z, buf, c->ff);
 
-    MAID_CLEAR_MP(ad)
-    MAID_CLEAR_MP(bc)
-    MAID_CLEAR_MP(buf)
+    MAID_MP_CLEAR(ad)
+    MAID_MP_CLEAR(bc)
+    MAID_MP_CLEAR(buf)
 }
 
 static size_t
 curve25519_size(void *ctx, size_t *key_s, size_t *point_s)
 {
-    struct curve25519 *c = ctx;
+    (void)ctx;
 
     if (key_s)
         *key_s = 32;
@@ -329,7 +332,7 @@ curve25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 {
     bool ret = true;
 
-    struct curve25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     u8 buffer[32] = {0};
@@ -348,7 +351,7 @@ curve25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 static void
 curve25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
 {
-    struct curve25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     fprintf(stderr, "%s (curve25519)\n", name);

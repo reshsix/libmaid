@@ -18,16 +18,20 @@
 #ifndef MAID_AEAD_H
 #define MAID_AEAD_H
 
-#include <maid/stream.h>
+#include <stdint.h>
+#include <stdbool.h>
+
 #include <maid/mac.h>
+#include <maid/stream.h>
 
 /* Internal interface */
 
 struct maid_aead_def
 {
-    void (*init)(const struct maid_stream_def *, const u8 *, const u8 *,
+    void (*init)(const struct maid_stream_def *,
+                 const uint8_t *, const uint8_t *,
                  maid_stream **, maid_mac **, bool);
-    void (*mode)(maid_stream *, u8 *, size_t);
+    void (*mode)(maid_stream *, uint8_t *, size_t);
 
     const struct maid_stream_def *s_def;
     const struct maid_mac_def *m_def;
@@ -39,15 +43,16 @@ struct maid_aead_def
 
 typedef struct maid_aead maid_aead;
 maid_aead *maid_aead_new(const struct maid_aead_def *def,
-                         const u8 *restrict key,
-                         const u8 *restrict nonce);
+                         const uint8_t *restrict key,
+                         const uint8_t *restrict nonce);
 maid_aead *maid_aead_del(maid_aead *ae);
-void maid_aead_renew(maid_aead *ae, const u8 *restrict key,
-                     const u8 *restrict nonce);
-void maid_aead_update(maid_aead *ae, const u8 *buffer, size_t size);
-void maid_aead_crypt(maid_aead *ae, u8 *buffer,
+void maid_aead_renew(maid_aead *ae,
+                     const uint8_t *restrict key,
+                     const uint8_t *restrict nonce);
+void maid_aead_update(maid_aead *ae, const uint8_t *buffer, size_t size);
+void maid_aead_crypt(maid_aead *ae, uint8_t *buffer,
                      size_t size, bool decrypt);
-void maid_aead_digest(maid_aead *ae, u8 *output);
+void maid_aead_digest(maid_aead *ae, uint8_t *output);
 
 /* External algorithms */
 

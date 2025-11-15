@@ -20,8 +20,11 @@
 
 #include <maid/ff.h>
 #include <maid/mp.h>
-#include <maid/mem.h>
 #include <maid/mac.h>
+#include <maid/mem.h>
+
+#include <internal/mp.h>
+#include <internal/types.h>
 
 /* Maid MAC definition */
 

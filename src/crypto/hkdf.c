@@ -18,11 +18,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/kdf.h>
 #include <maid/mac.h>
 #include <maid/mem.h>
 #include <maid/hash.h>
 
-#include <maid/kdf.h>
+#include <internal/types.h>
 
 /* Maid KDF definition */
 

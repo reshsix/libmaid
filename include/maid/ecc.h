@@ -18,9 +18,11 @@
 #ifndef MAID_ECC_H
 #define MAID_ECC_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #include <maid/mp.h>
 #include <maid/rng.h>
-#include <maid/types.h>
 
 typedef struct maid_ecc maid_ecc;
 typedef struct maid_ecc_point maid_ecc_point;
@@ -47,8 +49,8 @@ struct maid_ecc_def
     void (*copy)(void *, maid_ecc_point *, const maid_ecc_point *);
     void (*swap)(void *, maid_ecc_point *, maid_ecc_point *, bool);
 
-    bool (*encode)(void *, u8 *, const maid_ecc_point *);
-    bool (*decode)(void *, const u8 *, maid_ecc_point *);
+    bool (*encode)(void *, uint8_t *, const maid_ecc_point *);
+    bool (*decode)(void *, const uint8_t *, maid_ecc_point *);
 
     bool (*cmp)(void *, const maid_ecc_point *, const maid_ecc_point *);
     void (*dbl)(void *, maid_ecc_point *);
@@ -57,13 +59,13 @@ struct maid_ecc_def
                  const maid_ecc_point *, const maid_ecc_point *);
 
     size_t (*size)(void *, size_t *, size_t *);
-    bool (*keygen)(void *, u8 *, maid_rng *);
-    bool (*scalar)(void *, const u8 *, maid_mp_word *);
+    bool (*keygen)(void *, uint8_t *, maid_rng *);
+    bool (*scalar)(void *, const uint8_t *, maid_mp_word *);
 
     void (*debug)(void *, const char *, const maid_ecc_point *);
 
     size_t bits;
-    u32 flags;
+    uint8_t flags;
 };
 
 /* External interface */
@@ -79,8 +81,8 @@ void maid_ecc_copy(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 void maid_ecc_swap(maid_ecc *c, maid_ecc_point *p,
                    maid_ecc_point *q, bool swap);
 
-bool maid_ecc_encode(maid_ecc *c, u8 *buffer, const maid_ecc_point *p);
-bool maid_ecc_decode(maid_ecc *c, const u8 *buffer, maid_ecc_point *p);
+bool maid_ecc_encode(maid_ecc *c, uint8_t *buffer, const maid_ecc_point *p);
+bool maid_ecc_decode(maid_ecc *c, const uint8_t *buffer, maid_ecc_point *p);
 
 bool maid_ecc_cmp(maid_ecc *c, const maid_ecc_point *p,
                                const maid_ecc_point *q);
@@ -90,11 +92,11 @@ void maid_ecc_mul(maid_ecc *c, maid_ecc_point *p,
                   const maid_mp_word *s);
 
 size_t maid_ecc_size(maid_ecc *c, size_t *key_s, size_t *point_s);
-u32 maid_ecc_flags(maid_ecc *c);
+uint8_t maid_ecc_flags(maid_ecc *c);
 
-bool maid_ecc_keygen(maid_ecc *c, u8 *private, maid_rng *g);
-bool maid_ecc_pubgen(maid_ecc *c, const u8 *private, u8 *public);
-bool maid_ecc_scalar(maid_ecc *c, const u8 *private, maid_mp_word *s);
+bool maid_ecc_keygen(maid_ecc *c, uint8_t *private, maid_rng *g);
+bool maid_ecc_pubgen(maid_ecc *c, const uint8_t *private, uint8_t *public);
+bool maid_ecc_scalar(maid_ecc *c, const uint8_t *private, maid_mp_word *s);
 
 void maid_ecc_debug(maid_ecc *c, const char *name, const maid_ecc_point *a);
 

@@ -21,11 +21,13 @@
 
 #include <maid/ff.h>
 #include <maid/mp.h>
+#include <maid/ecc.h>
 #include <maid/mem.h>
 #include <maid/hash.h>
-
-#include <maid/ecc.h>
 #include <maid/sign.h>
+
+#include <internal/mp.h>
+#include <internal/types.h>
 
 static bool
 import_mp(size_t words, maid_mp_word *output, const char *input)
@@ -121,6 +123,7 @@ edwards25519_free(void *ctx, struct maid_ecc_point *p)
 static void *
 edwards25519_alloc(void *ctx)
 {
+    (void)ctx;
     return calloc(1, sizeof(struct maid_ecc_point));
 }
 
@@ -144,7 +147,7 @@ static void
 edwards25519_copy(void *ctx, struct maid_ecc_point *p,
                   const struct maid_ecc_point *q)
 {
-    struct edwards25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     if (q)
@@ -169,7 +172,7 @@ static void
 edwards25519_swap(void *ctx, struct maid_ecc_point *p,
                   struct maid_ecc_point *q, bool swap)
 {
-    struct edwards25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     maid_mp_swap(words, p->x, q->x, swap);
@@ -185,15 +188,15 @@ edwards25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
 
     struct edwards25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
-    MAID_ALLOC_MP(buf, 1)
+    MAID_MP_ALLOC(buf, 1)
 
     /* buf = Z^-1 */
     maid_mp_mov(words, buf, p->z);
     ret = maid_ff_inv(words, buf, c->ff);
     if (ret)
     {
-        MAID_ALLOC_MP(x, 1)
-        MAID_ALLOC_MP(y, 1)
+        MAID_MP_ALLOC(x, 1)
+        MAID_MP_ALLOC(y, 1)
 
         /* x = X * Z^-1 mod p */
         maid_mp_mov(words, x, p->x);
@@ -205,11 +208,11 @@ edwards25519_encode(void *ctx, u8 *buffer, const struct maid_ecc_point *p)
         maid_mp_write(words, y, buffer, false);
         buffer[31] |= (x[0] & 1) << 7;
 
-        MAID_CLEAR_MP(x)
-        MAID_CLEAR_MP(y)
+        MAID_MP_CLEAR(x)
+        MAID_MP_CLEAR(y)
     }
 
-    MAID_CLEAR_MP(buf)
+    MAID_MP_CLEAR(buf)
 
     return ret;
 }
@@ -221,7 +224,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
 
     struct edwards25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
-    MAID_ALLOC_MP(y, 1)
+    MAID_MP_ALLOC(y, 1)
 
     size_t xi = words - 1;
     size_t xj = (1ULL << ((sizeof(maid_mp_word) * 8) - 1));
@@ -234,10 +237,10 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
 
     if (ret)
     {
-        MAID_ALLOC_MP(u, 1)
-        MAID_ALLOC_MP(v, 1)
-        MAID_ALLOC_MP(x, 1)
-        MAID_ALLOC_MP(buf, 1)
+        MAID_MP_ALLOC(u, 1)
+        MAID_MP_ALLOC(v, 1)
+        MAID_MP_ALLOC(x, 1)
+        MAID_MP_ALLOC(buf, 1)
 
         buf[0] = 1;
         /* u = y^2 - 1 */
@@ -282,7 +285,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                 /* xI might be */
                 if (maid_mp_cmp(words, buf, v) == 0)
                 {
-                    MAID_ALLOC_MP(I, 1)
+                    MAID_MP_ALLOC(I, 1)
 
                     /* I = 2 ^ ((p - 1)/4) */
                     I[0] = 1;
@@ -295,7 +298,7 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
                     /* x *= I */
                     maid_ff_mul(words, x, I, c->ff);
 
-                    MAID_CLEAR_MP(I)
+                    MAID_MP_CLEAR(I)
                 }
                 else
                     ret = false;
@@ -330,14 +333,14 @@ edwards25519_decode(void *ctx, const u8 *buffer, struct maid_ecc_point *p)
             maid_ff_mul(words, p->t, y, c->ff);
         }
 
-        MAID_CLEAR_MP(u)
-        MAID_CLEAR_MP(v)
-        MAID_CLEAR_MP(x)
-        MAID_CLEAR_MP(buf)
+        MAID_MP_CLEAR(u)
+        MAID_MP_CLEAR(v)
+        MAID_MP_CLEAR(x)
+        MAID_MP_CLEAR(buf)
     }
 
     xp = false;
-    MAID_CLEAR_MP(y)
+    MAID_MP_CLEAR(y)
 
     return ret;
 }
@@ -351,10 +354,10 @@ edwards25519_cmp(void *ctx, const struct maid_ecc_point *a,
     struct edwards25519 *c = ctx;
     size_t words = MAID_MP_WORDS(256);
 
-    MAID_ALLOC_MP(buf, 1)
-    MAID_ALLOC_MP(buf2, 1)
-    MAID_ALLOC_MP(zi, 1)
-    MAID_ALLOC_MP(zi2, 1)
+    MAID_MP_ALLOC(buf, 1)
+    MAID_MP_ALLOC(buf2, 1)
+    MAID_MP_ALLOC(zi, 1)
+    MAID_MP_ALLOC(zi2, 1)
 
     /* Inverse Z calculation */
     maid_mp_mov(words, zi,  a->z);
@@ -376,10 +379,10 @@ edwards25519_cmp(void *ctx, const struct maid_ecc_point *a,
     maid_ff_mul(words, buf2, zi2, c->ff);
     ret &= (maid_mp_cmp(words, buf, buf2) == 0);
 
-    MAID_CLEAR_MP(buf)
-    MAID_CLEAR_MP(buf2)
-    MAID_CLEAR_MP(zi)
-    MAID_CLEAR_MP(zi2)
+    MAID_MP_CLEAR(buf)
+    MAID_MP_CLEAR(buf2)
+    MAID_MP_CLEAR(zi)
+    MAID_MP_CLEAR(zi2)
 
     return ret;
 }
@@ -392,15 +395,15 @@ edwards25519_dbl(void *ctx, struct maid_ecc_point *a)
 
     /* Dbl-2008-hwcd, as recommended by RFC8032 */
 
-    MAID_ALLOC_MP(ta, 1)
-    MAID_ALLOC_MP(tb, 1)
-    MAID_ALLOC_MP(tc, 1)
-    MAID_ALLOC_MP(te, 1)
-    MAID_ALLOC_MP(tf, 1)
-    MAID_ALLOC_MP(tg, 1)
-    MAID_ALLOC_MP(th, 1)
-    MAID_ALLOC_MP(buf,  1)
-    MAID_ALLOC_MP(buf2, 1)
+    MAID_MP_ALLOC(ta, 1)
+    MAID_MP_ALLOC(tb, 1)
+    MAID_MP_ALLOC(tc, 1)
+    MAID_MP_ALLOC(te, 1)
+    MAID_MP_ALLOC(tf, 1)
+    MAID_MP_ALLOC(tg, 1)
+    MAID_MP_ALLOC(th, 1)
+    MAID_MP_ALLOC(buf,  1)
+    MAID_MP_ALLOC(buf2, 1)
 
     /* A = X1^2 */
     maid_mp_mov(words, ta, a->x);
@@ -442,15 +445,15 @@ edwards25519_dbl(void *ctx, struct maid_ecc_point *a)
     maid_mp_mov(words, a->z, tf);
     maid_ff_mul(words, a->z, tg, c->ff);
 
-    MAID_CLEAR_MP(ta)
-    MAID_CLEAR_MP(tb)
-    MAID_CLEAR_MP(tc)
-    MAID_CLEAR_MP(te)
-    MAID_CLEAR_MP(tf)
-    MAID_CLEAR_MP(tg)
-    MAID_CLEAR_MP(th)
-    MAID_CLEAR_MP(buf)
-    MAID_CLEAR_MP(buf2)
+    MAID_MP_CLEAR(ta)
+    MAID_MP_CLEAR(tb)
+    MAID_MP_CLEAR(tc)
+    MAID_MP_CLEAR(te)
+    MAID_MP_CLEAR(tf)
+    MAID_MP_CLEAR(tg)
+    MAID_MP_CLEAR(th)
+    MAID_MP_CLEAR(buf)
+    MAID_MP_CLEAR(buf2)
 }
 
 static void
@@ -462,15 +465,15 @@ edwards25519_add(void *ctx, struct maid_ecc_point *a,
 
     /* Add-2008-hwcd-3, as recommended by RFC8032 */
 
-    MAID_ALLOC_MP(ta, 1)
-    MAID_ALLOC_MP(tb, 1)
-    MAID_ALLOC_MP(tc, 1)
-    MAID_ALLOC_MP(td, 1)
-    MAID_ALLOC_MP(te, 1)
-    MAID_ALLOC_MP(tf, 1)
-    MAID_ALLOC_MP(tg, 1)
-    MAID_ALLOC_MP(th, 1)
-    MAID_ALLOC_MP(buf, 1)
+    MAID_MP_ALLOC(ta, 1)
+    MAID_MP_ALLOC(tb, 1)
+    MAID_MP_ALLOC(tc, 1)
+    MAID_MP_ALLOC(td, 1)
+    MAID_MP_ALLOC(te, 1)
+    MAID_MP_ALLOC(tf, 1)
+    MAID_MP_ALLOC(tg, 1)
+    MAID_MP_ALLOC(th, 1)
+    MAID_MP_ALLOC(buf, 1)
 
     /* A = (Y1 - X1) */
     maid_mp_mov(words, buf, a->y);
@@ -522,25 +525,25 @@ edwards25519_add(void *ctx, struct maid_ecc_point *a,
     maid_mp_mov(words, a->z, tf);
     maid_ff_mul(words, a->z, tg, c->ff);
 
-    MAID_CLEAR_MP(ta)
-    MAID_CLEAR_MP(tb)
-    MAID_CLEAR_MP(tc)
-    MAID_CLEAR_MP(td)
-    MAID_CLEAR_MP(te)
-    MAID_CLEAR_MP(tf)
-    MAID_CLEAR_MP(tg)
-    MAID_CLEAR_MP(th)
-    MAID_CLEAR_MP(buf)
+    MAID_MP_CLEAR(ta)
+    MAID_MP_CLEAR(tb)
+    MAID_MP_CLEAR(tc)
+    MAID_MP_CLEAR(td)
+    MAID_MP_CLEAR(te)
+    MAID_MP_CLEAR(tf)
+    MAID_MP_CLEAR(tg)
+    MAID_MP_CLEAR(th)
+    MAID_MP_CLEAR(buf)
 }
 
 static size_t
 edwards25519_size(void *ctx, size_t *key_s, size_t *point_s)
 {
-    struct edwards25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     if (key_s)
-        *key_s = 34;
+        *key_s = 32;
     if (point_s)
         *point_s = 32;
 
@@ -579,7 +582,7 @@ edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 static void
 edwards25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
 {
-    struct edwards25519 *c = ctx;
+    (void)ctx;
     size_t words = MAID_MP_WORDS(256);
 
     fprintf(stderr, "%s (edwards25519)\n", name);

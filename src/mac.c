@@ -18,8 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/mem.h>
 #include <maid/mac.h>
+#include <maid/mem.h>
+
+#include <internal/types.h>
 
 struct maid_mac
 {

@@ -20,6 +20,8 @@
 
 #include <maid/sign.h>
 
+#include <internal/types.h>
+
 struct maid_sign
 {
     const struct maid_sign_def *def;

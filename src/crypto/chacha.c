@@ -19,10 +19,12 @@
 #include <string.h>
 
 #include <maid/mem.h>
-#include <maid/stream.h>
 #include <maid/mac.h>
-#include <maid/aead.h>
 #include <maid/rng.h>
+#include <maid/aead.h>
+#include <maid/stream.h>
+
+#include <internal/types.h>
 
 /* Chacha20 implementation */
 
@@ -70,6 +72,7 @@ chacha_new(u8 version, const u8 *restrict key,
            const u8 *restrict nonce, u64 counter)
 {
     /* IETF version */
+    (void)version;
 
     struct chacha *ret = calloc(1, sizeof(struct chacha));
 

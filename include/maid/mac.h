@@ -18,34 +18,30 @@
 #ifndef MAID_MAC_H
 #define MAID_MAC_H
 
-#include <maid/types.h>
+#include <stdint.h>
 
 /* Internal interface */
 
 struct maid_mac_def
 {
-    void * (*new)(u8, const u8 *);
+    void * (*new)(uint8_t, const uint8_t *);
     void * (*del)(void *);
-    void (*renew)(void *, const u8 *);
-    void (*update)(void *, u8 *, size_t);
-    void (*digest)(void *, u8 *);
+    void (*renew)(void *, const uint8_t *);
+    void (*update)(void *, uint8_t *, size_t);
+    void (*digest)(void *, uint8_t *);
     size_t state_s;
     size_t digest_s;
-    u8 version;
+    uint8_t version;
 };
-
-/* Internal algorithms */
-
-extern const struct maid_mac_def maid_gcm;
 
 /* External interface */
 
 typedef struct maid_mac maid_mac;
-maid_mac *maid_mac_new(const struct maid_mac_def *def, const u8 *key);
+maid_mac *maid_mac_new(const struct maid_mac_def *def, const uint8_t *key);
 maid_mac *maid_mac_del(maid_mac *m);
-void maid_mac_renew(maid_mac *m, const u8 *key);
-void maid_mac_update(maid_mac *m, const u8 *buffer, size_t size);
-size_t maid_mac_digest(maid_mac *m, u8 *output);
+void maid_mac_renew(maid_mac *m, const uint8_t *key);
+void maid_mac_update(maid_mac *m, const uint8_t *buffer, size_t size);
+size_t maid_mac_digest(maid_mac *m, uint8_t *output);
 
 /* External algorithms */
 
@@ -58,8 +54,8 @@ extern const struct maid_mac_def maid_hmac_sha512;
 extern const struct maid_mac_def maid_hmac_sha512_224;
 extern const struct maid_mac_def maid_hmac_sha512_256;
 
-struct maid_mac_def maid_blake2s_k(u8 digest_s);
-struct maid_mac_def maid_blake2b_k(u8 digest_s);
+struct maid_mac_def maid_blake2s_k(uint8_t digest_s);
+struct maid_mac_def maid_blake2b_k(uint8_t digest_s);
 extern const struct maid_mac_def maid_blake2s_128k;
 extern const struct maid_mac_def maid_blake2s_160k;
 extern const struct maid_mac_def maid_blake2s_224k;

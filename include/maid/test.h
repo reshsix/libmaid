@@ -18,21 +18,21 @@
 #ifndef MAID_TEST_H
 #define MAID_TEST_H
 
-#include <maid/types.h>
+#include <stdint.h>
 
-u8 maid_test_mem(void);
-u8 maid_test_mp(void);
+uint8_t maid_test_mem(void);
+uint8_t maid_test_mp(void);
 
-u8 maid_test_aes_ecb(void);
-u8 maid_test_aes_ctr(void);
-u8 maid_test_aes_gcm(void);
-u8 maid_test_chacha(void);
-u8 maid_test_poly1305(void);
-u8 maid_test_chacha20poly1305(void);
-u8 maid_test_sha2(void);
-u8 maid_test_hmac_sha2(void);
+uint8_t maid_test_aes_ecb(void);
+uint8_t maid_test_aes_ctr(void);
+uint8_t maid_test_aes_gcm(void);
+uint8_t maid_test_chacha(void);
+uint8_t maid_test_poly1305(void);
+uint8_t maid_test_chacha20poly1305(void);
+uint8_t maid_test_sha2(void);
+uint8_t maid_test_hmac_sha2(void);
 
-u8 maid_test_curve25519(void);
-u8 maid_test_edwards25519(void);
+uint8_t maid_test_curve25519(void);
+uint8_t maid_test_edwards25519(void);
 
 #endif

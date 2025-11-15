@@ -18,7 +18,8 @@
 #ifndef MAID_KEX_H
 #define MAID_KEX_H
 
-#include <maid/types.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 /* Internal interface */
 
@@ -26,8 +27,8 @@ struct maid_kex_def
 {
     void * (*new)(void);
     void * (*del)(void *);
-    bool (*pubgen)(void *, const u8 *, u8 *);
-    bool (*secgen)(void *, const u8 *, const u8 *, u8 *);
+    bool (*pubgen)(void *, const uint8_t *, uint8_t *);
+    bool (*secgen)(void *, const uint8_t *, const uint8_t *, uint8_t *);
 };
 
 /* External interface */
@@ -35,9 +36,9 @@ struct maid_kex_def
 typedef struct maid_kex maid_kex;
 maid_kex *maid_kex_new(const struct maid_kex_def *def);
 maid_kex *maid_kex_del(maid_kex *x);
-bool maid_kex_pubgen(maid_kex *x, const u8 *private, u8 *public);
-bool maid_kex_secgen(maid_kex *x, const u8 *private,
-                     const u8 *public, u8 *buffer);
+bool maid_kex_pubgen(maid_kex *x, const uint8_t *private, uint8_t *public);
+bool maid_kex_secgen(maid_kex *x, const uint8_t *private,
+                     const uint8_t *public, uint8_t *buffer);
 
 /* External algorithms */
 

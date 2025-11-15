@@ -21,6 +21,8 @@
 #include <maid/mem.h>
 #include <maid/stream.h>
 
+#include <internal/types.h>
+
 struct maid_stream
 {
     const struct maid_stream_def *def;

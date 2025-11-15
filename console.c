@@ -25,16 +25,17 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include <maid/mem.h>
-
-#include <maid/stream.h>
+#include <maid/ecc.h>
+#include <maid/kex.h>
 #include <maid/mac.h>
+#include <maid/mem.h>
 #include <maid/aead.h>
 #include <maid/hash.h>
-#include <maid/ecc.h>
 #include <maid/sign.h>
-#include <maid/kex.h>
 #include <maid/test.h>
+#include <maid/stream.h>
+
+#include <internal/types.h>
 
 /* Filter functions */
 

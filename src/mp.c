@@ -18,9 +18,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <maid/mp.h>
 #include <maid/mem.h>
 
-#include <maid/mp.h>
+#include <internal/mp.h>
+#include <internal/types.h>
 
 #if defined(__x86_64__) || defined(_M_X64)
 #include <immintrin.h>
@@ -176,8 +178,8 @@ maid_mp_swap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap)
 {
     if (words && a && b)
     {
-        MAID_ALLOC_MP(mask, 1)
-        MAID_ALLOC_MP(tmp,  1)
+        MAID_MP_ALLOC(mask, 1)
+        MAID_MP_ALLOC(tmp,  1)
 
         /* mask = 0 - bit */
         tmp[0] = swap;
@@ -192,8 +194,8 @@ maid_mp_swap(size_t words, maid_mp_word *a, maid_mp_word *b, bool swap)
         maid_mp_xor(words, a, tmp);
         maid_mp_xor(words, b, tmp);
 
-        MAID_CLEAR_MP(mask)
-        MAID_CLEAR_MP(tmp)
+        MAID_MP_CLEAR(mask)
+        MAID_MP_CLEAR(tmp)
     }
 }
 
@@ -334,12 +336,12 @@ maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b)
 {
     if (words && a)
     {
-        MAID_ALLOC_MP(tmp,  1)
-        MAID_ALLOC_MP(tmp2, 1)
+        MAID_MP_ALLOC(tmp,  1)
+        MAID_MP_ALLOC(tmp2, 1)
 
         /* Uses a bit of space to improve calculations */
-        MAID_ALLOC_MP(low,  1)
-        MAID_ALLOC_MP(high, 1)
+        MAID_MP_ALLOC(low,  1)
+        MAID_MP_ALLOC(high, 1)
 
         /* Initializes values */
         maid_mp_mov(words, tmp, a);
@@ -402,10 +404,10 @@ maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b)
             }
         }
 
-        MAID_CLEAR_MP(tmp);
-        MAID_CLEAR_MP(tmp2);
+        MAID_MP_CLEAR(tmp);
+        MAID_MP_CLEAR(tmp2);
 
-        MAID_CLEAR_MP(low);
-        MAID_CLEAR_MP(high);
+        MAID_MP_CLEAR(low);
+        MAID_MP_CLEAR(high);
     }
 }

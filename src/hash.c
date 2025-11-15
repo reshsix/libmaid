@@ -21,6 +21,8 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/types.h>
+
 struct maid_hash
 {
     const struct maid_hash_def *def;
@@ -32,14 +34,14 @@ struct maid_hash
 };
 
 extern struct maid_hash *
-maid_hash_del(maid_hash *m)
+maid_hash_del(maid_hash *h)
 {
-    if (m)
+    if (h)
     {
-        m->def->del(m->ctx);
-        free(m->buffer);
+        h->def->del(h->ctx);
+        free(h->buffer);
     }
-    free(m);
+    free(h);
 
     return NULL;
 }
@@ -65,35 +67,35 @@ maid_hash_new(const struct maid_hash_def *def)
 }
 
 extern void
-maid_hash_renew(struct maid_hash *m)
+maid_hash_renew(struct maid_hash *h)
 {
-    if (m)
+    if (h)
     {
-        m->def->renew(m->ctx);
+        h->def->renew(h->ctx);
 
-        m->buffer_c = 0;
-        m->finished = false;
-        maid_mem_clear(m->buffer, m->def->state_s);
+        h->buffer_c = 0;
+        h->finished = false;
+        maid_mem_clear(h->buffer, h->def->state_s);
     }
 }
 
 extern void
-maid_hash_update(struct maid_hash *m, const u8 *buffer, size_t size)
+maid_hash_update(struct maid_hash *h, const u8 *buffer, size_t size)
 {
-    if (m && buffer && size && !(m->finished))
+    if (h && buffer && size && !(h->finished))
     {
         while (size)
         {
-            u8 empty = m->def->state_s - m->buffer_c;
+            u8 empty = h->def->state_s - h->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
-            memcpy(&(m->buffer[m->buffer_c]), buffer, copy);
-            m->buffer_c += copy;
-            if (m->buffer_c < m->def->state_s)
+            memcpy(&(h->buffer[h->buffer_c]), buffer, copy);
+            h->buffer_c += copy;
+            if (h->buffer_c < h->def->state_s)
                 break;
 
-            m->def->update(m->ctx, m->buffer, m->def->state_s);
-            m->buffer_c = 0;
+            h->def->update(h->ctx, h->buffer, h->def->state_s);
+            h->buffer_c = 0;
 
             buffer = &(buffer[copy]);
             size -= copy;
@@ -102,21 +104,21 @@ maid_hash_update(struct maid_hash *m, const u8 *buffer, size_t size)
 }
 
 extern size_t
-maid_hash_digest(struct maid_hash *m, u8 *output)
+maid_hash_digest(struct maid_hash *h, u8 *output)
 {
     size_t ret = 0;
 
-    if (m && output && !(m->finished))
+    if (h && output && !(h->finished))
     {
-        if (m->buffer_c)
-            m->def->update(m->ctx, m->buffer, m->buffer_c);
+        if (h->buffer_c)
+            h->def->update(h->ctx, h->buffer, h->buffer_c);
 
-        m->def->digest(m->ctx, output);
-        m->buffer_c = 0;
+        h->def->digest(h->ctx, output);
+        h->buffer_c = 0;
 
-        m->finished = true;
+        h->finished = true;
 
-        ret = m->def->digest_s;
+        ret = h->def->digest_s;
     }
 
     return ret;

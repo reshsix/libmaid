@@ -18,10 +18,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/mac.h>
 #include <maid/mem.h>
 #include <maid/hash.h>
 
-#include <maid/mac.h>
+#include <internal/types.h>
 
 /* Maid MAC definition */
 

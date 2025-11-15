@@ -21,6 +21,8 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/types.h>
+
 static u32
 rr32(u32 a, u8 n)
 {

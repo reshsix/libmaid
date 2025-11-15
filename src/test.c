@@ -18,18 +18,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/mem.h>
 #include <maid/mp.h>
-
-#include <maid/stream.h>
-#include <maid/mac.h>
-#include <maid/aead.h>
-#include <maid/rng.h>
-#include <maid/hash.h>
-
 #include <maid/ecc.h>
-#include <maid/sign.h>
 #include <maid/kex.h>
+#include <maid/mac.h>
+#include <maid/mem.h>
+#include <maid/rng.h>
+#include <maid/aead.h>
+#include <maid/hash.h>
+#include <maid/sign.h>
+#include <maid/stream.h>
+
+#include <internal/mp.h>
+#include <internal/types.h>
 
 /* Test macros */
 

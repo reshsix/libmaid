@@ -18,11 +18,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <maid/mem.h>
-#include <maid/stream.h>
 #include <maid/mac.h>
-
+#include <maid/mem.h>
 #include <maid/aead.h>
+#include <maid/stream.h>
+
+#include <internal/types.h>
 
 struct maid_aead
 {

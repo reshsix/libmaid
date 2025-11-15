@@ -18,9 +18,7 @@
 #ifndef MAID_FF_H
 #define MAID_FF_H
 
-#include <maid/types.h>
-
-/* External functions */
+#include <stdbool.h>
 
 #include <maid/mp.h>
 
