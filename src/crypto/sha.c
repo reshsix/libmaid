@@ -21,6 +21,7 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/hash.h>
 #include <internal/types.h>
 
 static u32
@@ -426,7 +427,7 @@ sha_digest(void *ctx, u8 *output)
     }
 }
 
-const struct maid_hash_def maid_sha224 =
+static const struct maid_hash_def sha224_def =
 {
     .new = sha_new,
     .del = sha_del,
@@ -438,7 +439,7 @@ const struct maid_hash_def maid_sha224 =
     .version = SHA_224
 };
 
-const struct maid_hash_def maid_sha256 =
+static const struct maid_hash_def sha256_def =
 {
     .new = sha_new,
     .del = sha_del,
@@ -450,7 +451,7 @@ const struct maid_hash_def maid_sha256 =
     .version = SHA_256
 };
 
-const struct maid_hash_def maid_sha384 =
+static const struct maid_hash_def sha384_def =
 {
     .new = sha_new,
     .del = sha_del,
@@ -462,7 +463,7 @@ const struct maid_hash_def maid_sha384 =
     .version = SHA_384
 };
 
-const struct maid_hash_def maid_sha512 =
+static const struct maid_hash_def sha512_def =
 {
     .new = sha_new,
     .del = sha_del,
@@ -474,7 +475,7 @@ const struct maid_hash_def maid_sha512 =
     .version = SHA_512
 };
 
-const struct maid_hash_def maid_sha512_224 =
+static const struct maid_hash_def sha512_224_def =
 {
     .new = sha_new,
     .del = sha_del,
@@ -486,7 +487,7 @@ const struct maid_hash_def maid_sha512_224 =
     .version = SHA_512_224
 };
 
-const struct maid_hash_def maid_sha512_256 =
+static const struct maid_hash_def sha512_256_def =
 {
     .new = sha_new,
     .del = sha_del,
@@ -497,3 +498,39 @@ const struct maid_hash_def maid_sha512_256 =
     .digest_s = 32,
     .version = SHA_512_256
 };
+
+extern maid_hash *
+maid_sha224(void)
+{
+    return maid_hash_new(&sha224_def);
+}
+
+extern maid_hash *
+maid_sha256(void)
+{
+    return maid_hash_new(&sha256_def);
+}
+
+extern maid_hash *
+maid_sha384(void)
+{
+    return maid_hash_new(&sha384_def);
+}
+
+extern maid_hash *
+maid_sha512(void)
+{
+    return maid_hash_new(&sha512_def);
+}
+
+extern maid_hash *
+maid_sha512_224(void)
+{
+    return maid_hash_new(&sha512_224_def);
+}
+
+extern maid_hash *
+maid_sha512_256(void)
+{
+    return maid_hash_new(&sha512_256_def);
+}

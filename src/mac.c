@@ -21,6 +21,7 @@
 #include <maid/mac.h>
 #include <maid/mem.h>
 
+#include <internal/mac.h>
 #include <internal/types.h>
 
 struct maid_mac

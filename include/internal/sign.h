@@ -15,22 +15,23 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_SIGN_H
-#define MAID_SIGN_H
+#ifndef INTERNAL_SIGN_H
+#define INTERNAL_SIGN_H
 
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct maid_sign maid_sign;
+struct maid_sign_def
+{
+    void * (*new)(uint8_t, uint8_t *, uint8_t *);
+    void * (*del)(void *);
+    size_t (*size)(void *);
+    bool (*generate)(void *, const uint8_t *, size_t, uint8_t *);
+    bool (*verify)(void *, const uint8_t *, size_t, const uint8_t *);
+    uint8_t version;
+};
 
-maid_sign *maid_ed25519(uint8_t *pub, uint8_t *prv);
-maid_sign *maid_sign_del(maid_sign *s);
-
-size_t maid_sign_size(maid_sign *s);
-bool maid_sign_generate(maid_sign *s, const uint8_t *data,
-                        size_t size, uint8_t *sign);
-bool maid_sign_verify(maid_sign *s, const uint8_t *data,
-                      size_t size, const uint8_t *sign);
-
+maid_sign *maid_sign_new(const struct maid_sign_def *def,
+                         uint8_t *pub, uint8_t *prv);
 
 #endif

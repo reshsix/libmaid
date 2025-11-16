@@ -15,8 +15,8 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef DEF_TYPES_H
-#define DEF_TYPES_H
+#ifndef INTERNAL_TYPES_H
+#define INTERNAL_TYPES_H
 
 #include <stddef.h>
 #include <stdint.h>

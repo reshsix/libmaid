@@ -27,6 +27,8 @@
 #include <maid/sign.h>
 
 #include <internal/mp.h>
+#include <internal/ecc.h>
+#include <internal/sign.h>
 #include <internal/types.h>
 
 static bool
@@ -86,7 +88,7 @@ edwards25519_new(void)
 
     if (ret)
     {
-        ret->hash = maid_hash_new(&maid_sha512);
+        ret->hash = maid_sha512();
         ret->ff   = maid_ff_new(MAID_FF_25519);
         if (ret->hash && ret->ff)
             ret->prime = maid_ff_prime(ret->ff);
@@ -592,7 +594,7 @@ edwards25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
     maid_mp_debug(words, "t", a->t);
 }
 
-const struct maid_ecc_def maid_edwards25519 =
+static const struct maid_ecc_def edwards25519_def =
 {
     .new    = edwards25519_new,    .del    = edwards25519_del,
     .alloc  = edwards25519_alloc,  .free   = edwards25519_free,
@@ -605,6 +607,12 @@ const struct maid_ecc_def maid_edwards25519 =
     .debug  = edwards25519_debug,
     .bits   = 256
 };
+
+extern maid_ecc *
+maid_edwards25519(void)
+{
+    return maid_ecc_new(&edwards25519_def);
+}
 
 /* Ed25519 signature definition */
 
@@ -646,7 +654,7 @@ ed25519_del(void *ed25519)
 }
 
 static void *
-ed25519_new(u8 version, void *pub, void *prv)
+ed25519_new(u8 version, u8 *pub, u8 *prv)
 {
     struct ed25519 *ret = calloc(1, sizeof(struct ed25519));
 
@@ -654,8 +662,8 @@ ed25519_new(u8 version, void *pub, void *prv)
     if (ret)
     {
         /* Allocation */
-        ret->ecc  = maid_ecc_new(&maid_edwards25519);
-        ret->hash = maid_hash_new(&maid_sha512);
+        ret->ecc  = maid_edwards25519();
+        ret->hash = maid_sha512();
         if (!(ret->ecc && ret->hash))
             ret = ed25519_del(ret);
 
@@ -667,10 +675,8 @@ ed25519_new(u8 version, void *pub, void *prv)
         /* Private key loading */
         if (ret && prv)
         {
-            u8 *data = prv;
-
             u8 buffer[64] = {0};
-            maid_hash_update(ret->hash, data, 32);
+            maid_hash_update(ret->hash, prv, 32);
             maid_hash_digest(ret->hash, buffer);
             maid_hash_renew(ret->hash);
 
@@ -825,7 +831,7 @@ ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
     return ret;
 }
 
-const struct maid_sign_def maid_ed25519 =
+static const struct maid_sign_def ed25519_def =
 {
     .new      = ed25519_new,
     .del      = ed25519_del,
@@ -834,3 +840,9 @@ const struct maid_sign_def maid_ed25519 =
     .verify   = ed25519_verify,
     .version  = 0
 };
+
+extern maid_sign *
+maid_ed25519(u8 *pub, u8 *prv)
+{
+    return maid_sign_new(&ed25519_def, pub, prv);
+}

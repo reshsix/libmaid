@@ -20,28 +20,12 @@
 
 #include <stdint.h>
 
-/* Internal interface */
-
-struct maid_rng_def
-{
-    void * (*new)(uint8_t, const uint8_t *);
-    void * (*del)(void *);
-    void (*renew)(void *, const uint8_t *);
-    void (*generate)(void *, uint8_t *);
-    size_t state_s;
-    uint8_t version;
-};
-
-/* External interface */
-
 typedef struct maid_rng maid_rng;
-maid_rng *maid_rng_new(const struct maid_rng_def *def, const uint8_t *entropy);
+
+maid_rng *maid_chacha20_rng(const uint8_t *entropy);
 maid_rng *maid_rng_del(maid_rng *g);
+
 void maid_rng_renew(maid_rng *g, const uint8_t *entropy);
 void maid_rng_generate(maid_rng *g, uint8_t *buffer, size_t size);
-
-/* External algorithms */
-
-extern const struct maid_rng_def maid_chacha20_rng;
 
 #endif

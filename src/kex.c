@@ -20,6 +20,7 @@
 
 #include <maid/kex.h>
 
+#include <internal/kex.h>
 #include <internal/types.h>
 
 struct maid_kex
@@ -55,24 +56,24 @@ maid_kex_del(struct maid_kex *x)
 }
 
 extern bool
-maid_kex_pubgen(struct maid_kex *x, const u8 *private, u8 *public)
+maid_kex_pubgen(struct maid_kex *x, const u8 *prv, u8 *pub)
 {
     bool ret = false;
 
-    if (x && private && public)
-        ret = x->def->pubgen(x->context, private, public);
+    if (x && prv && pub)
+        ret = x->def->pubgen(x->context, prv, pub);
 
     return ret;
 }
 
 extern bool
-maid_kex_secgen(struct maid_kex *x, const u8 *private,
-                const u8 *public, u8 *buffer)
+maid_kex_secgen(struct maid_kex *x, const u8 *prv,
+                const u8 *pub, u8 *buffer)
 {
     bool ret = false;
 
-    if (x && private && public && buffer)
-        ret = x->def->secgen(x->context, private, public, buffer);
+    if (x && prv && pub && buffer)
+        ret = x->def->secgen(x->context, prv, pub, buffer);
 
     return ret;
 }

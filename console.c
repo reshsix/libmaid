@@ -431,23 +431,19 @@ stream(int argc, char *argv[])
         u8 key[32] = {0};
         u8  iv[16] = {0};
 
-        size_t key_s = 0;
-        size_t iv_s  = 0;
-
-        const struct maid_stream_def *def_s = NULL;
+        maid_stream *ctx = NULL;
         if (strcmp(argv[1], "chacha20") == 0)
         {
-            key_s  = 32;
-            iv_s   = 16;
-            def_s  = &maid_chacha20;
+            ret = get_data(argv[2], key, 32, false) &&
+                  get_data(argv[3],  iv, 16, false);
+            if (ret)
+                ctx = maid_chacha20(key, iv, 0);
         }
         else
             ret = usage("stream");
 
-        if (ret && get_data(argv[2], key, key_s, false) &&
-                   get_data(argv[3],  iv, iv_s,  false))
+        if (ret)
         {
-            void *ctx = maid_stream_new(def_s, key, iv, 0);
             if (ctx)
                 run_filter(ctx, filter_stream);
             else
@@ -474,92 +470,103 @@ mac(int argc, char *argv[])
     {
         u8 key[128] = {0};
 
-        size_t key_s = 0;
-        const struct maid_mac_def *def = NULL;
-
+        maid_mac *ctx = NULL;
         ret = true;
         if (strcmp(argv[1], "hmac-sha224") == 0)
         {
-            key_s = 64;
-            def   = &maid_hmac_sha224;
+            ret = get_data(argv[2], key, 64, false);
+            if (ret)
+                ctx = maid_hmac_sha224(key);
         }
         else if (strcmp(argv[1], "hmac-sha256") == 0)
         {
-            key_s = 64;
-            def   = &maid_hmac_sha256;
+            ret = get_data(argv[2], key, 64, false);
+            if (ret)
+                ctx = maid_hmac_sha256(key);
         }
         else if (strcmp(argv[1], "hmac-sha384") == 0)
         {
-            key_s = 128;
-            def   = &maid_hmac_sha384;
+            ret = get_data(argv[2], key, 128, false);
+            if (ret)
+                ctx = maid_hmac_sha384(key);
         }
         else if (strcmp(argv[1], "hmac-sha512") == 0)
         {
-            key_s = 128;
-            def   = &maid_hmac_sha512;
+            ret = get_data(argv[2], key, 128, false);
+            if (ret)
+                ctx = maid_hmac_sha512(key);
         }
         else if (strcmp(argv[1], "hmac-sha512-224") == 0)
         {
-            key_s = 128;
-            def   = &maid_hmac_sha512_224;
+            ret = get_data(argv[2], key, 128, false);
+            if (ret)
+                ctx = maid_hmac_sha512_224(key);
         }
         else if (strcmp(argv[1], "hmac-sha512-256") == 0)
         {
-            key_s = 128;
-            def   = &maid_hmac_sha512_256;
+            ret = get_data(argv[2], key, 128, false);
+            if (ret)
+                ctx = maid_hmac_sha512_256(key);
         }
         else if (strcmp(argv[1], "poly1305") == 0)
         {
-            key_s = 32;
-            def   = &maid_poly1305;
+            ret = get_data(argv[2], key, 32, false);
+            if (ret)
+                ctx = maid_poly1305(key);
         }
         else if (strcmp(argv[1], "blake2s-128") == 0)
         {
-            key_s = 32;
-            def   = &maid_blake2s_128k;
+            ret = get_data(argv[2], key, 32, false);
+            if (ret)
+                ctx = maid_blake2s_k(key, 16);
         }
         else if (strcmp(argv[1], "blake2s-160") == 0)
         {
-            key_s = 32;
-            def   = &maid_blake2s_160k;
+            ret = get_data(argv[2], key, 32, false);
+            if (ret)
+                ctx = maid_blake2s_k(key, 20);
         }
         else if (strcmp(argv[1], "blake2s-224") == 0)
         {
-            key_s = 32;
-            def   = &maid_blake2s_224k;
+            ret = get_data(argv[2], key, 32, false);
+            if (ret)
+                ctx = maid_blake2s_k(key, 28);
         }
         else if (strcmp(argv[1], "blake2s-256") == 0)
         {
-            key_s = 32;
-            def   = &maid_blake2s_256k;
+            ret = get_data(argv[2], key, 32, false);
+            if (ret)
+                ctx = maid_blake2s_k(key, 32);
         }
         else if (strcmp(argv[1], "blake2b-160") == 0)
         {
-            key_s = 64;
-            def   = &maid_blake2b_160k;
+            ret = get_data(argv[2], key, 64, false);
+            if (ret)
+                ctx = maid_blake2b_k(key, 20);
         }
         else if (strcmp(argv[1], "blake2b-256") == 0)
         {
-            key_s = 64;
-            def   = &maid_blake2b_256k;
+            ret = get_data(argv[2], key, 64, false);
+            if (ret)
+                ctx = maid_blake2b_k(key, 32);
         }
         else if (strcmp(argv[1], "blake2b-384") == 0)
         {
-            key_s = 64;
-            def   = &maid_blake2b_384k;
+            ret = get_data(argv[2], key, 64, false);
+            if (ret)
+                ctx = maid_blake2b_k(key, 48);
         }
         else if (strcmp(argv[1], "blake2b-512") == 0)
         {
-            key_s = 64;
-            def   = &maid_blake2b_512k;
+            ret = get_data(argv[2], key, 64, false);
+            if (ret)
+                ctx = maid_blake2b_k(key, 64);
         }
         else
             ret = usage("mac");
 
-        if (ret && get_data(argv[2], key, key_s, false))
+        if (ret)
         {
-            maid_mac *ctx = maid_mac_new(def, key);
-
             if (ctx)
                 run_filter(ctx, filter_mac);
             else
@@ -589,21 +596,18 @@ rng(int argc, char *argv[])
 
         u8 entropy[48] = {0};
 
-        size_t entropy_s = 0;
-        const struct maid_rng_def *def = NULL;
-
+        maid_rng *ctx = NULL;
         if (strcmp(argv[1], "chacha20-rng") == 0)
         {
-            entropy_s = 44;
-            def       = &maid_chacha20_rng;
+            ret = get_data(argv[2], entropy, 44, false);
+            if (ret)
+                ctx = maid_chacha20_rng(entropy);
         }
         else
             ret = usage("rng");
 
-        if (ret && get_data(argv[2], entropy, entropy_s, false))
+        if (ret)
         {
-            maid_rng *ctx = maid_rng_new(def, entropy);
-
             if (ctx)
             {
                 u8 buffer[4096] = {0};
@@ -638,43 +642,40 @@ hash(int argc, char *argv[])
     {
         ret = true;
 
-        const struct maid_hash_def *def = NULL;
-
+        maid_hash *ctx = NULL;
         if (strcmp(argv[1], "sha224") == 0)
-            def = &maid_sha224;
+            ctx = maid_sha224();
         else if (strcmp(argv[1], "sha256") == 0)
-            def = &maid_sha256;
+            ctx = maid_sha256();
         else if (strcmp(argv[1], "sha384") == 0)
-            def = &maid_sha384;
+            ctx = maid_sha384();
         else if (strcmp(argv[1], "sha512") == 0)
-            def = &maid_sha512;
+            ctx = maid_sha512();
         else if (strcmp(argv[1], "sha512-224") == 0)
-            def = &maid_sha512_224;
+            ctx = maid_sha512_224();
         else if (strcmp(argv[1], "sha512-256") == 0)
-            def = &maid_sha512_256;
+            ctx = maid_sha512_256();
         else if (strcmp(argv[1], "blake2s-128") == 0)
-            def = &maid_blake2s_128;
+            ctx = maid_blake2s(16);
         else if (strcmp(argv[1], "blake2s-160") == 0)
-            def = &maid_blake2s_160;
+            ctx = maid_blake2s(20);
         else if (strcmp(argv[1], "blake2s-224") == 0)
-            def = &maid_blake2s_224;
+            ctx = maid_blake2s(28);
         else if (strcmp(argv[1], "blake2s-256") == 0)
-            def = &maid_blake2s_256;
+            ctx = maid_blake2s(32);
         else if (strcmp(argv[1], "blake2b-160") == 0)
-            def = &maid_blake2b_160;
+            ctx = maid_blake2b(20);
         else if (strcmp(argv[1], "blake2b-256") == 0)
-            def = &maid_blake2b_256;
+            ctx = maid_blake2b(32);
         else if (strcmp(argv[1], "blake2b-384") == 0)
-            def = &maid_blake2b_384;
+            ctx = maid_blake2b(48);
         else if (strcmp(argv[1], "blake2b-512") == 0)
-            def = &maid_blake2b_512;
+            ctx = maid_blake2b(64);
         else
             ret = usage("hash");
 
         if (ret)
         {
-            maid_hash *ctx = maid_hash_new(def);
-
             if (ctx)
                 run_filter(ctx, filter_hash);
             else
@@ -704,25 +705,22 @@ encrypt_decrypt(int argc, char *argv[], bool decrypt)
         u8  key[32] = {0};
         u8   iv[16] = {0};
 
-        size_t  key_s = 0;
-        size_t  iv_s  = 0;
+        maid_aead *ctx = NULL;
         ssize_t tag_s = 0;
-        const struct maid_aead_def *def = NULL;
 
         if (strcmp(argv[1], "chacha20poly1305") == 0)
         {
-            key_s = 32;
-            iv_s  = 12;
-            tag_s = 32;
-            def = &maid_chacha20poly1305;
+            ret = get_data(argv[2], key, 32, false) &&
+                  get_data(argv[3],  iv, 12, false);
+
+            if (ret)
+                ctx = maid_chacha20poly1305(key, iv);
         }
         else
             ret = usage((decrypt) ? "decrypt" : "encrypt");
 
-        if (ret && get_data(argv[2], key, key_s, false) &&
-                   get_data(argv[3],  iv, iv_s,  false))
+        if (ret)
         {
-            maid_aead *ctx = maid_aead_new(def, key, iv);
             if (!ctx)
             {
                 fprintf(stderr, "Out of memory\n");
@@ -851,37 +849,30 @@ sign_verify(int argc, char *argv[], bool verify)
 
             int out = STDOUT_FILENO;
 
-            const struct maid_sign_def *sign_d = NULL;
-
-            void *pub = NULL;
+            maid_sign *ctx = NULL;
             if (strcmp(argv[1], "ed25519") == 0)
             {
-                sign_d = &maid_ed25519;
                 if (n == 32)
-                    pub = key;
+                {
+                    if (!verify)
+                        ctx = maid_ed25519(NULL, key);
+                    else
+                        ctx = maid_ed25519(key, NULL);
+
+                    if (!ctx)
+                    {
+                        fprintf(stderr, "Out of memory\n");
+                        ret = false;
+                    }
+                }
             }
             else
                 ret = usage((verify) ? "verify" : "sign");
 
-            if (ret && !pub)
+            if (ret && !ctx)
             {
                 fprintf(stderr, "Invalid key\n");
                 ret = false;
-            }
-
-            maid_sign *ctx = NULL;
-            if (ret)
-            {
-                if (!verify)
-                    ctx = maid_sign_new(sign_d, NULL, pub);
-                else
-                    ctx = maid_sign_new(sign_d, pub, NULL);
-
-                if (!ctx)
-                {
-                    fprintf(stderr, "Out of memory\n");
-                    ret = false;
-                }
             }
 
             if (ret)
@@ -938,7 +929,7 @@ exchange_secret(int argc, char *argv[], bool secret)
         maid_kex *ctx = NULL;
         if (strcmp(argv[1], "x25519") == 0)
         {
-            ctx   = maid_kex_new(&maid_x25519);
+            ctx   = maid_x25519();
             key_s = 32;
         }
         else
@@ -1007,24 +998,22 @@ keygen(int argc, char *argv[])
             ret = usage("keygen");
 
         u8 entropy[48] = {0};
-        size_t entropy_s = 0;
 
-        const struct maid_rng_def *def = NULL;
+        maid_rng *gen = NULL;
         if (ret)
         {
             if (strcmp(argv[2], "chacha20-rng") == 0)
             {
-                entropy_s = 44;
-                def       = &maid_chacha20_rng;
+                ret = get_data(argv[3], entropy, 44, false);
+                if (ret)
+                    gen = maid_chacha20_rng(entropy);
             }
             else
                 ret = usage("keygen");
         }
 
-        maid_rng *gen = NULL;
-        if (ret && get_data(argv[3], entropy, entropy_s, false))
+        if (ret)
         {
-            gen = maid_rng_new(def, entropy);
             if (!gen)
             {
                 fprintf(stderr, "Out of memory\n");
@@ -1037,7 +1026,7 @@ keygen(int argc, char *argv[])
             switch (type)
             {
                 case 1:;
-                    maid_ecc *ed25519 = maid_ecc_new(&maid_edwards25519);
+                    maid_ecc *ed25519 = maid_edwards25519();
                     if (ed25519)
                     {
                         u8 key[32] = {0};
@@ -1094,7 +1083,7 @@ pubgen(int argc, char *argv[])
             switch (type)
             {
                 case 1:;
-                    maid_ecc *ed25519 = maid_ecc_new(&maid_edwards25519);
+                    maid_ecc *ed25519 = maid_edwards25519();
                     if (ed25519)
                     {
                         u8 pub[32] = {0};

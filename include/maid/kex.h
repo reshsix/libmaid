@@ -21,27 +21,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* Internal interface */
-
-struct maid_kex_def
-{
-    void * (*new)(void);
-    void * (*del)(void *);
-    bool (*pubgen)(void *, const uint8_t *, uint8_t *);
-    bool (*secgen)(void *, const uint8_t *, const uint8_t *, uint8_t *);
-};
-
-/* External interface */
-
 typedef struct maid_kex maid_kex;
-maid_kex *maid_kex_new(const struct maid_kex_def *def);
+
+maid_kex *maid_x25519(void);
 maid_kex *maid_kex_del(maid_kex *x);
-bool maid_kex_pubgen(maid_kex *x, const uint8_t *private, uint8_t *public);
-bool maid_kex_secgen(maid_kex *x, const uint8_t *private,
-                     const uint8_t *public, uint8_t *buffer);
 
-/* External algorithms */
-
-extern const struct maid_kex_def maid_x25519;
+bool maid_kex_pubgen(maid_kex *x, const uint8_t *prv, uint8_t *pub);
+bool maid_kex_secgen(maid_kex *x, const uint8_t *prv,
+                     const uint8_t *pub, uint8_t *buffer);
 
 #endif

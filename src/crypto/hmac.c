@@ -22,6 +22,7 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/mac.h>
 #include <internal/types.h>
 
 /* Maid MAC definition */
@@ -84,43 +85,39 @@ hmac_new(u8 version, const u8 *key)
 
     if (ret)
     {
-        const struct maid_hash_def *def = NULL;
         switch (version)
         {
             case HMAC_SHA224:
-                def = &maid_sha224;
+                ret->hash   = maid_sha224();
                 ret->hash_s = 28;
                 ret->bytes  = 64;
                 break;
             case HMAC_SHA256:
-                def = &maid_sha256;
+                ret->hash   = maid_sha256();
                 ret->hash_s = 32;
                 ret->bytes  = 64;
                 break;
             case HMAC_SHA384:
-                def = &maid_sha384;
+                ret->hash   = maid_sha384();
                 ret->hash_s = 48;
                 ret->bytes  = 128;
                 break;
             case HMAC_SHA512:
-                def = &maid_sha512;
+                ret->hash   = maid_sha512();
                 ret->hash_s = 64;
                 ret->bytes  = 128;
                 break;
             case HMAC_SHA512_224:
-                def = &maid_sha512_224;
+                ret->hash   = maid_sha512_224();
                 ret->hash_s = 28;
                 ret->bytes  = 128;
                 break;
             case HMAC_SHA512_256:
-                def = &maid_sha512_256;
+                ret->hash   = maid_sha512_256();
                 ret->hash_s = 32;
                 ret->bytes  = 128;
                 break;
         }
-
-        if (def)
-            ret->hash = maid_hash_new(def);
 
         if (ret->hash)
             hmac_init(ret, key);
@@ -164,7 +161,7 @@ hmac_digest(void *ctx, u8 *output)
     }
 }
 
-const struct maid_mac_def maid_hmac_sha224 =
+static const struct maid_mac_def hmac_sha224 =
 {
     .new = hmac_new,
     .del = hmac_del,
@@ -176,7 +173,7 @@ const struct maid_mac_def maid_hmac_sha224 =
     .version = HMAC_SHA224
 };
 
-const struct maid_mac_def maid_hmac_sha256 =
+static const struct maid_mac_def hmac_sha256 =
 {
     .new = hmac_new,
     .del = hmac_del,
@@ -188,7 +185,7 @@ const struct maid_mac_def maid_hmac_sha256 =
     .version = HMAC_SHA256
 };
 
-const struct maid_mac_def maid_hmac_sha384 =
+static const struct maid_mac_def hmac_sha384 =
 {
     .new = hmac_new,
     .del = hmac_del,
@@ -200,7 +197,7 @@ const struct maid_mac_def maid_hmac_sha384 =
     .version = HMAC_SHA384
 };
 
-const struct maid_mac_def maid_hmac_sha512 =
+static const struct maid_mac_def hmac_sha512 =
 {
     .new = hmac_new,
     .del = hmac_del,
@@ -212,7 +209,7 @@ const struct maid_mac_def maid_hmac_sha512 =
     .version = HMAC_SHA512
 };
 
-const struct maid_mac_def maid_hmac_sha512_224 =
+static const struct maid_mac_def hmac_sha512_224 =
 {
     .new = hmac_new,
     .del = hmac_del,
@@ -224,7 +221,7 @@ const struct maid_mac_def maid_hmac_sha512_224 =
     .version = HMAC_SHA512_224
 };
 
-const struct maid_mac_def maid_hmac_sha512_256 =
+static const struct maid_mac_def hmac_sha512_256 =
 {
     .new = hmac_new,
     .del = hmac_del,
@@ -235,3 +232,39 @@ const struct maid_mac_def maid_hmac_sha512_256 =
     .digest_s = 32,
     .version = HMAC_SHA512_256
 };
+
+extern maid_mac *
+maid_hmac_sha224(const u8 *key)
+{
+    return maid_mac_new(&hmac_sha224, key);
+}
+
+extern maid_mac *
+maid_hmac_sha256(const u8 *key)
+{
+    return maid_mac_new(&hmac_sha256, key);
+}
+
+extern maid_mac *
+maid_hmac_sha384(const u8 *key)
+{
+    return maid_mac_new(&hmac_sha384, key);
+}
+
+extern maid_mac *
+maid_hmac_sha512(const u8 *key)
+{
+    return maid_mac_new(&hmac_sha512, key);
+}
+
+extern maid_mac *
+maid_hmac_sha512_224(const u8 *key)
+{
+    return maid_mac_new(&hmac_sha512_224, key);
+}
+
+extern maid_mac *
+maid_hmac_sha512_256(const u8 *key)
+{
+    return maid_mac_new(&hmac_sha512_256, key);
+}

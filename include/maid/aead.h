@@ -21,31 +21,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <maid/mac.h>
-#include <maid/stream.h>
-
-/* Internal interface */
-
-struct maid_aead_def
-{
-    void (*init)(const struct maid_stream_def *,
-                 const uint8_t *, const uint8_t *,
-                 maid_stream **, maid_mac **, bool);
-    void (*mode)(maid_stream *, uint8_t *, size_t);
-
-    const struct maid_stream_def *s_def;
-    const struct maid_mac_def *m_def;
-
-    bool s_bits, s_big;
-};
-
-/* External interface */
-
 typedef struct maid_aead maid_aead;
-maid_aead *maid_aead_new(const struct maid_aead_def *def,
-                         const uint8_t *restrict key,
-                         const uint8_t *restrict nonce);
+
+maid_aead *maid_chacha20poly1305(const uint8_t *restrict key,
+                                 const uint8_t *restrict nonce);
 maid_aead *maid_aead_del(maid_aead *ae);
+
 void maid_aead_renew(maid_aead *ae,
                      const uint8_t *restrict key,
                      const uint8_t *restrict nonce);
@@ -53,13 +34,5 @@ void maid_aead_update(maid_aead *ae, const uint8_t *buffer, size_t size);
 void maid_aead_crypt(maid_aead *ae, uint8_t *buffer,
                      size_t size, bool decrypt);
 void maid_aead_digest(maid_aead *ae, uint8_t *output);
-
-/* External algorithms */
-
-extern const struct maid_aead_def maid_aes_gcm_128;
-extern const struct maid_aead_def maid_aes_gcm_192;
-extern const struct maid_aead_def maid_aes_gcm_256;
-
-extern const struct maid_aead_def maid_chacha20poly1305;
 
 #endif

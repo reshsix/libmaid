@@ -22,6 +22,7 @@
 #include <maid/stream.h>
 
 #include <internal/types.h>
+#include <internal/stream.h>
 
 struct maid_stream
 {

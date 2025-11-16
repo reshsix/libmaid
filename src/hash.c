@@ -21,6 +21,7 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/hash.h>
 #include <internal/types.h>
 
 struct maid_hash

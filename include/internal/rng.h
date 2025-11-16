@@ -15,22 +15,21 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_SIGN_H
-#define MAID_SIGN_H
+#ifndef INTERNAL_RNG_H
+#define INTERNAL_RNG_H
 
 #include <stdint.h>
-#include <stdbool.h>
 
-typedef struct maid_sign maid_sign;
+struct maid_rng_def
+{
+    void * (*new)(uint8_t, const uint8_t *);
+    void * (*del)(void *);
+    void (*renew)(void *, const uint8_t *);
+    void (*generate)(void *, uint8_t *);
+    size_t state_s;
+    uint8_t version;
+};
 
-maid_sign *maid_ed25519(uint8_t *pub, uint8_t *prv);
-maid_sign *maid_sign_del(maid_sign *s);
-
-size_t maid_sign_size(maid_sign *s);
-bool maid_sign_generate(maid_sign *s, const uint8_t *data,
-                        size_t size, uint8_t *sign);
-bool maid_sign_verify(maid_sign *s, const uint8_t *data,
-                      size_t size, const uint8_t *sign);
-
+maid_rng *maid_rng_new(const struct maid_rng_def *def, const uint8_t *entropy);
 
 #endif

@@ -22,6 +22,7 @@
 #include <maid/ecc.h>
 
 #include <internal/mp.h>
+#include <internal/ecc.h>
 #include <internal/types.h>
 
 struct maid_ecc

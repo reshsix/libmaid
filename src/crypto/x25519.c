@@ -28,6 +28,8 @@
 #include <maid/sign.h>
 
 #include <internal/mp.h>
+#include <internal/ecc.h>
+#include <internal/kex.h>
 #include <internal/types.h>
 
 /* Curve25519 curve definition */
@@ -359,7 +361,7 @@ curve25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
     maid_mp_debug(words, "z", a->z);
 }
 
-const struct maid_ecc_def maid_curve25519 =
+static const struct maid_ecc_def curve25519_def =
 {
     .new    = curve25519_new,    .del    = curve25519_del,
     .alloc  = curve25519_alloc,  .free   = curve25519_free,
@@ -373,6 +375,12 @@ const struct maid_ecc_def maid_curve25519 =
     .bits   = 256,
     .flags  = MAID_ECC_DIFF_ADD | MAID_ECC_NO_INF | MAID_ECC_LADDER_AD
 };
+
+extern maid_ecc *
+maid_curve25519(void)
+{
+    return maid_ecc_new(&curve25519_def);
+}
 
 /* Maid KEX definitions */
 
@@ -424,8 +432,14 @@ x25519_secgen(void *x25519, const u8 *private, const u8 *public, u8 *buffer)
     return ret;
 }
 
-const struct maid_kex_def maid_x25519 =
+static const struct maid_kex_def x25519_def =
 {
     .new    = x25519_new,    .del    = x25519_del,
     .pubgen = x25519_pubgen, .secgen = x25519_secgen
 };
+
+extern maid_kex *
+maid_x25519(void)
+{
+    return maid_kex_new(&x25519_def);
+}

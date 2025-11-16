@@ -21,6 +21,7 @@
 #include <maid/mem.h>
 #include <maid/rng.h>
 
+#include <internal/rng.h>
 #include <internal/types.h>
 
 struct maid_rng

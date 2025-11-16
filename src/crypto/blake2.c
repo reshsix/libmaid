@@ -22,6 +22,8 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/mac.h>
+#include <internal/hash.h>
 #include <internal/types.h>
 
 static u32
@@ -343,10 +345,10 @@ blake2_digest(void *ctx, u8 *output)
     }
 }
 
-extern struct maid_hash_def
+extern maid_hash *
 maid_blake2s(u8 digest_s)
 {
-    const struct maid_hash_def ret =
+    const struct maid_hash_def def =
     {
         .new = (digest_s && digest_s <= 64) ? blake2_new : NULL,
         .del = blake2_del,
@@ -358,13 +360,13 @@ maid_blake2s(u8 digest_s)
         .version = BLAKE2S + digest_s - 1
     };
 
-    return ret;
+    return maid_hash_new(&def);
 }
 
-extern struct maid_hash_def
+extern maid_hash *
 maid_blake2b(u8 digest_s)
 {
-    const struct maid_hash_def ret =
+    const struct maid_hash_def def =
     {
         .new = (digest_s && digest_s <= 64) ? blake2_new : NULL,
         .del = blake2_del,
@@ -376,104 +378,8 @@ maid_blake2b(u8 digest_s)
         .version = BLAKE2B + digest_s - 1
     };
 
-    return ret;
+    return maid_hash_new(&def);
 }
-
-const struct maid_hash_def maid_blake2s_128 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 64,
-    .digest_s = 20,
-    .version = BLAKE2S + 20 - 1
-};
-
-const struct maid_hash_def maid_blake2s_160 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 64,
-    .digest_s = 24,
-    .version = BLAKE2S + 24 - 1
-};
-
-const struct maid_hash_def maid_blake2s_224 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 64,
-    .digest_s = 28,
-    .version = BLAKE2S + 28 - 1
-};
-
-const struct maid_hash_def maid_blake2s_256 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 64,
-    .digest_s = 32,
-    .version = BLAKE2S + 32 - 1
-};
-
-const struct maid_hash_def maid_blake2b_160 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 128,
-    .digest_s = 24,
-    .version = BLAKE2B + 24 - 1
-};
-
-const struct maid_hash_def maid_blake2b_256 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 128,
-    .digest_s = 32,
-    .version = BLAKE2B + 32 - 1
-};
-
-const struct maid_hash_def maid_blake2b_384 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 128,
-    .digest_s = 48,
-    .version = BLAKE2B + 48 - 1
-};
-
-const struct maid_hash_def maid_blake2b_512 =
-{
-    .new = blake2_new,
-    .del = blake2_del,
-    .renew = blake2_renew,
-    .update = blake2_update,
-    .digest = blake2_digest,
-    .state_s = 128,
-    .digest_s = 64,
-    .version = BLAKE2B + 64 - 1
-};
 
 /* Maid MAC definition */
 
@@ -560,10 +466,10 @@ blake2k_digest(void *ctx, u8 *output)
     }
 }
 
-extern struct maid_mac_def
-maid_blake2s_k(u8 digest_s)
+extern maid_mac *
+maid_blake2s_k(const u8 *key, u8 digest_s)
 {
-    const struct maid_mac_def ret =
+    const struct maid_mac_def def =
     {
         .new = (digest_s && digest_s <= 64) ? blake2k_new : NULL,
         .del = blake2k_del,
@@ -575,13 +481,13 @@ maid_blake2s_k(u8 digest_s)
         .version = BLAKE2SK + digest_s - 1
     };
 
-    return ret;
+    return maid_mac_new(&def, key);
 }
 
-extern struct maid_mac_def
-maid_blake2b_k(u8 digest_s)
+extern maid_mac *
+maid_blake2b_k(const u8 *key, u8 digest_s)
 {
-    const struct maid_mac_def ret =
+    const struct maid_mac_def def =
     {
         .new = (digest_s && digest_s <= 64) ? blake2k_new : NULL,
         .del = blake2k_del,
@@ -593,102 +499,5 @@ maid_blake2b_k(u8 digest_s)
         .version = BLAKE2BK + digest_s - 1
     };
 
-    return ret;
+    return maid_mac_new(&def, key);
 }
-
-const struct maid_mac_def maid_blake2s_128k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 64,
-    .digest_s = 20,
-    .version = BLAKE2SK + 20 - 1
-};
-
-const struct maid_mac_def maid_blake2s_160k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 64,
-    .digest_s = 24,
-    .version = BLAKE2SK + 24 - 1
-};
-
-const struct maid_mac_def maid_blake2s_224k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 64,
-    .digest_s = 28,
-    .version = BLAKE2SK + 28 - 1
-};
-
-const struct maid_mac_def maid_blake2s_256k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 64,
-    .digest_s = 32,
-    .version = BLAKE2SK + 32 - 1
-};
-
-const struct maid_mac_def maid_blake2b_160k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 128,
-    .digest_s = 24,
-    .version = BLAKE2BK + 24 - 1
-};
-
-const struct maid_mac_def maid_blake2b_256k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 128,
-    .digest_s = 32,
-    .version = BLAKE2BK + 32 - 1
-};
-
-const struct maid_mac_def maid_blake2b_384k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 128,
-    .digest_s = 48,
-    .version = BLAKE2BK + 48 - 1
-};
-
-const struct maid_mac_def maid_blake2b_512k =
-{
-    .new = blake2k_new,
-    .del = blake2k_del,
-    .renew = blake2k_renew,
-    .update = blake2k_update,
-    .digest = blake2k_digest,
-    .state_s = 128,
-    .digest_s = 64,
-    .version = BLAKE2BK + 64 - 1
-};
-

@@ -20,6 +20,7 @@
 
 #include <maid/sign.h>
 
+#include <internal/sign.h>
 #include <internal/types.h>
 
 struct maid_sign
@@ -29,16 +30,16 @@ struct maid_sign
 };
 
 extern struct maid_sign *
-maid_sign_new(const struct maid_sign_def *def, void *pub, void *priv)
+maid_sign_new(const struct maid_sign_def *def, u8 *pub, u8 *prv)
 {
     struct maid_sign *ret = NULL;
-    if (pub || priv)
+    if (pub || prv)
         ret = calloc(1, sizeof(struct maid_sign));
 
     if (ret)
     {
         ret->def = def;
-        ret->context = def->new(def->version, pub, priv);
+        ret->context = def->new(def->version, pub, prv);
         if (!(ret->context))
             ret = maid_sign_del(ret);
     }

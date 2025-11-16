@@ -23,6 +23,7 @@
 #include <maid/mem.h>
 #include <maid/hash.h>
 
+#include <internal/kdf.h>
 #include <internal/types.h>
 
 /* Maid KDF definition */
@@ -65,44 +66,42 @@ hkdf_new(u8 version, const void *params, size_t output_s)
 
     if (ret)
     {
-        const struct maid_mac_def  *mdef = NULL;
-        const struct maid_hash_def *hdef = NULL;
-
+        u8 empty[128] = {0};
         switch (version)
         {
             case SHA224:
-                mdef = &maid_hmac_sha224;
-                hdef = &maid_sha224;
+                ret->prf      = maid_hmac_sha224(empty);
+                ret->hash     = maid_sha224();
                 ret->key_s    = 64;
                 ret->digest_s = 28;
                 break;
             case SHA256:
-                mdef = &maid_hmac_sha256;
-                hdef = &maid_sha256;
+                ret->prf      = maid_hmac_sha256(empty);
+                ret->hash     = maid_sha256();
                 ret->key_s    = 64;
                 ret->digest_s = 32;
                 break;
             case SHA384:
-                mdef = &maid_hmac_sha384;
-                hdef = &maid_sha384;
+                ret->prf      = maid_hmac_sha384(empty);
+                ret->hash     = maid_sha384();
                 ret->key_s    = 128;
                 ret->digest_s = 48;
                 break;
             case SHA512:
-                mdef = &maid_hmac_sha512;
-                hdef = &maid_sha512;
+                ret->prf      = maid_hmac_sha512(empty);
+                ret->hash     = maid_sha512();
                 ret->key_s    = 128;
                 ret->digest_s = 64;
                 break;
             case SHA512_224:
-                mdef = &maid_hmac_sha512_224;
-                hdef = &maid_sha512_224;
+                ret->prf      = maid_hmac_sha512_224(empty);
+                ret->hash     = maid_sha512_224();
                 ret->key_s    = 128;
                 ret->digest_s = 28;
                 break;
             case SHA512_256:
-                mdef = &maid_hmac_sha512_256;
-                hdef = &maid_sha512_256;
+                ret->prf      = maid_hmac_sha512_256(empty);
+                ret->hash     = maid_sha512_256();
                 ret->key_s    = 128;
                 ret->digest_s = 32;
                 break;
@@ -110,9 +109,6 @@ hkdf_new(u8 version, const void *params, size_t output_s)
 
         if (output_s <= (255 * ret->digest_s))
         {
-            u8 empty[128] = {0};
-            ret->prf  = maid_mac_new(mdef, empty);
-            ret->hash = maid_hash_new(hdef);
             if (ret->prf && ret->hash)
             {
                 memcpy(&(ret->prm), params, sizeof(struct maid_hkdf_params));
@@ -191,7 +187,7 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
     }
 }
 
-const struct maid_kdf_def maid_hkdf_sha224 =
+static const struct maid_kdf_def hkdf_sha224_def =
 {
     .new     = hkdf_new,
     .del     = hkdf_del,
@@ -200,7 +196,7 @@ const struct maid_kdf_def maid_hkdf_sha224 =
     .version = SHA224
 };
 
-const struct maid_kdf_def maid_hkdf_sha256 =
+static const struct maid_kdf_def hkdf_sha256_def =
 {
     .new     = hkdf_new,
     .del     = hkdf_del,
@@ -209,7 +205,7 @@ const struct maid_kdf_def maid_hkdf_sha256 =
     .version = SHA256
 };
 
-const struct maid_kdf_def maid_hkdf_sha384 =
+static const struct maid_kdf_def hkdf_sha384_def =
 {
     .new     = hkdf_new,
     .del     = hkdf_del,
@@ -218,7 +214,7 @@ const struct maid_kdf_def maid_hkdf_sha384 =
     .version = SHA384
 };
 
-const struct maid_kdf_def maid_hkdf_sha512 =
+static const struct maid_kdf_def hkdf_sha512_def =
 {
     .new     = hkdf_new,
     .del     = hkdf_del,
@@ -227,7 +223,7 @@ const struct maid_kdf_def maid_hkdf_sha512 =
     .version = SHA512
 };
 
-const struct maid_kdf_def maid_hkdf_sha512_224 =
+static const struct maid_kdf_def hkdf_sha512_224_def =
 {
     .new     = hkdf_new,
     .del     = hkdf_del,
@@ -236,7 +232,7 @@ const struct maid_kdf_def maid_hkdf_sha512_224 =
     .version = SHA512_224
 };
 
-const struct maid_kdf_def maid_hkdf_sha512_256 =
+static const struct maid_kdf_def hkdf_sha512_256_def =
 {
     .new     = hkdf_new,
     .del     = hkdf_del,
@@ -244,3 +240,39 @@ const struct maid_kdf_def maid_hkdf_sha512_256 =
     .hash    = hkdf_hash,
     .version = SHA512_256
 };
+
+extern maid_kdf *
+maid_hkdf_sha224(const struct maid_hkdf_params *p, size_t output_s)
+{
+    return maid_kdf_new(&hkdf_sha224_def, p, output_s);
+}
+
+extern maid_kdf *
+maid_hkdf_sha256(const struct maid_hkdf_params *p, size_t output_s)
+{
+    return maid_kdf_new(&hkdf_sha256_def, p, output_s);
+}
+
+extern maid_kdf *
+maid_hkdf_sha384(const struct maid_hkdf_params *p, size_t output_s)
+{
+    return maid_kdf_new(&hkdf_sha384_def, p, output_s);
+}
+
+extern maid_kdf *
+maid_hkdf_sha512(const struct maid_hkdf_params *p, size_t output_s)
+{
+    return maid_kdf_new(&hkdf_sha512_def, p, output_s);
+}
+
+extern maid_kdf *
+maid_hkdf_sha512_224(const struct maid_hkdf_params *p, size_t output_s)
+{
+    return maid_kdf_new(&hkdf_sha512_224_def, p, output_s);
+}
+
+extern maid_kdf *
+maid_hkdf_sha512_256(const struct maid_hkdf_params *p, size_t output_s)
+{
+    return maid_kdf_new(&hkdf_sha512_256_def, p, output_s);
+}

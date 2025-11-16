@@ -24,6 +24,7 @@
 #include <maid/mem.h>
 
 #include <internal/mp.h>
+#include <internal/mac.h>
 #include <internal/types.h>
 
 /* Maid MAC definition */
@@ -152,7 +153,7 @@ poly1305_digest(void *ctx, u8 *output)
     }
 }
 
-const struct maid_mac_def maid_poly1305 =
+static const struct maid_mac_def poly1305_def =
 {
     .new      = poly1305_new,
     .del      = poly1305_del,
@@ -162,3 +163,9 @@ const struct maid_mac_def maid_poly1305 =
     .state_s  = 16,
     .digest_s = 16,
 };
+
+extern maid_mac *
+maid_poly1305(const u8 *key)
+{
+    return maid_mac_new(&poly1305_def, key);
+}

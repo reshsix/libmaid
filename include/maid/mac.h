@@ -20,49 +20,21 @@
 
 #include <stdint.h>
 
-/* Internal interface */
-
-struct maid_mac_def
-{
-    void * (*new)(uint8_t, const uint8_t *);
-    void * (*del)(void *);
-    void (*renew)(void *, const uint8_t *);
-    void (*update)(void *, uint8_t *, size_t);
-    void (*digest)(void *, uint8_t *);
-    size_t state_s;
-    size_t digest_s;
-    uint8_t version;
-};
-
-/* External interface */
-
 typedef struct maid_mac maid_mac;
-maid_mac *maid_mac_new(const struct maid_mac_def *def, const uint8_t *key);
+
+maid_mac *maid_poly1305(const uint8_t *key);
+maid_mac *maid_hmac_sha224(const uint8_t *key);
+maid_mac *maid_hmac_sha256(const uint8_t *key);
+maid_mac *maid_hmac_sha384(const uint8_t *key);
+maid_mac *maid_hmac_sha512(const uint8_t *key);
+maid_mac *maid_hmac_sha512_224(const uint8_t *key);
+maid_mac *maid_hmac_sha512_256(const uint8_t *key);
+maid_mac *maid_blake2s_k(const uint8_t *key, uint8_t digest_s);
+maid_mac *maid_blake2b_k(const uint8_t *key, uint8_t digest_s);
 maid_mac *maid_mac_del(maid_mac *m);
+
 void maid_mac_renew(maid_mac *m, const uint8_t *key);
 void maid_mac_update(maid_mac *m, const uint8_t *buffer, size_t size);
 size_t maid_mac_digest(maid_mac *m, uint8_t *output);
-
-/* External algorithms */
-
-extern const struct maid_mac_def maid_poly1305;
-
-extern const struct maid_mac_def maid_hmac_sha224;
-extern const struct maid_mac_def maid_hmac_sha256;
-extern const struct maid_mac_def maid_hmac_sha384;
-extern const struct maid_mac_def maid_hmac_sha512;
-extern const struct maid_mac_def maid_hmac_sha512_224;
-extern const struct maid_mac_def maid_hmac_sha512_256;
-
-struct maid_mac_def maid_blake2s_k(uint8_t digest_s);
-struct maid_mac_def maid_blake2b_k(uint8_t digest_s);
-extern const struct maid_mac_def maid_blake2s_128k;
-extern const struct maid_mac_def maid_blake2s_160k;
-extern const struct maid_mac_def maid_blake2s_224k;
-extern const struct maid_mac_def maid_blake2s_256k;
-extern const struct maid_mac_def maid_blake2b_160k;
-extern const struct maid_mac_def maid_blake2b_256k;
-extern const struct maid_mac_def maid_blake2b_384k;
-extern const struct maid_mac_def maid_blake2b_512k;
 
 #endif

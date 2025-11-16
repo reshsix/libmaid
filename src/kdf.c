@@ -21,6 +21,7 @@
 #include <maid/kdf.h>
 #include <maid/mem.h>
 
+#include <internal/kdf.h>
 #include <internal/types.h>
 
 struct maid_kdf

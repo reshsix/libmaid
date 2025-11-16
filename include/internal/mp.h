@@ -15,8 +15,8 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef DEF_MP_H
-#define DEF_MP_H
+#ifndef INTERNAL_MP_H
+#define INTERNAL_MP_H
 
 #define MAID_MP_ALLOC(name, length) \
     maid_mp_word name[words * length]; \
