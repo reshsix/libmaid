@@ -41,8 +41,8 @@ maid_kdf_del(maid_kdf *k)
 }
 
 extern struct maid_kdf *
-maid_kdf_new(const struct maid_kdf_def *def,
-             const void *params, size_t output_s)
+maid_kdf_new(const struct maid_kdf_def *def, const void *params,
+             u8 state_s, u8 digest_s, size_t output_s)
 {
     struct maid_kdf *ret = NULL;
     if (params)
@@ -51,7 +51,7 @@ maid_kdf_new(const struct maid_kdf_def *def,
     if (ret)
     {
         ret->def = def;
-        ret->ctx = def->new(def->version, params, output_s);
+        ret->ctx = def->new(params, state_s, digest_s, output_s);
         if (!(ret->ctx))
             ret = maid_kdf_del(ret);
     }

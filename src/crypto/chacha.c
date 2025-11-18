@@ -71,12 +71,9 @@ struct chacha
 };
 
 static void *
-chacha_new(u8 version, const u8 *restrict key,
-           const u8 *restrict nonce, u64 counter)
+chacha_new(const u8 *key, const u8 *nonce, u64 counter)
 {
     /* IETF version */
-    (void)version;
-
     struct chacha *ret = calloc(1, sizeof(struct chacha));
 
     if (ret)
@@ -100,8 +97,7 @@ chacha_del(void *ctx)
 }
 
 static void
-chacha_renew(void *ctx, const u8 *restrict key,
-             const u8 *restrict nonce, u64 counter)
+chacha_renew(void *ctx, const u8 *key, const u8 *nonce, u64 counter)
 {
     if (ctx)
     {
@@ -157,7 +153,7 @@ static const struct maid_stream_def chacha20_def =
 };
 
 extern maid_stream *
-maid_chacha20(const u8 *restrict key, const u8 *restrict nonce, u64 counter)
+maid_chacha20(const u8 *key, const u8 *nonce, u64 counter)
 {
     return maid_stream_new(&chacha20_def, key, nonce, counter);
 }
@@ -190,7 +186,7 @@ chacha20poly1305_init(const u8 *key, const u8 *nonce,
     }
 }
 
-const struct maid_aead_def chacha20poly1305_def =
+static const struct maid_aead_def chacha20poly1305_def =
 {
     .init  = chacha20poly1305_init,
     .mode  = maid_stream_xor,
@@ -201,7 +197,7 @@ const struct maid_aead_def chacha20poly1305_def =
 };
 
 extern maid_aead *
-maid_chacha20poly1305(const u8 *restrict key, const u8 *restrict nonce)
+maid_chacha20poly1305(const u8 *key, const u8 *nonce)
 {
     return maid_aead_new(&chacha20poly1305_def, key, nonce);
 }
@@ -227,11 +223,10 @@ chacha20_rng_del(void *ctx)
 }
 
 static void *
-chacha20_rng_new(u8 version, const u8 *entropy)
+chacha20_rng_new(const u8 *entropy)
 {
     struct chacha20_rng *ret = calloc(1, sizeof(struct chacha20_rng));
 
-    (void)version;
     if (ret)
     {
         ret->st = maid_chacha20(entropy, &(entropy[32]), 0);
@@ -270,7 +265,6 @@ static const struct maid_rng_def chacha20_rng_def =
     .renew    = chacha20_rng_renew,
     .generate = chacha20_rng_generate,
     .state_s  = 64,
-    .version  = 0
 };
 
 extern maid_rng *

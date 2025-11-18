@@ -23,9 +23,6 @@
 uint8_t maid_test_mem(void);
 uint8_t maid_test_mp(void);
 
-uint8_t maid_test_aes_ecb(void);
-uint8_t maid_test_aes_ctr(void);
-uint8_t maid_test_aes_gcm(void);
 uint8_t maid_test_chacha(void);
 uint8_t maid_test_poly1305(void);
 uint8_t maid_test_chacha20poly1305(void);

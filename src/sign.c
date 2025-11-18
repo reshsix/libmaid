@@ -39,7 +39,7 @@ maid_sign_new(const struct maid_sign_def *def, u8 *pub, u8 *prv)
     if (ret)
     {
         ret->def = def;
-        ret->context = def->new(def->version, pub, prv);
+        ret->context = def->new(pub, prv);
         if (!(ret->context))
             ret = maid_sign_del(ret);
     }

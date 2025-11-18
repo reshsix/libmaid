@@ -22,7 +22,7 @@
 
 struct maid_kdf_def
 {
-    void * (*new)(uint8_t, const void *, size_t);
+    void * (*new)(const void *, uint8_t, uint8_t, size_t);
     void * (*del)(void *);
     void (*renew)(void *, const void *);
     void (*hash)(void *, const uint8_t *, size_t,
@@ -30,7 +30,7 @@ struct maid_kdf_def
     uint8_t version;
 };
 
-maid_kdf *maid_kdf_new(const struct maid_kdf_def *def,
-                       const void *params, size_t output_s);
+maid_kdf *maid_kdf_new(const struct maid_kdf_def *def, const void *params,
+                       uint8_t state_s, uint8_t digest_s, size_t output_s);
 
 #endif

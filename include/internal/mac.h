@@ -22,16 +22,14 @@
 
 struct maid_mac_def
 {
-    void * (*new)(uint8_t, const uint8_t *);
+    void * (*new)(const uint8_t *, uint8_t, uint8_t);
     void * (*del)(void *);
     void (*renew)(void *, const uint8_t *);
     void (*update)(void *, uint8_t *, size_t);
     void (*digest)(void *, uint8_t *);
-    size_t state_s;
-    size_t digest_s;
-    uint8_t version;
 };
 
-maid_mac *maid_mac_new(const struct maid_mac_def *def, const uint8_t *key);
+maid_mac *maid_mac_new(const struct maid_mac_def *def, const uint8_t *key,
+                       uint8_t state_s, uint8_t digest_s);
 
 #endif

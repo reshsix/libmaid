@@ -22,14 +22,8 @@
 
 typedef struct maid_hash maid_hash;
 
-maid_hash *maid_sha224(void);
-maid_hash *maid_sha256(void);
-maid_hash *maid_sha384(void);
-maid_hash *maid_sha512(void);
-maid_hash *maid_sha512_224(void);
-maid_hash *maid_sha512_256(void);
-maid_hash *maid_blake2s(uint8_t digest_s);
-maid_hash *maid_blake2b(uint8_t digest_s);
+maid_hash *maid_sha2(bool bits64, uint8_t digest_s);
+maid_hash *maid_blake2(bool bits64, uint8_t digest_s);
 maid_hash *maid_hash_del(maid_hash *h);
 
 void maid_hash_renew(maid_hash *h);

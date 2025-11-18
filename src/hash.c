@@ -27,6 +27,7 @@
 struct maid_hash
 {
     const struct maid_hash_def *def;
+    u8 state_s, digest_s;
     void *ctx;
 
     u8 *buffer;
@@ -48,18 +49,18 @@ maid_hash_del(maid_hash *h)
 }
 
 extern struct maid_hash *
-maid_hash_new(const struct maid_hash_def *def)
+maid_hash_new(const struct maid_hash_def *def, u8 state_s, u8 digest_s)
 {
     struct maid_hash *ret = calloc(1, sizeof(struct maid_hash));
 
     if (ret)
     {
-        ret->def = def;
-        if (def->new)
-        {
-            ret->ctx = def->new(def->version);
-            ret->buffer = calloc(1, def->state_s);
-        }
+        ret->def      = def;
+        ret->state_s  = state_s;
+        ret->digest_s = digest_s;
+
+        ret->ctx    = def->new(state_s, digest_s);
+        ret->buffer = calloc(1, state_s);
         if (!(ret->ctx && ret->buffer))
             ret = maid_hash_del(ret);
     }
@@ -76,7 +77,7 @@ maid_hash_renew(struct maid_hash *h)
 
         h->buffer_c = 0;
         h->finished = false;
-        maid_mem_clear(h->buffer, h->def->state_s);
+        maid_mem_clear(h->buffer, h->state_s);
     }
 }
 
@@ -87,15 +88,15 @@ maid_hash_update(struct maid_hash *h, const u8 *buffer, size_t size)
     {
         while (size)
         {
-            u8 empty = h->def->state_s - h->buffer_c;
+            u8 empty = h->state_s - h->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
             memcpy(&(h->buffer[h->buffer_c]), buffer, copy);
             h->buffer_c += copy;
-            if (h->buffer_c < h->def->state_s)
+            if (h->buffer_c < h->state_s)
                 break;
 
-            h->def->update(h->ctx, h->buffer, h->def->state_s);
+            h->def->update(h->ctx, h->buffer, h->state_s);
             h->buffer_c = 0;
 
             buffer = &(buffer[copy]);
@@ -119,7 +120,7 @@ maid_hash_digest(struct maid_hash *h, u8 *output)
 
         h->finished = true;
 
-        ret = h->def->digest_s;
+        ret = h->digest_s;
     }
 
     return ret;

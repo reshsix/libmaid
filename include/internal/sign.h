@@ -23,12 +23,11 @@
 
 struct maid_sign_def
 {
-    void * (*new)(uint8_t, uint8_t *, uint8_t *);
+    void * (*new)(uint8_t *, uint8_t *);
     void * (*del)(void *);
     size_t (*size)(void *);
     bool (*generate)(void *, const uint8_t *, size_t, uint8_t *);
     bool (*verify)(void *, const uint8_t *, size_t, const uint8_t *);
-    uint8_t version;
 };
 
 maid_sign *maid_sign_new(const struct maid_sign_def *def,

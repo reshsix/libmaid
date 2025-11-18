@@ -27,12 +27,6 @@
 
 /* Maid MAC definition */
 
-enum
-{
-    HMAC_SHA224, HMAC_SHA256, HMAC_SHA384, HMAC_SHA512,
-    HMAC_SHA512_224, HMAC_SHA512_256
-};
-
 struct hmac
 {
     maid_hash *hash;
@@ -79,45 +73,16 @@ hmac_del(void *ctx)
 }
 
 static void *
-hmac_new(u8 version, const u8 *key)
+hmac_new(const u8 *key, u8 state_s, u8 digest_s)
 {
     struct hmac *ret = calloc(1, sizeof(struct hmac));
 
+    (void)digest_s;
     if (ret)
     {
-        switch (version)
-        {
-            case HMAC_SHA224:
-                ret->hash   = maid_sha224();
-                ret->hash_s = 28;
-                ret->bytes  = 64;
-                break;
-            case HMAC_SHA256:
-                ret->hash   = maid_sha256();
-                ret->hash_s = 32;
-                ret->bytes  = 64;
-                break;
-            case HMAC_SHA384:
-                ret->hash   = maid_sha384();
-                ret->hash_s = 48;
-                ret->bytes  = 128;
-                break;
-            case HMAC_SHA512:
-                ret->hash   = maid_sha512();
-                ret->hash_s = 64;
-                ret->bytes  = 128;
-                break;
-            case HMAC_SHA512_224:
-                ret->hash   = maid_sha512_224();
-                ret->hash_s = 28;
-                ret->bytes  = 128;
-                break;
-            case HMAC_SHA512_256:
-                ret->hash   = maid_sha512_256();
-                ret->hash_s = 32;
-                ret->bytes  = 128;
-                break;
-        }
+        ret->hash   = maid_sha2((state_s == 128), digest_s);
+        ret->hash_s = digest_s;
+        ret->bytes  = state_s;
 
         if (ret->hash)
             hmac_init(ret, key);
@@ -161,110 +126,23 @@ hmac_digest(void *ctx, u8 *output)
     }
 }
 
-static const struct maid_mac_def hmac_sha224 =
+static const struct maid_mac_def hmac_sha2 =
 {
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
+    .new    = hmac_new,
+    .del    = hmac_del,
+    .renew  = hmac_renew,
     .update = hmac_update,
     .digest = hmac_digest,
-    .state_s = 64,
-    .digest_s = 28,
-    .version = HMAC_SHA224
-};
-
-static const struct maid_mac_def hmac_sha256 =
-{
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
-    .update = hmac_update,
-    .digest = hmac_digest,
-    .state_s = 64,
-    .digest_s = 32,
-    .version = HMAC_SHA256
-};
-
-static const struct maid_mac_def hmac_sha384 =
-{
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
-    .update = hmac_update,
-    .digest = hmac_digest,
-    .state_s = 128,
-    .digest_s = 48,
-    .version = HMAC_SHA384
-};
-
-static const struct maid_mac_def hmac_sha512 =
-{
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
-    .update = hmac_update,
-    .digest = hmac_digest,
-    .state_s = 128,
-    .digest_s = 64,
-    .version = HMAC_SHA512
-};
-
-static const struct maid_mac_def hmac_sha512_224 =
-{
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
-    .update = hmac_update,
-    .digest = hmac_digest,
-    .state_s = 128,
-    .digest_s = 28,
-    .version = HMAC_SHA512_224
-};
-
-static const struct maid_mac_def hmac_sha512_256 =
-{
-    .new = hmac_new,
-    .del = hmac_del,
-    .renew = hmac_renew,
-    .update = hmac_update,
-    .digest = hmac_digest,
-    .state_s = 128,
-    .digest_s = 32,
-    .version = HMAC_SHA512_256
 };
 
 extern maid_mac *
-maid_hmac_sha224(const u8 *key)
+maid_hmac_sha2(bool bits64, const u8 *key, u8 digest_s)
 {
-    return maid_mac_new(&hmac_sha224, key);
-}
+    maid_mac *ret = NULL;
 
-extern maid_mac *
-maid_hmac_sha256(const u8 *key)
-{
-    return maid_mac_new(&hmac_sha256, key);
-}
+    if (digest_s == 28 || digest_s == 32 ||
+        (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
+        ret = maid_mac_new(&hmac_sha2, key, (bits64) ? 128 : 64, digest_s);
 
-extern maid_mac *
-maid_hmac_sha384(const u8 *key)
-{
-    return maid_mac_new(&hmac_sha384, key);
-}
-
-extern maid_mac *
-maid_hmac_sha512(const u8 *key)
-{
-    return maid_mac_new(&hmac_sha512, key);
-}
-
-extern maid_mac *
-maid_hmac_sha512_224(const u8 *key)
-{
-    return maid_mac_new(&hmac_sha512_224, key);
-}
-
-extern maid_mac *
-maid_hmac_sha512_256(const u8 *key)
-{
-    return maid_mac_new(&hmac_sha512_256, key);
+    return ret;
 }

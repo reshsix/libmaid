@@ -922,34 +922,34 @@ maid_test_sha2(void)
 
     maid_hash *h = NULL;
 
-    h = maid_sha224();
+    h = maid_sha2(false, 28);
     ret -= test_hash(h, input0, outputs0[0]);
-    h = maid_sha224();
+    h = maid_sha2(false, 28);
     ret -= test_hash(h, input1, outputs1[0]);
 
-    h = maid_sha256();
+    h = maid_sha2(false, 32);
     ret -= test_hash(h, input0, outputs0[1]);
-    h = maid_sha256();
+    h = maid_sha2(false, 32);
     ret -= test_hash(h, input1, outputs1[1]);
 
-    h = maid_sha384();
+    h = maid_sha2(true, 48);
     ret -= test_hash(h, input0, outputs0[2]);
-    h = maid_sha384();
+    h = maid_sha2(true, 48);
     ret -= test_hash(h, input2, outputs2[0]);
 
-    h = maid_sha512();
+    h = maid_sha2(true, 64);
     ret -= test_hash(h, input0, outputs0[3]);
-    h = maid_sha512();
+    h = maid_sha2(true, 64);
     ret -= test_hash(h, input2, outputs2[1]);
 
-    h = maid_sha512_224();
+    h = maid_sha2(true, 28);
     ret -= test_hash(h, input0, outputs0[4]);
-    h = maid_sha512_224();
+    h = maid_sha2(true, 28);
     ret -= test_hash(h, input2, outputs2[2]);
 
-    h = maid_sha512_256();
+    h = maid_sha2(true, 32);
     ret -= test_hash(h, input0, outputs0[5]);
-    h = maid_sha512_256();
+    h = maid_sha2(true, 32);
     ret -= test_hash(h, input2, outputs2[3]);
 
     return ret;
@@ -993,18 +993,18 @@ maid_test_hmac_sha2(void)
     maid_mac *m = NULL;
     u8 zeros[128] = {0};
 
-    m = maid_hmac_sha224(zeros);
+    m = maid_hmac_sha2(false, zeros, 28);
     ret -= test_mac(m, keys[0], data, tags[0]);
-    m = maid_hmac_sha256(zeros);
+    m = maid_hmac_sha2(false, zeros, 32);
     ret -= test_mac(m, keys[0], data, tags[1]);
 
-    m = maid_hmac_sha384(zeros);
+    m = maid_hmac_sha2(true, zeros, 48);
     ret -= test_mac(m, keys[1], data, tags[2]);
-    m = maid_hmac_sha512(zeros);
+    m = maid_hmac_sha2(true, zeros, 64);
     ret -= test_mac(m, keys[1], data, tags[3]);
-    m = maid_hmac_sha512_224(zeros);
+    m = maid_hmac_sha2(true, zeros, 28);
     ret -= test_mac(m, keys[1], data, tags[4]);
-    m = maid_hmac_sha512_256(zeros);
+    m = maid_hmac_sha2(true, zeros, 32);
     ret -= test_mac(m, keys[1], data, tags[5]);
 
     return ret;

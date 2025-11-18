@@ -476,37 +476,37 @@ mac(int argc, char *argv[])
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_hmac_sha224(key);
+                ctx = maid_hmac_sha2(false, key, 28);
         }
         else if (strcmp(argv[1], "hmac-sha256") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_hmac_sha256(key);
+                ctx = maid_hmac_sha2(false, key, 32);
         }
         else if (strcmp(argv[1], "hmac-sha384") == 0)
         {
             ret = get_data(argv[2], key, 128, false);
             if (ret)
-                ctx = maid_hmac_sha384(key);
+                ctx = maid_hmac_sha2(true, key, 48);
         }
         else if (strcmp(argv[1], "hmac-sha512") == 0)
         {
             ret = get_data(argv[2], key, 128, false);
             if (ret)
-                ctx = maid_hmac_sha512(key);
+                ctx = maid_hmac_sha2(true, key, 64);
         }
         else if (strcmp(argv[1], "hmac-sha512-224") == 0)
         {
             ret = get_data(argv[2], key, 128, false);
             if (ret)
-                ctx = maid_hmac_sha512_224(key);
+                ctx = maid_hmac_sha2(true, key, 28);
         }
         else if (strcmp(argv[1], "hmac-sha512-256") == 0)
         {
             ret = get_data(argv[2], key, 128, false);
             if (ret)
-                ctx = maid_hmac_sha512_256(key);
+                ctx = maid_hmac_sha2(true, key, 32);
         }
         else if (strcmp(argv[1], "poly1305") == 0)
         {
@@ -518,49 +518,49 @@ mac(int argc, char *argv[])
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2s_k(key, 16);
+                ctx = maid_blake2k(false, key, 16);
         }
         else if (strcmp(argv[1], "blake2s-160") == 0)
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2s_k(key, 20);
+                ctx = maid_blake2k(false, key, 20);
         }
         else if (strcmp(argv[1], "blake2s-224") == 0)
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2s_k(key, 28);
+                ctx = maid_blake2k(false, key, 28);
         }
         else if (strcmp(argv[1], "blake2s-256") == 0)
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2s_k(key, 32);
+                ctx = maid_blake2k(false, key, 32);
         }
         else if (strcmp(argv[1], "blake2b-160") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2b_k(key, 20);
+                ctx = maid_blake2k(true, key, 20);
         }
         else if (strcmp(argv[1], "blake2b-256") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2b_k(key, 32);
+                ctx = maid_blake2k(true, key, 32);
         }
         else if (strcmp(argv[1], "blake2b-384") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2b_k(key, 48);
+                ctx = maid_blake2k(true, key, 48);
         }
         else if (strcmp(argv[1], "blake2b-512") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2b_k(key, 64);
+                ctx = maid_blake2k(true, key, 64);
         }
         else
             ret = usage("mac");
@@ -644,33 +644,33 @@ hash(int argc, char *argv[])
 
         maid_hash *ctx = NULL;
         if (strcmp(argv[1], "sha224") == 0)
-            ctx = maid_sha224();
+            ctx = maid_sha2(false, 28);
         else if (strcmp(argv[1], "sha256") == 0)
-            ctx = maid_sha256();
+            ctx = maid_sha2(false, 32);
         else if (strcmp(argv[1], "sha384") == 0)
-            ctx = maid_sha384();
+            ctx = maid_sha2(true, 48);
         else if (strcmp(argv[1], "sha512") == 0)
-            ctx = maid_sha512();
+            ctx = maid_sha2(true, 64);
         else if (strcmp(argv[1], "sha512-224") == 0)
-            ctx = maid_sha512_224();
+            ctx = maid_sha2(true, 28);
         else if (strcmp(argv[1], "sha512-256") == 0)
-            ctx = maid_sha512_256();
+            ctx = maid_sha2(true, 32);
         else if (strcmp(argv[1], "blake2s-128") == 0)
-            ctx = maid_blake2s(16);
+            ctx = maid_blake2(false, 16);
         else if (strcmp(argv[1], "blake2s-160") == 0)
-            ctx = maid_blake2s(20);
+            ctx = maid_blake2(false, 20);
         else if (strcmp(argv[1], "blake2s-224") == 0)
-            ctx = maid_blake2s(28);
+            ctx = maid_blake2(false, 28);
         else if (strcmp(argv[1], "blake2s-256") == 0)
-            ctx = maid_blake2s(32);
+            ctx = maid_blake2(false, 32);
         else if (strcmp(argv[1], "blake2b-160") == 0)
-            ctx = maid_blake2b(20);
+            ctx = maid_blake2(true, 20);
         else if (strcmp(argv[1], "blake2b-256") == 0)
-            ctx = maid_blake2b(32);
+            ctx = maid_blake2(true, 32);
         else if (strcmp(argv[1], "blake2b-384") == 0)
-            ctx = maid_blake2b(48);
+            ctx = maid_blake2(true, 48);
         else if (strcmp(argv[1], "blake2b-512") == 0)
-            ctx = maid_blake2b(64);
+            ctx = maid_blake2(true, 64);
         else
             ret = usage("hash");
 

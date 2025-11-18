@@ -22,12 +22,11 @@
 
 struct maid_rng_def
 {
-    void * (*new)(uint8_t, const uint8_t *);
+    void * (*new)(const uint8_t *);
     void * (*del)(void *);
     void (*renew)(void *, const uint8_t *);
     void (*generate)(void *, uint8_t *);
     size_t state_s;
-    uint8_t version;
 };
 
 maid_rng *maid_rng_new(const struct maid_rng_def *def, const uint8_t *entropy);

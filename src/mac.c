@@ -27,6 +27,7 @@
 struct maid_mac
 {
     const struct maid_mac_def *def;
+    u8 state_s, digest_s;
     void *ctx;
 
     u8 *buffer;
@@ -48,7 +49,8 @@ maid_mac_del(maid_mac *m)
 }
 
 extern struct maid_mac *
-maid_mac_new(const struct maid_mac_def *def, const u8 *key)
+maid_mac_new(const struct maid_mac_def *def, const u8 *key,
+             u8 state_s, u8 digest_s)
 {
     struct maid_mac *ret = NULL;
     if (key)
@@ -56,9 +58,12 @@ maid_mac_new(const struct maid_mac_def *def, const u8 *key)
 
     if (ret)
     {
-        ret->def = def;
-        ret->ctx = def->new(def->version, key);
-        ret->buffer = calloc(1, def->state_s);
+        ret->def      = def;
+        ret->state_s  = state_s;
+        ret->digest_s = digest_s;
+
+        ret->ctx    = def->new(key, state_s, digest_s);
+        ret->buffer = calloc(1, state_s);
         if (!(ret->ctx && ret->buffer))
             ret = maid_mac_del(ret);
     }
@@ -75,7 +80,7 @@ maid_mac_renew(struct maid_mac *m, const u8 *key)
 
         m->buffer_c = 0;
         m->finished = false;
-        maid_mem_clear(m->buffer, m->def->state_s);
+        maid_mem_clear(m->buffer, m->state_s);
     }
 }
 
@@ -86,15 +91,15 @@ maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
     {
         while (size)
         {
-            u8 empty = m->def->state_s - m->buffer_c;
+            u8 empty = m->state_s - m->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
             memcpy(&(m->buffer[m->buffer_c]), buffer, copy);
             m->buffer_c += copy;
-            if (m->buffer_c < m->def->state_s)
+            if (m->buffer_c < m->state_s)
                 break;
 
-            m->def->update(m->ctx, m->buffer, m->def->state_s);
+            m->def->update(m->ctx, m->buffer, m->state_s);
             m->buffer_c = 0;
 
             buffer = &(buffer[copy]);
@@ -118,7 +123,7 @@ maid_mac_digest(struct maid_mac *m, u8 *output)
 
         m->finished = true;
 
-        ret = m->def->digest_s;
+        ret = m->digest_s;
     }
 
     return ret;

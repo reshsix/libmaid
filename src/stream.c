@@ -52,9 +52,7 @@ maid_stream_del(maid_stream *st)
 
 extern struct maid_stream *
 maid_stream_new(const struct maid_stream_def *def,
-                const u8 *restrict key,
-                const u8 *restrict nonce,
-                u64 counter)
+                const u8 *key, const u8 *nonce, u64 counter)
 {
     struct maid_stream *ret = NULL;
     if (key && nonce)
@@ -63,7 +61,7 @@ maid_stream_new(const struct maid_stream_def *def,
     if (ret)
     {
         ret->def = def;
-        ret->ctx = def->new(def->version, key, nonce, counter);
+        ret->ctx = def->new(key, nonce, counter);
         ret->buffer = calloc(1, def->state_s);
 
         if (!(ret->ctx && ret->buffer))
@@ -74,8 +72,8 @@ maid_stream_new(const struct maid_stream_def *def,
 }
 
 extern void
-maid_stream_renew(struct maid_stream *st, const u8 *restrict key,
-                  const u8 *restrict nonce, u64 counter)
+maid_stream_renew(struct maid_stream *st,
+                  const u8 *key, const u8 *nonce, u64 counter)
 {
     if (st)
     {

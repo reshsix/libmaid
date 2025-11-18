@@ -60,7 +60,7 @@ maid_rng_new(const struct maid_rng_def *def, const u8 *entropy)
     if (ret)
     {
         ret->def = def;
-        ret->ctx = def->new(def->version, entropy);
+        ret->ctx = def->new(entropy);
 
         ret->buffer = calloc(1, def->state_s);
         if (!(ret->ctx && ret->buffer))

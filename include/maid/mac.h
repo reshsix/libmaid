@@ -19,18 +19,13 @@
 #define MAID_MAC_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct maid_mac maid_mac;
 
 maid_mac *maid_poly1305(const uint8_t *key);
-maid_mac *maid_hmac_sha224(const uint8_t *key);
-maid_mac *maid_hmac_sha256(const uint8_t *key);
-maid_mac *maid_hmac_sha384(const uint8_t *key);
-maid_mac *maid_hmac_sha512(const uint8_t *key);
-maid_mac *maid_hmac_sha512_224(const uint8_t *key);
-maid_mac *maid_hmac_sha512_256(const uint8_t *key);
-maid_mac *maid_blake2s_k(const uint8_t *key, uint8_t digest_s);
-maid_mac *maid_blake2b_k(const uint8_t *key, uint8_t digest_s);
+maid_mac *maid_hmac_sha2(bool bits64, const uint8_t *key, uint8_t digest_s);
+maid_mac *maid_blake2k(bool bits64, const uint8_t *key, uint8_t digest_s);
 maid_mac *maid_mac_del(maid_mac *m);
 
 void maid_mac_renew(maid_mac *m, const uint8_t *key);

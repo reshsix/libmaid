@@ -78,9 +78,10 @@ poly1305_del(void *ctx)
 }
 
 static void *
-poly1305_new(u8 version, const u8 *key)
+poly1305_new(const u8 *key, u8 state_s, u8 digest_s)
 {
-    (void)version;
+    (void)state_s;
+    (void)digest_s;
 
     struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
 
@@ -160,12 +161,10 @@ static const struct maid_mac_def poly1305_def =
     .renew    = poly1305_renew,
     .update   = poly1305_update,
     .digest   = poly1305_digest,
-    .state_s  = 16,
-    .digest_s = 16,
 };
 
 extern maid_mac *
 maid_poly1305(const u8 *key)
 {
-    return maid_mac_new(&poly1305_def, key);
+    return maid_mac_new(&poly1305_def, key, 16, 16);
 }

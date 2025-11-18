@@ -19,6 +19,7 @@
 #define MAID_KDF_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct maid_kdf maid_kdf;
 
@@ -28,14 +29,8 @@ struct maid_hkdf_params
     size_t info_s;
 };
 
-maid_kdf *maid_hkdf_sha224(const struct maid_hkdf_params *p, size_t output_s);
-maid_kdf *maid_hkdf_sha256(const struct maid_hkdf_params *p, size_t output_s);
-maid_kdf *maid_hkdf_sha384(const struct maid_hkdf_params *p, size_t output_s);
-maid_kdf *maid_hkdf_sha512(const struct maid_hkdf_params *p, size_t output_s);
-maid_kdf *maid_hkdf_sha512_224(const struct maid_hkdf_params *p,
-                               size_t output_s);
-maid_kdf *maid_hkdf_sha512_256(const struct maid_hkdf_params *p,
-                               size_t output_s);
+maid_kdf *maid_hkdf_sha2(const struct maid_hkdf_params *p,
+                         bool bits64, uint8_t digest_s, size_t output_s);
 maid_kdf *maid_kdf_del(maid_kdf *k);
 
 void maid_kdf_renew(maid_kdf *k, const void *params);

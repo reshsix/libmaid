@@ -22,12 +22,12 @@
 
 typedef struct maid_stream maid_stream;
 
-maid_stream *maid_chacha20(const uint8_t *restrict key,
-                           const uint8_t *restrict nonce, uint64_t counter);
+maid_stream *maid_chacha20(const uint8_t *key, const uint8_t *nonce,
+                           uint64_t counter);
 maid_stream *maid_stream_del(maid_stream *st);
 
-void maid_stream_renew(maid_stream *st, const uint8_t *restrict key,
-                       const uint8_t *restrict nonce, uint64_t counter);
+void maid_stream_renew(maid_stream *st, const uint8_t *key,
+                       const uint8_t *nonce, uint64_t counter);
 void maid_stream_xor(maid_stream *st, uint8_t *buffer, size_t size);
 
 #endif

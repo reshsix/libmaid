@@ -55,8 +55,7 @@ maid_aead_del(struct maid_aead *ae)
 
 extern struct maid_aead *
 maid_aead_new(const struct maid_aead_def *def,
-              const u8 *restrict key,
-              const u8 *restrict nonce)
+              const u8 *key, const u8 *nonce)
 {
     struct maid_aead *ret = NULL;
     if (key && nonce)
@@ -79,8 +78,7 @@ maid_aead_new(const struct maid_aead_def *def,
 }
 
 extern void
-maid_aead_renew(struct maid_aead *ae, const u8 *restrict key,
-                const u8 *restrict nonce)
+maid_aead_renew(struct maid_aead *ae, const u8 *key, const u8 *nonce)
 {
     if (ae)
     {

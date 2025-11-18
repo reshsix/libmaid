@@ -88,7 +88,7 @@ edwards25519_new(void)
 
     if (ret)
     {
-        ret->hash = maid_sha512();
+        ret->hash = maid_sha2(true, 64);
         ret->ff   = maid_ff_new(MAID_FF_25519);
         if (ret->hash && ret->ff)
             ret->prime = maid_ff_prime(ret->ff);
@@ -654,16 +654,15 @@ ed25519_del(void *ed25519)
 }
 
 static void *
-ed25519_new(u8 version, u8 *pub, u8 *prv)
+ed25519_new(u8 *pub, u8 *prv)
 {
     struct ed25519 *ret = calloc(1, sizeof(struct ed25519));
 
-    (void)version;
     if (ret)
     {
         /* Allocation */
         ret->ecc  = maid_edwards25519();
-        ret->hash = maid_sha512();
+        ret->hash = maid_sha2(true, 64);
         if (!(ret->ecc && ret->hash))
             ret = ed25519_del(ret);
 
@@ -838,7 +837,6 @@ static const struct maid_sign_def ed25519_def =
     .size     = ed25519_size,
     .generate = ed25519_generate,
     .verify   = ed25519_verify,
-    .version  = 0
 };
 
 extern maid_sign *

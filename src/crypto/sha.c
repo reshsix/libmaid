@@ -50,59 +50,59 @@ sr64(u64 a, u8 n)
 
 /* SHA-2 implementation */
 
-enum
-{
-    SHA_224, SHA_256, SHA_384, SHA_512, SHA_512_224, SHA_512_256
-};
-
 static void
-sha_init(u8 version, void *h)
+sha_init(void *h, bool bits64, u8 digest_s)
 {
-    switch (version)
+    if (bits64)
     {
-        case SHA_224:;
-            u32 i224[8] = {0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939,
-                           0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4};
-            memcpy(h, i224, sizeof(i224));
-            break;
+        switch (digest_s)
+        {
+            case 28:;
+                u64 i512_224[8] = {0x8c3d37c819544da2, 0x73e1996689dcd4d6,
+                                   0x1dfab7ae32ff9c82, 0x679dd514582f9fcf,
+                                   0x0f6d2b697bd44da8, 0x77e36f7304c48942,
+                                   0x3f9d85a86a1d36c8, 0x1112e6ad91d692a1};
+                memcpy(h, i512_224, sizeof(i512_224));
+                break;
+            case 32:;
+                u64 i512_256[8] = {0x22312194fc2bf72c, 0x9f555fa3c84c64c2,
+                                   0x2393b86b6f53b151, 0x963877195940eabd,
+                                   0x96283ee2a88effe3, 0xbe5e1e2553863992,
+                                   0x2b0199fc2c85b8aa, 0x0eb72ddc81c52ca2};
+                memcpy(h, i512_256, sizeof(i512_256));
+                break;
+            case 48:;
+                u64 i384[8] = {0xcbbb9d5dc1059ed8, 0x629a292a367cd507,
+                               0x9159015a3070dd17, 0x152fecd8f70e5939,
+                               0x67332667ffc00b31, 0x8eb44a8768581511,
+                               0xdb0c2e0d64f98fa7, 0x47b5481dbefa4fa4};
+                memcpy(h, i384, sizeof(i384));
+                break;
+            case 64:;
+                u64 i512[8] = {0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
+                               0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
+                               0x510e527fade682d1, 0x9b05688c2b3e6c1f,
+                               0x1f83d9abfb41bd6b, 0x5be0cd19137e2179};
+                memcpy(h, i512, sizeof(i512));
+                break;
+        }
+    }
+    else
+    {
+        switch (digest_s)
+        {
+            case 28:;
+                u32 i224[8] = {0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939,
+                               0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4};
+                memcpy(h, i224, sizeof(i224));
+                break;
 
-        case SHA_256:;
-            u32 i256[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                           0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-            memcpy(h, i256, sizeof(i256));
-            break;
-
-        case SHA_384:;
-            u64 i384[8] = {0xcbbb9d5dc1059ed8, 0x629a292a367cd507,
-                           0x9159015a3070dd17, 0x152fecd8f70e5939,
-                           0x67332667ffc00b31, 0x8eb44a8768581511,
-                           0xdb0c2e0d64f98fa7, 0x47b5481dbefa4fa4};
-            memcpy(h, i384, sizeof(i384));
-            break;
-
-        case SHA_512:;
-            u64 i512[8] = {0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
-                           0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
-                           0x510e527fade682d1, 0x9b05688c2b3e6c1f,
-                           0x1f83d9abfb41bd6b, 0x5be0cd19137e2179};
-            memcpy(h, i512, sizeof(i512));
-            break;
-
-        case SHA_512_224:;
-            u64 i512_224[8] = {0x8c3d37c819544da2, 0x73e1996689dcd4d6,
-                               0x1dfab7ae32ff9c82, 0x679dd514582f9fcf,
-                               0x0f6d2b697bd44da8, 0x77e36f7304c48942,
-                               0x3f9d85a86a1d36c8, 0x1112e6ad91d692a1};
-            memcpy(h, i512_224, sizeof(i512_224));
-            break;
-
-        case SHA_512_256:;
-            u64 i512_256[8] = {0x22312194fc2bf72c, 0x9f555fa3c84c64c2,
-                               0x2393b86b6f53b151, 0x963877195940eabd,
-                               0x96283ee2a88effe3, 0xbe5e1e2553863992,
-                               0x2b0199fc2c85b8aa, 0x0eb72ddc81c52ca2};
-            memcpy(h, i512_256, sizeof(i512_256));
-            break;
+            case 32:;
+                u32 i256[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                               0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+                memcpy(h, i256, sizeof(i256));
+                break;
+        }
     }
 }
 
@@ -129,36 +129,40 @@ sha256_rounds(u32 *h, const u8 *message)
     for (u8 i = 0; i < 16; i++)
         w[i] = maid_mem_read(message, i, sizeof(u32), true);
 
+    u32 tmp[2] = {0};
     for (u8 i = 16; i < 64; i++)
     {
-       u32 s0 = rr32(w[i - 15], 7) ^ rr32(w[i - 15], 18) ^ sr32(w[i - 15], 3);
-       u32 s1 = rr32(w[i - 2], 17) ^ rr32(w[i - 2],  19) ^ sr32(w[i - 2], 10);
-       w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+       tmp[0] = rr32(w[i - 15], 7) ^ rr32(w[i - 15], 18) ^ sr32(w[i - 15], 3);
+       tmp[1] = rr32(w[i - 2], 17) ^ rr32(w[i - 2],  19) ^ sr32(w[i - 2], 10);
+       w[i] = w[i - 16] + tmp[0] + w[i - 7] + tmp[1];
     }
 
     u32 var[] = {h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]};
-
     for (u8 i = 0; i < 64; i++)
     {
-        u32 s0 = rr32(var[0], 2) ^ rr32(var[0], 13) ^ rr32(var[0], 22);
-        u32 s1 = rr32(var[4], 6) ^ rr32(var[4], 11) ^ rr32(var[4], 25);
-        u32 cho = (var[4] & var[5]) ^ ((~var[4]) & var[6]);
-        u32 maj = (var[0] & var[1]) ^ (var[0] & var[2]) ^ (var[1] & var[2]);
-        u32 tmp1 = var[7] + s1 + cho + k[i] + w[i];
-        u32 tmp2 = s0 + maj;
+        tmp[0] = rr32(var[0], 2) ^ rr32(var[0], 13) ^ rr32(var[0], 22);
+        tmp[0] += (var[0] & var[1]) ^ (var[0] & var[2]) ^ (var[1] & var[2]);
+
+        tmp[1] = rr32(var[4], 6) ^ rr32(var[4], 11) ^ rr32(var[4], 25);
+        tmp[1] += (var[4] & var[5]) ^ ((~var[4]) & var[6]);
+        tmp[1] += var[7] + k[i] + w[i];
 
         var[7] = var[6];
         var[6] = var[5];
         var[5] = var[4];
-        var[4] = var[3] + tmp1;
+        var[4] = var[3] + tmp[1];
         var[3] = var[2];
         var[2] = var[1];
         var[1] = var[0];
-        var[0] = tmp1 + tmp2;
+        var[0] = tmp[1] + tmp[0];
     }
 
     for (u8 i = 0; i < 8; i++)
         h[i] += var[i];
+
+    maid_mem_clear(w,   sizeof(w));
+    maid_mem_clear(tmp, sizeof(tmp));
+    maid_mem_clear(var, sizeof(var));
 }
 
 static void
@@ -208,95 +212,59 @@ sha512_rounds(u64 *h, const u8 *message)
     for (u8 i = 0; i < 16; i++)
         w[i] = maid_mem_read(message, i, sizeof(u64), true);
 
+    u64 tmp[2] = {0};
     for (u8 i = 16; i < 80; i++)
     {
-       u64 s0 = rr64(w[i - 15], 1) ^ rr64(w[i - 15],  8) ^ sr64(w[i - 15], 7);
-       u64 s1 = rr64(w[i - 2], 19) ^ rr64(w[i - 2],  61) ^ sr64(w[i - 2],  6);
-       w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+       tmp[0] = rr64(w[i - 15], 1) ^ rr64(w[i - 15],  8) ^ sr64(w[i - 15], 7);
+       tmp[1] = rr64(w[i - 2], 19) ^ rr64(w[i - 2],  61) ^ sr64(w[i - 2],  6);
+       w[i] = w[i - 16] + tmp[0] + w[i - 7] + tmp[1];
     }
 
     u64 var[] = {h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]};
-
     for (u8 i = 0; i < 80; i++)
     {
-        u64 s0 = rr64(var[0], 28) ^ rr64(var[0], 34) ^ rr64(var[0], 39);
-        u64 s1 = rr64(var[4], 14) ^ rr64(var[4], 18) ^ rr64(var[4], 41);
-        u64 cho = (var[4] & var[5]) ^ ((~var[4]) & var[6]);
-        u64 maj = (var[0] & var[1]) ^ (var[0] & var[2]) ^ (var[1] & var[2]);
-        u64 tmp1 = var[7] + s1 + cho + k[i] + w[i];
-        u64 tmp2 = s0 + maj;
+        tmp[0] = rr64(var[0], 28) ^ rr64(var[0], 34) ^ rr64(var[0], 39);
+        tmp[0] += (var[0] & var[1]) ^ (var[0] & var[2]) ^ (var[1] & var[2]);
+
+        tmp[1] = rr64(var[4], 14) ^ rr64(var[4], 18) ^ rr64(var[4], 41);
+        tmp[1] += (var[4] & var[5]) ^ ((~var[4]) & var[6]);
+        tmp[1] += var[7] + k[i] + w[i];
 
         var[7] = var[6];
         var[6] = var[5];
         var[5] = var[4];
-        var[4] = var[3] + tmp1;
+        var[4] = var[3] + tmp[1];
         var[3] = var[2];
         var[2] = var[1];
         var[1] = var[0];
-        var[0] = tmp1 + tmp2;
+        var[0] = tmp[1] + tmp[0];
     }
 
     for (u8 i = 0; i < 8; i++)
         h[i] += var[i];
+
+    maid_mem_clear(w,   sizeof(w));
+    maid_mem_clear(tmp, sizeof(tmp));
+    maid_mem_clear(var, sizeof(var));
 }
 
 static void
-sha_rounds(u8 version, void *h, const u8 *message)
+sha_rounds(void *h, const u8 *message, bool bits64)
 {
-    switch (version)
-    {
-        case SHA_224:;
-        case SHA_256:;
-            sha256_rounds(h, message);
-            break;
-
-        case SHA_384:;
-        case SHA_512:;
-        case SHA_512_224:;
-        case SHA_512_256:;
-            sha512_rounds(h, message);
-            break;
-    }
+    if (bits64)
+        sha512_rounds(h, message);
+    else
+        sha256_rounds(h, message);
 }
 
 static void
-sha_output(u8 version, void *h, u8 *tag)
+sha_output(void *h, u8 *tag, bool bits64, size_t digest_s)
 {
-    u8 length = 0;
-    bool bits64 = false;
-    bool trunc = false;
+    u8 length = digest_s / ((bits64) ? 8 : 4);
 
-    switch (version)
-    {
-        case SHA_224:
-            length = 7;
-            break;
-
-        case SHA_256:
-            length = 8;
-            break;
-
-        case SHA_384:
-            length = 6;
-            bits64 = true;
-            break;
-
-        case SHA_512:
-            length = 8;
-            bits64 = true;
-            break;
-
-        case SHA_512_224:
-            length = 4;
-            bits64 = true;
-            trunc = true;
-            break;
-
-        case SHA_512_256:
-            length = 4;
-            bits64 = true;
-            break;
-    }
+    bool trunc = (bits64 && digest_s == 28);
+    if (trunc)
+        length++;
 
     if (!bits64)
     {
@@ -325,8 +293,8 @@ sha_output(u8 version, void *h, u8 *tag)
 
 struct sha
 {
-    u8 version;
     bool bits64;
+    u8 digest_s;
     u64 h[8];
 
     size_t length;
@@ -336,29 +304,23 @@ struct sha
 static void *
 sha_del(void *ctx)
 {
+    if (ctx)
+        maid_mem_clear(ctx, sizeof(struct sha));
+
     free(ctx);
     return NULL;
 }
 
 static void *
-sha_new(u8 version)
+sha_new(u8 state_s, u8 digest_s)
 {
     struct sha *s2 = calloc(1, sizeof(struct sha));
 
     if (s2)
     {
-        s2->version = version;
-        sha_init(s2->version, &(s2->h));
-
-        switch (s2->version)
-        {
-            case SHA_384:
-            case SHA_512:
-            case SHA_512_224:
-            case SHA_512_256:
-                s2->bits64 = true;
-                break;
-        }
+        s2->bits64   = (state_s == 128);
+        s2->digest_s = digest_s;
+        sha_init(&(s2->h), s2->bits64, s2->digest_s);
     }
 
     return s2;
@@ -370,7 +332,7 @@ sha_renew(void *ctx)
     if (ctx)
     {
         struct sha *s2 = ctx;
-        sha_init(s2->version, &(s2->h));
+        sha_init(&(s2->h), s2->bits64, s2->digest_s);
         s2->length = 0;
         s2->last = false;
     }
@@ -388,7 +350,7 @@ sha_update(void *ctx, u8 *buffer, size_t size)
         u8 limit2 = ((s2->bits64) ? limit1 - 16 : limit1 - 8) - 1;
 
         if (size >= limit1)
-            sha_rounds(s2->version, &(s2->h), buffer);
+            sha_rounds(&(s2->h), buffer, s2->bits64);
         else
         {
             u8 buffer2[128] = {0};
@@ -400,14 +362,14 @@ sha_update(void *ctx, u8 *buffer, size_t size)
 
             if (size >= limit2)
             {
-                sha_rounds(s2->version, &(s2->h), buffer2);
+                sha_rounds(&(s2->h), buffer2, s2->bits64);
                 maid_mem_clear(buffer2, limit1);
             }
 
             maid_mem_write(buffer2, (limit1 / sizeof(u64)) - 1,
                            sizeof(u64), true, s2->length);
 
-            sha_rounds(s2->version, &(s2->h), buffer2);
+            sha_rounds(&(s2->h), buffer2, s2->bits64);
         }
     }
 }
@@ -423,114 +385,27 @@ sha_digest(void *ctx, u8 *output)
         if (!(s2->last))
             sha_update(ctx, NULL, 0);
 
-        sha_output(s2->version, &(s2->h), output);
+        sha_output(&(s2->h), output, s2->bits64, s2->digest_s);
     }
 }
 
-static const struct maid_hash_def sha224_def =
+static const struct maid_hash_def sha2_def =
 {
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
+    .new    = sha_new,
+    .del    = sha_del,
+    .renew  = sha_renew,
     .update = sha_update,
     .digest = sha_digest,
-    .state_s = 64,
-    .digest_s = 28,
-    .version = SHA_224
-};
-
-static const struct maid_hash_def sha256_def =
-{
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
-    .update = sha_update,
-    .digest = sha_digest,
-    .state_s = 64,
-    .digest_s = 32,
-    .version = SHA_256
-};
-
-static const struct maid_hash_def sha384_def =
-{
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
-    .update = sha_update,
-    .digest = sha_digest,
-    .state_s = 128,
-    .digest_s = 48,
-    .version = SHA_384
-};
-
-static const struct maid_hash_def sha512_def =
-{
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
-    .update = sha_update,
-    .digest = sha_digest,
-    .state_s = 128,
-    .digest_s = 64,
-    .version = SHA_512
-};
-
-static const struct maid_hash_def sha512_224_def =
-{
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
-    .update = sha_update,
-    .digest = sha_digest,
-    .state_s = 128,
-    .digest_s = 28,
-    .version = SHA_512_224
-};
-
-static const struct maid_hash_def sha512_256_def =
-{
-    .new = sha_new,
-    .del = sha_del,
-    .renew = sha_renew,
-    .update = sha_update,
-    .digest = sha_digest,
-    .state_s = 128,
-    .digest_s = 32,
-    .version = SHA_512_256
 };
 
 extern maid_hash *
-maid_sha224(void)
+maid_sha2(bool bits64, u8 digest_s)
 {
-    return maid_hash_new(&sha224_def);
-}
+    maid_hash *ret = NULL;
 
-extern maid_hash *
-maid_sha256(void)
-{
-    return maid_hash_new(&sha256_def);
-}
+    if (digest_s == 28 || digest_s == 32 ||
+        (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
+        ret = maid_hash_new(&sha2_def, (bits64) ? 128 : 64, digest_s);
 
-extern maid_hash *
-maid_sha384(void)
-{
-    return maid_hash_new(&sha384_def);
-}
-
-extern maid_hash *
-maid_sha512(void)
-{
-    return maid_hash_new(&sha512_def);
-}
-
-extern maid_hash *
-maid_sha512_224(void)
-{
-    return maid_hash_new(&sha512_224_def);
-}
-
-extern maid_hash *
-maid_sha512_256(void)
-{
-    return maid_hash_new(&sha512_256_def);
+    return ret;
 }

@@ -34,7 +34,6 @@ struct maid_aead_def
 };
 
 maid_aead *maid_aead_new(const struct maid_aead_def *def,
-                         const uint8_t *restrict key,
-                         const uint8_t *restrict nonce);
+                         const uint8_t *key, const uint8_t *nonce);
 
 #endif
