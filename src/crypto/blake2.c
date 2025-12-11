@@ -168,12 +168,8 @@ f64(u64 *h, const u64 *m, u64 th, u64 tl, bool f)
 }
 
 static void
-blake2_init(void *h, bool bits64, u8 nn, bool keyed)
+blake2_init(void *h, bool bits64, u8 nn, u8 kk)
 {
-    size_t kk = 0;
-    if (keyed)
-        kk = (bits64) ? 64 : 32;
-
     if (bits64)
     {
         memcpy(h, iv64, sizeof(iv64));
@@ -204,18 +200,39 @@ blake2_output(void *h, bool bits64, u8 length, u8 *tag)
 {
     if (!bits64)
     {
+        u8 remain = length % sizeof(u32);
+        length    = length / sizeof(u32);
+
         u32 *h32 = h;
         for (u8 i = 0; i < length; i++)
             maid_mem_write(tag, i, sizeof(u32), false, h32[i]);
+
+        if (remain)
+        {
+            u8 mem[sizeof(u32)] = {0};
+            maid_mem_write(mem, 0, sizeof(u32), false, h32[length]);
+
+            memcpy(&(tag[length * sizeof(u32)]), mem, remain);
+            maid_mem_clear(mem, sizeof(mem));
+        }
     }
     else
     {
+        u8 remain = length % sizeof(u64);
+        length    = length / sizeof(u64);
+
         u64 *h64 = h;
-        for (u8 i = 0; i < length - 1; i++)
+        for (u8 i = 0; i < length; i++)
             maid_mem_write(tag, i, sizeof(u64), false, h64[i]);
 
-        maid_mem_write(tag, (length - 1) * 2,  sizeof(u32), false,
-                       h64[length - 1] >> 32);
+        if (remain)
+        {
+            u8 mem[sizeof(u64)] = {0};
+            maid_mem_write(mem, 0, sizeof(u64), false, h64[length]);
+
+            memcpy(&(tag[length * sizeof(u64)]), mem, remain);
+            maid_mem_clear(mem, sizeof(mem));
+        }
     }
 }
 
@@ -224,7 +241,7 @@ blake2_output(void *h, bool bits64, u8 length, u8 *tag)
 struct blake2
 {
     bool bits64;
-    u8 nn;
+    u8 nn, kk;
 
     u64 h[8];
     u8 buf[128];
@@ -346,18 +363,18 @@ blake2k_init(void *ctx, const u8 *key)
     if (ctx)
     {
         struct blake2 *b2 = ctx;
-        blake2_init(&(b2->h), b2->bits64, b2->nn, true);
+        blake2_init(&(b2->h), b2->bits64, b2->nn, b2->kk);
 
-        size_t kk = (b2->bits64) ? 64 : 32;
-        u8 buf[128] = {0};
-        memcpy(buf, key, kk);
-        blake2_update(b2, buf, kk * 2);
+        u8 buf[(b2->bits64) ? 128 : 64];
+        maid_mem_clear(buf, sizeof(buf));
+        memcpy(buf, key, b2->kk);
+        blake2_update(b2, buf, sizeof(buf));
         maid_mem_clear(buf, sizeof(buf));
     }
 }
 
 static void *
-blake2k_new(const u8 *key, u8 state_s, u8 digest_s)
+blake2k_new(const u8 *key, u8 key_s, u8 state_s, u8 digest_s)
 {
     struct blake2 *ret = calloc(1, sizeof(struct blake2));
 
@@ -366,6 +383,7 @@ blake2k_new(const u8 *key, u8 state_s, u8 digest_s)
         ret->first   = true;
         ret->bits64  = (state_s == 128);
         ret->nn      = digest_s;
+        ret->kk      = key_s;
 
         blake2k_init(ret, key);
     }
@@ -382,7 +400,6 @@ blake2k_renew(void *ctx, const u8 *key)
     b2->last = false;
 
     blake2k_init(ctx, key);
-    maid_mem_clear(b2->buf, sizeof(b2->buf));
 }
 
 static const struct maid_mac_def blake2k_def =
@@ -395,13 +412,14 @@ static const struct maid_mac_def blake2k_def =
 };
 
 extern maid_mac *
-maid_blake2k(bool bits64, const u8 *key, u8 digest_s)
+maid_blake2k(bool bits64, u8 digest_s, const u8 *key, u8 key_s)
 {
     maid_mac *ret = NULL;
 
-    if (( bits64 && digest_s >= 1 && digest_s <= 64) ||
-        (!bits64 && digest_s >= 1 && digest_s <= 32) )
-        ret = maid_mac_new(&blake2k_def, key, (bits64) ? 128 : 64, digest_s);
+    if (( bits64 && digest_s >= 1 && digest_s <= 64 && key_s <= 64) ||
+        (!bits64 && digest_s >= 1 && digest_s <= 32 && key_s <= 32) )
+        ret = maid_mac_new(&blake2k_def, key, key_s,
+                           (bits64) ? 128 : 64, digest_s);
 
     return ret;
 }

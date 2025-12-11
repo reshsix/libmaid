@@ -78,8 +78,9 @@ poly1305_del(void *ctx)
 }
 
 static void *
-poly1305_new(const u8 *key, u8 state_s, u8 digest_s)
+poly1305_new(const u8 *key, u8 key_s, u8 state_s, u8 digest_s)
 {
+    (void)key_s;
     (void)state_s;
     (void)digest_s;
 
@@ -166,5 +167,5 @@ static const struct maid_mac_def poly1305_def =
 extern maid_mac *
 maid_poly1305(const u8 *key)
 {
-    return maid_mac_new(&poly1305_def, key, 16, 16);
+    return maid_mac_new(&poly1305_def, key, 32, 16, 16);
 }

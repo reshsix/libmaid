@@ -98,6 +98,7 @@ maid_hash_update(struct maid_hash *h, const u8 *buffer, size_t size)
 
             h->def->update(h->ctx, h->buffer, h->state_s);
             h->buffer_c = 0;
+            maid_mem_clear(h->buffer, h->state_s);
 
             buffer = &(buffer[copy]);
             size -= copy;

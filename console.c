@@ -518,49 +518,49 @@ mac(int argc, char *argv[])
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2k(false, key, 16);
+                ctx = maid_blake2k(false, 16, key, 32);
         }
         else if (strcmp(argv[1], "blake2s-160") == 0)
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2k(false, key, 20);
+                ctx = maid_blake2k(false, 20, key, 32);
         }
         else if (strcmp(argv[1], "blake2s-224") == 0)
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2k(false, key, 28);
+                ctx = maid_blake2k(false, 28, key, 32);
         }
         else if (strcmp(argv[1], "blake2s-256") == 0)
         {
             ret = get_data(argv[2], key, 32, false);
             if (ret)
-                ctx = maid_blake2k(false, key, 32);
+                ctx = maid_blake2k(false, 32, key, 32);
         }
         else if (strcmp(argv[1], "blake2b-160") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2k(true, key, 20);
+                ctx = maid_blake2k(true, 20, key, 64);
         }
         else if (strcmp(argv[1], "blake2b-256") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2k(true, key, 32);
+                ctx = maid_blake2k(true, 32, key, 64);
         }
         else if (strcmp(argv[1], "blake2b-384") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2k(true, key, 48);
+                ctx = maid_blake2k(true, 48, key, 64);
         }
         else if (strcmp(argv[1], "blake2b-512") == 0)
         {
             ret = get_data(argv[2], key, 64, false);
             if (ret)
-                ctx = maid_blake2k(true, key, 64);
+                ctx = maid_blake2k(true, 64, key, 64);
         }
         else
             ret = usage("mac");
@@ -1250,12 +1250,20 @@ test(int argc, char *argv[])
 
         TEST(maid_test_mem)
         TEST(maid_test_mp)
-
+        printf("\n");
         TEST(maid_test_chacha)
         TEST(maid_test_poly1305)
         TEST(maid_test_chacha20poly1305)
+        printf("\n");
+        TEST(maid_test_chacha20_rng);
+        printf("\n");
+        TEST(maid_test_blake2)
+        TEST(maid_test_blake2k)
+        printf("\n");
         TEST(maid_test_sha2)
         TEST(maid_test_hmac_sha2)
+        TEST(maid_test_hkdf_sha2)
+        printf("\n");
         TEST(maid_test_curve25519)
         TEST(maid_test_edwards25519)
 

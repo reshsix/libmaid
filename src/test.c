@@ -20,6 +20,7 @@
 
 #include <maid/mp.h>
 #include <maid/ecc.h>
+#include <maid/kdf.h>
 #include <maid/kex.h>
 #include <maid/mac.h>
 #include <maid/mem.h>
@@ -415,6 +416,38 @@ test_rng(maid_rng *g, char *entropy, char *output)
     else
         ret = false;
     maid_rng_del(g);
+
+    return ret;
+}
+
+static bool
+test_hkdf(bool bits64, size_t digest_s,
+          char *input, char *output, char *salt, char *info)
+{
+    bool ret = true;
+
+    TEST_IMPORT(output_b, output)
+
+    struct maid_hkdf_params p = {.info = NULL, .info_s = 0};
+    maid_kdf *k = maid_hkdf_sha2(&p, bits64, digest_s, sizeof(output_b));
+    if (ret && k)
+    {
+        TEST_IMPORT(input_b,  input)
+        TEST_IMPORT(salt_b, salt)
+        TEST_IMPORT(info_b, info)
+        TEST_EMPTY(output2_b, output)
+
+        if (ret)
+        {
+            p.info   = info_b;
+            p.info_s = sizeof(info_b);
+            maid_kdf_renew(k, &p);
+            maid_kdf_hash(k, input_b, sizeof(input_b),
+                          salt_b, sizeof(salt_b), output2_b);
+            ret = maid_mem_cmp(output_b, output2_b, sizeof(output_b));
+        }
+    }
+    maid_kdf_del(k);
 
     return ret;
 }
@@ -875,6 +908,128 @@ maid_test_chacha20poly1305(void)
 }
 
 extern u8
+maid_test_chacha20_rng(void)
+{
+    /* One vector from Chacha20 RFC8439 vectors */
+
+    u8 ret = 1;
+
+
+    char entropy[] = "1c9240a5eb55d38af333888604f6b5f0"
+                     "473917c1402b80099dca5cbc207075c0"
+                     "000000000000000000000002";
+    char output[]  = "965e3bc6f9ec7ed9560808f4d229f94b"
+                     "137ff275ca9b3fcbdd59deaad23310ae";
+
+    u8 zeros[44] = {0};
+    maid_rng *g = maid_chacha20_rng(zeros);
+    ret -= test_rng(g, entropy, output);
+
+    return ret;
+}
+
+extern u8
+maid_test_blake2(void)
+{
+    /* Comparison with other implementation */
+    u8 ret = 4;
+
+    maid_hash *h = NULL;
+    char *input[] = {"41414141414141414141414141414141"
+                     "42424242424242424242424242424242"
+                     "43434343434343434343434343434343"
+                     "44444444444444444444444444444444"
+                     "45454545454545454545454545454545",
+                     "41414141414141414141414141414141"
+                     "42424242424242424242424242424242"
+                     "43434343434343434343434343434343"
+                     "44444444444444444444444444444444"
+                     "45454545454545454545454545454545"
+                     "46464646464646464646464646464646"
+                     "47474747474747474747474747474747"
+                     "48484848484848484848484848484848"
+                     "49494949494949494949494949494949"};
+
+    h = maid_blake2(false, 32);
+    ret -= test_hash(h, input[0],
+                     "70823ccd93338440a94857e8f7259b4e"
+                     "907432b0290b1c480eb96aeaeb9a9f2f");
+    h = maid_blake2(true, 64);
+    ret -= test_hash(h, input[1],
+                     "3d1ed85f78d95f8e1e88a6594d9c3ca6"
+                     "236ece2dcc4069b405012a7ab89e50b5"
+                     "9d69ea41562bfcc9de4bc4742c1bcc7d"
+                     "ade3843edeb62f649d5705eb6b084bc5");
+
+    h = maid_blake2(false, 31);
+    ret -= test_hash(h, input[0],
+                     "04b8b0036e2bf3064c55a61ef471496e"
+                     "35ec44a4347b1259b715f3ff5b2dca");
+    h = maid_blake2(true, 63);
+    ret -= test_hash(h, input[1],
+                     "ae65cc80af9a851588dac908e5308e3f"
+                     "5187205d1e93775c5b26dd0d61c697ed"
+                     "841fb46db7bef7c3a29488e762748f70"
+                     "d16aec671b4ad3219a3713a30e9ed2");
+
+    return ret;
+}
+
+extern u8
+maid_test_blake2k(void)
+{
+    /* Comparison with other implementation */
+    u8 ret = 4;
+
+    maid_mac *m = NULL;
+    char *key  [] = {"41414141414141414141414141414141"
+                     "42424242424242424242424242424242",
+                     "41414141414141414141414141414141"
+                     "42424242424242424242424242424242"
+                     "43434343434343434343434343434343"
+                     "44444444444444444444444444444444"};
+    char *input[] = {"41414141414141414141414141414141"
+                     "42424242424242424242424242424242"
+                     "43434343434343434343434343434343"
+                     "44444444444444444444444444444444"
+                     "45454545454545454545454545454545",
+                     "41414141414141414141414141414141"
+                     "42424242424242424242424242424242"
+                     "43434343434343434343434343434343"
+                     "44444444444444444444444444444444"
+                     "45454545454545454545454545454545"
+                     "46464646464646464646464646464646"
+                     "47474747474747474747474747474747"
+                     "48484848484848484848484848484848"
+                     "49494949494949494949494949494949"};
+
+    u8 empty[64] = {0};
+    m = maid_blake2k(false, 32, empty, 32);
+    ret -= test_mac(m, key[0], input[0],
+                    "683832d20c6ee232522598e3048c677b"
+                    "39ce5c07ae040ffdd548fe027258e6a4");
+    m = maid_blake2k(true, 64, empty, 64);
+    ret -= test_mac(m, key[1], input[1],
+                    "6fc5fab086737360ac153fa9e7b52f7e"
+                    "628aeabeb6ca81c185209001bc6e0b11"
+                    "f978d89b11ce5691f3f79edb21dba595"
+                    "8d6ee8f48375c2bdfa9ff0ecf5b2a81d");
+
+    m = maid_blake2k(false, 31, empty, 32);
+    ret -= test_mac(m, key[0], input[0],
+                    "f1c8699d74e8e04d70f34b77cffeeeac"
+                    "cbc099d1188582d163dd43b011d2b1");
+    m = maid_blake2k(true, 63, empty, 64);
+    ret -= test_mac(m, key[1], input[1],
+                    "98d80fbefb90c9f0cfa0882c17c2a38a"
+                    "fa0b5016c8b4106dd5221197cae2af62"
+                    "1e9bd19d102ba815803886928da24e7a"
+                    "67911ed7b5e8e60b7a288b406b4c1b");
+
+    return ret;
+}
+
+extern u8
 maid_test_sha2(void)
 {
     /* SHA-2 NIST CSRC examples */
@@ -1006,6 +1161,53 @@ maid_test_hmac_sha2(void)
     ret -= test_mac(m, keys[1], data, tags[4]);
     m = maid_hmac_sha2(true, zeros, 32);
     ret -= test_mac(m, keys[1], data, tags[5]);
+
+    return ret;
+}
+
+extern u8
+maid_test_hkdf_sha2(void)
+{
+    /* RFC5869 test vectors */
+
+    u8 ret = 3;
+
+    ret -= test_hkdf(false, 32,
+                     "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+                     "0b0b0b0b0b0b",
+                     "3cb25f25faacd57a90434f64d0362f2a"
+                     "2d2d0a90cf1a5a4c5db02d56ecc4c5bf"
+                     "34007208d5b887185865",
+                     "000102030405060708090a0b0c",
+                     "f0f1f2f3f4f5f6f7f8f9");
+    ret -= test_hkdf(false, 32,
+                     "000102030405060708090a0b0c0d0e0f"
+                     "101112131415161718191a1b1c1d1e1f"
+                     "202122232425262728292a2b2c2d2e2f"
+                     "303132333435363738393a3b3c3d3e3f"
+                     "404142434445464748494a4b4c4d4e4f",
+                     "b11e398dc80327a1c8e7f78c596a4934"
+                     "4f012eda2d4efad8a050cc4c19afa97c"
+                     "59045a99cac7827271cb41c65e590e09"
+                     "da3275600c2f09b8367793a9aca3db71"
+                     "cc30c58179ec3e87c14c01d5c1f3434f"
+                     "1d87",
+                     "606162636465666768696a6b6c6d6e6f"
+                     "707172737475767778797a7b7c7d7e7f"
+                     "808182838485868788898a8b8c8d8e8f"
+                     "909192939495969798999a9b9c9d9e9f"
+                     "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+                     "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+                     "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
+                     "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
+                     "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
+                     "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
+    ret -= test_hkdf(false, 32,
+                     "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+                     "0b0b0b0b0b0b",
+                     "8da4e775a563c18f715f802a063c5a31"
+                     "b8a11f5c5ee1879ec3454e5f3c738d2d"
+                     "9d201395faa4b61a96c8", "", "");
 
     return ret;
 }

@@ -73,11 +73,11 @@ hmac_del(void *ctx)
 }
 
 static void *
-hmac_new(const u8 *key, u8 state_s, u8 digest_s)
+hmac_new(const u8 *key, u8 key_s, u8 state_s, u8 digest_s)
 {
     struct hmac *ret = calloc(1, sizeof(struct hmac));
 
-    (void)digest_s;
+    (void)key_s;
     if (ret)
     {
         ret->hash   = maid_sha2((state_s == 128), digest_s);
@@ -142,7 +142,7 @@ maid_hmac_sha2(bool bits64, const u8 *key, u8 digest_s)
 
     if (digest_s == 28 || digest_s == 32 ||
         (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
-        ret = maid_mac_new(&hmac_sha2, key, (bits64) ? 128 : 64, digest_s);
+        ret = maid_mac_new(&hmac_sha2, key, 0, (bits64) ? 128 : 64, digest_s);
 
     return ret;
 }

@@ -49,7 +49,7 @@ maid_mac_del(maid_mac *m)
 }
 
 extern struct maid_mac *
-maid_mac_new(const struct maid_mac_def *def, const u8 *key,
+maid_mac_new(const struct maid_mac_def *def, const u8 *key, u8 key_s,
              u8 state_s, u8 digest_s)
 {
     struct maid_mac *ret = NULL;
@@ -62,7 +62,7 @@ maid_mac_new(const struct maid_mac_def *def, const u8 *key,
         ret->state_s  = state_s;
         ret->digest_s = digest_s;
 
-        ret->ctx    = def->new(key, state_s, digest_s);
+        ret->ctx    = def->new(key, key_s, state_s, digest_s);
         ret->buffer = calloc(1, state_s);
         if (!(ret->ctx && ret->buffer))
             ret = maid_mac_del(ret);
@@ -101,6 +101,7 @@ maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
 
             m->def->update(m->ctx, m->buffer, m->state_s);
             m->buffer_c = 0;
+            maid_mem_clear(m->buffer, m->state_s);
 
             buffer = &(buffer[copy]);
             size -= copy;
