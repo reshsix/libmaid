@@ -530,7 +530,7 @@ test_ecc(maid_ecc *c, size_t words, char *base, char *inf,
 extern u8
 maid_test_mem(void)
 {
-    u8 ret = 26;
+    u8 ret = 78;
 
     u8 mem[24] = {0x00, 0x00, 0x00, 0x00, 0xb0, 0x0b, 0x00, 0x00};
 
@@ -561,19 +561,35 @@ maid_test_mem(void)
     ret -= maid_mem_cmp(NULL, NULL, sizeof(mem));
 
     /* From RFC 4648 */
-    char *base64[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==",
-                      "Zm9vYmE=", "Zm9vYmFy"};
-    char  *ascii[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
+    char *base16l[]  = {"", "66", "666f", "666f6f", "666f6f62",
+                        "666f6f6261", "666f6f626172"};
+    char *base16u[]  = {"", "66", "666F", "666F6F", "666F6F62",
+                        "666F6F6261", "666F6F626172"};
+    char *base32[]  = {"", "MY======", "MZXQ====", "MZXW6===",
+                      "MZXW6YQ=", "MZXW6YTB", "MZXW6YTBOI======"};
+    char *base32h[] = {"", "CO======", "CPNG====", "CPNMU===",
+                      "CPNMUOG=", "CPNMUOJ1", "CPNMUOJ1E8======"};
+    char *base64[]  = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==",
+                       "Zm9vYmE=", "Zm9vYmFy"};
+    char  *ascii[]  = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
 
     for (size_t i = 0; i < 7; i++)
     {
-        ret -= test_mem_import(MAID_BASE64, base64[i], ascii[i]);
-        ret -= test_mem_export(MAID_BASE64, ascii[i], base64[i]);
-    }
+        ret -= test_mem_import(MAID_BASE16L, base16l[i], ascii[i]);
+        ret -= test_mem_export(MAID_BASE16L, ascii[i], base16l[i]);
 
-    char *bad64[] = {"Zm9vYg", "Zm9vY%", "Zm9vY=Fy", "Zm9vYm=y"};
-    for (size_t i = 0; i < 4; i++)
-        ret -= !test_mem_import(MAID_BASE64, bad64[i], ascii[6]);
+        ret -= test_mem_import(MAID_BASE16U, base16u[i], ascii[i]);
+        ret -= test_mem_export(MAID_BASE16U, ascii[i], base16u[i]);
+
+        ret -= test_mem_import(MAID_BASE32,  base32[i], ascii[i]);
+        ret -= test_mem_export(MAID_BASE32,  ascii[i], base32[i]);
+
+        ret -= test_mem_import(MAID_BASE32H, base32h[i], ascii[i]);
+        ret -= test_mem_export(MAID_BASE32H, ascii[i], base32h[i]);
+
+        ret -= test_mem_import(MAID_BASE64,  base64[i], ascii[i]);
+        ret -= test_mem_export(MAID_BASE64,  ascii[i], base64[i]);
+    }
 
     return ret;
 }

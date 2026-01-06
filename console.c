@@ -184,7 +184,7 @@ get_data(char *input, u8 *out, size_t size, bool lt)
     }
     else if (strncmp(input, "b32h:", 5) == 0)
     {
-        type = MAID_BASE32HEX;
+        type = MAID_BASE32H;
         input = &(input[5]);
         conv = (size * 8) / 5;
     }
@@ -192,12 +192,6 @@ get_data(char *input, u8 *out, size_t size, bool lt)
     {
         type = MAID_BASE64;
         input = &(input[4]);
-        conv = (size * 4) / 3;
-    }
-    else if (strncmp(input, "b64u:", 5) == 0)
-    {
-        type = MAID_BASE64URL;
-        input = &(input[5]);
         conv = (size * 4) / 3;
     }
     else if (strncmp(input, "str:", 4) == 0)
@@ -400,9 +394,8 @@ usage(char *ctx)
                         "    base16l\n"
                         "    base16u\n"
                         "    base32\n"
-                        "    base32hex\n"
-                        "    base64\n"
-                        "    base64url\n");
+                        "    base32h\n"
+                        "    base64\n");
     else if (strcmp(ctx, "decode") == 0)
         fprintf(stderr, "maid decode [algorithm] < data\n"
                         "Decodes data from a certain format\n\n"
@@ -410,9 +403,8 @@ usage(char *ctx)
                         "    base16l\n"
                         "    base16u\n"
                         "    base32\n"
-                        "    base32hex\n"
-                        "    base64\n"
-                        "    base64url\n");
+                        "    base32h\n"
+                        "    base64\n");
     else
         fprintf(stderr, "maid %s: No usage text found\n", ctx);
 
@@ -1138,21 +1130,15 @@ encode_decode(int argc, char *argv[], bool decode)
             memb = 5;
             forb = 8;
         }
-        else if (strcmp(argv[1], "base32hex") == 0)
+        else if (strcmp(argv[1], "base32h") == 0)
         {
-            type = MAID_BASE32HEX;
+            type = MAID_BASE32H;
             memb = 5;
             forb = 8;
         }
         else if (strcmp(argv[1], "base64") == 0)
         {
             type = MAID_BASE64;
-            memb = 3;
-            forb = 4;
-        }
-        else if (strcmp(argv[1], "base64url") == 0)
-        {
-            type = MAID_BASE64URL;
             memb = 3;
             forb = 4;
         }

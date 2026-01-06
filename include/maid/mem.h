@@ -33,9 +33,8 @@ enum maid_mem
     MAID_BASE16L,
     MAID_BASE16U,
     MAID_BASE32,
-    MAID_BASE32HEX,
-    MAID_BASE64,
-    MAID_BASE64URL
+    MAID_BASE32H,
+    MAID_BASE64
 };
 size_t maid_mem_import(enum maid_mem type, void *addr, size_t limit,
                        const char *input, size_t length);

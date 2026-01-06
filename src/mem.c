@@ -333,7 +333,7 @@ base32_export(const void *addr, size_t length,
 
 static size_t
 base64_import(void *addr, size_t limit,
-              const char *input, size_t length, bool url)
+              const char *input, size_t length)
 {
     size_t ret = 0;
 
@@ -346,8 +346,8 @@ base64_import(void *addr, size_t limit,
         table['a' + i] = 26 + i;
     for (int i = 0; i < 10; i++)
         table['0' + i] = 52 + i;
-    table[(url) ? '-' : '+'] = 62;
-    table[(url) ? '_' : '/'] = 63;
+    table['+'] = 62;
+    table['/'] = 63;
 
     /* Won't read if there's any error */
     table['='] = 0xFE;
@@ -402,15 +402,12 @@ base64_import(void *addr, size_t limit,
 
 static size_t
 base64_export(const void *addr, size_t length,
-              char *output, size_t limit, bool url)
+              char *output, size_t limit)
 {
     size_t ret = 0;
 
-    const char chars [64] =
+    const char table[64] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    const char chars2[64] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    const char *table = (url) ? chars2 : chars;
 
     if (limit % 4 != 0)
         limit -= limit % 4;
@@ -464,14 +461,11 @@ maid_mem_import(enum maid_mem type, void *addr, size_t limit,
         case MAID_BASE32:
             ret = base32_import(addr, limit, input, length, false);
             break;
-        case MAID_BASE32HEX:
+        case MAID_BASE32H:
             ret = base32_import(addr, limit, input, length, true);
             break;
         case MAID_BASE64:
-            ret = base64_import(addr, limit, input, length, false);
-            break;
-        case MAID_BASE64URL:
-            ret = base64_import(addr, limit, input, length, true);
+            ret = base64_import(addr, limit, input, length);
             break;
     }
 
@@ -495,14 +489,11 @@ maid_mem_export(enum maid_mem type, const void *addr, size_t length,
         case MAID_BASE32:
             ret = base32_export(addr, length, output, limit, false);
             break;
-        case MAID_BASE32HEX:
+        case MAID_BASE32H:
             ret = base32_export(addr, length, output, limit, true);
             break;
         case MAID_BASE64:
-            ret = base64_export(addr, length, output, limit, false);
-            break;
-        case MAID_BASE64URL:
-            ret = base64_export(addr, length, output, limit, true);
+            ret = base64_export(addr, length, output, limit);
             break;
     }
 
