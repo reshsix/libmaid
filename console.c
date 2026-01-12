@@ -1237,6 +1237,10 @@ test(int argc, char *argv[])
         TEST(maid_test_mem)
         TEST(maid_test_mp)
         printf("\n");
+        TEST(maid_test_1305)
+        TEST(maid_test_25519)
+        TEST(maid_test_order25519)
+        printf("\n");
         TEST(maid_test_chacha)
         TEST(maid_test_poly1305)
         TEST(maid_test_chacha20poly1305)
@@ -1252,6 +1256,9 @@ test(int argc, char *argv[])
         printf("\n");
         TEST(maid_test_curve25519)
         TEST(maid_test_edwards25519)
+        printf("\n");
+        TEST(maid_test_ed25519)
+        TEST(maid_test_x25519)
 
         #undef TEST
 

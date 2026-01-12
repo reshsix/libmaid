@@ -23,6 +23,10 @@
 uint8_t maid_test_mem(void);
 uint8_t maid_test_mp(void);
 
+uint8_t maid_test_1305(void);
+uint8_t maid_test_25519(void);
+uint8_t maid_test_order25519(void);
+
 uint8_t maid_test_chacha(void);
 uint8_t maid_test_poly1305(void);
 uint8_t maid_test_chacha20poly1305(void);
@@ -38,5 +42,8 @@ uint8_t maid_test_hkdf_sha2(void);
 
 uint8_t maid_test_curve25519(void);
 uint8_t maid_test_edwards25519(void);
+
+uint8_t maid_test_ed25519(void);
+uint8_t maid_test_x25519(void);
 
 #endif

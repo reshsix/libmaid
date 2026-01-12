@@ -395,7 +395,12 @@ static void *
 x25519_del(void *x25519)
 {
     if (x25519)
+    {
+        struct x25519 *x = x25519;
+        maid_ecc_del(x->c);
+
         maid_mem_clear(x25519, sizeof(struct x25519));
+    }
     free(x25519);
 
     return NULL;
@@ -404,7 +409,16 @@ x25519_del(void *x25519)
 static void *
 x25519_new(void)
 {
-    return calloc(1, sizeof(struct x25519));
+    struct x25519 *ret = calloc(1, sizeof(struct x25519));
+
+    if (ret)
+    {
+        ret->c = maid_curve25519();
+        if (!(ret->c))
+            ret = x25519_del(ret);
+    }
+
+    return ret;
 }
 
 static bool

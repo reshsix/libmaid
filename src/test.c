@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <maid/ff.h>
 #include <maid/mp.h>
 #include <maid/ecc.h>
 #include <maid/kdf.h>
@@ -210,21 +211,33 @@ test_mp_s(size_t words, void (*f)(size_t, maid_mp_word *, size_t),
     return ret;
 }
 
-/*
 static bool
-test_mp_mulmod(size_t words, char *a, char *b, char *m, char *r)
+test_ff_p(size_t words, const maid_ff *ff, char *r)
+{
+    bool ret = true;
+
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+        ret &= maid_mem_cmp(maid_ff_prime(ff), rm, size);
+
+    return ret;
+}
+
+static bool
+test_ff_1(void (*f)(size_t, maid_mp_word *, const maid_ff *),
+          size_t words, char *a, const maid_ff *ff, char *r)
 {
     bool ret = true;
 
     TEST_IMPORT_MP(words, am, ab, a)
-    TEST_IMPORT_MP(words, bm, bb, b)
-    TEST_IMPORT_MP(words, mm, mb, m)
     TEST_IMPORT_MP(words, rm, rb, r)
 
     size_t size = words * sizeof(maid_mp_word);
     if (ret)
     {
-        maid_mp_mulmod(words, am, bm, mm);
+        f(words, am, ff);
         ret &= maid_mem_cmp(am, rm, size);
     }
 
@@ -232,48 +245,57 @@ test_mp_mulmod(size_t words, char *a, char *b, char *m, char *r)
 }
 
 static bool
-test_mp_invmod(size_t words, char *a, char *n, char *m, char *r)
+test_ff_i(size_t words, char *a, const maid_ff *ff, char *r)
 {
     bool ret = true;
 
     TEST_IMPORT_MP(words, am, ab, a)
-    TEST_IMPORT_MP(words, nm, nb, n)
-    TEST_IMPORT_MP(words, mm, mb, m)
-    TEST_IMPORT_MP(words, rm, rb, r)
-
-    size_t size = words * sizeof(maid_mp_word);
-    if (ret)
-        ret &= !maid_mp_invmod(words, nm, mm);
-
-    if (ret)
-        ret &= maid_mp_invmod(words, am, mm);
-
-    if (ret)
-        ret &= maid_mem_cmp(am, rm, size);
-
-    return ret;
-}
-
-static bool
-test_mp_expmod(size_t words, char *a, char *b, char *m, char *r)
-{
-    bool ret = true;
-
-    TEST_IMPORT_MP(words, am, ab, a)
-    TEST_IMPORT_MP(words, bm, bb, b)
-    TEST_IMPORT_MP(words, mm, mb, m)
     TEST_IMPORT_MP(words, rm, rb, r)
 
     size_t size = words * sizeof(maid_mp_word);
     if (ret)
     {
-        maid_mp_expmod(words, am, bm, mm);
+        ret &= maid_ff_inv(words, am, ff);
         ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    if (ret)
+    {
+        maid_mem_clear(am, size);
+        ret &= !(maid_ff_inv(words, am, ff));
     }
 
     return ret;
 }
-*/
+
+static bool
+test_ff_2(void (*f)(size_t, maid_mp_word *,
+                    const maid_mp_word *, const maid_ff *),
+          size_t words, char *a, char *b, const maid_ff *ff, bool zeros,
+          char *r)
+{
+    bool ret = true;
+
+    TEST_EMPTY_MP(words, zm)
+    TEST_IMPORT_MP(words, am, ab, a)
+    TEST_IMPORT_MP(words, bm, bb, b)
+    TEST_IMPORT_MP(words, rm, rb, r)
+
+    size_t size = words * sizeof(maid_mp_word);
+    if (ret)
+    {
+        f(words, am, bm, ff);
+        ret &= maid_mem_cmp(am, rm, size);
+    }
+
+    if (ret)
+    {
+        f(words, am, NULL, ff);
+        ret &= maid_mem_cmp(am, (zeros) ? zm : rm, size);
+    }
+
+    return ret;
+}
 
 static bool
 test_stream(maid_stream *st, char *key, char *nonce,
@@ -525,6 +547,86 @@ test_ecc(maid_ecc *c, size_t words, char *base, char *inf,
     return ret;
 }
 
+static bool
+test_sign(maid_sign *s, char *data, char *sign)
+{
+    bool ret = true;
+
+    if (s)
+    {
+        TEST_IMPORT(data_b, data);
+        TEST_IMPORT(sign_b, sign);
+
+        TEST_EMPTY(buf_b, sign)
+        if (ret)
+            ret = maid_sign_size(s) == sizeof(sign_b);
+
+        if (ret)
+        {
+            ret = maid_sign_generate(s, data_b, sizeof(data_b), buf_b);
+            if (ret)
+                ret = maid_mem_cmp(buf_b, sign_b, sizeof(buf_b));
+        }
+
+        if (ret)
+            ret = maid_sign_verify(s, data_b, sizeof(data_b), buf_b);
+    }
+    else
+        ret = false;
+    maid_sign_del(s);
+
+    return ret;
+}
+
+static bool
+test_kex(maid_kex *x, char *prv, char *pub, char *prv2, char *pub2, char *sec)
+{
+    bool ret = true;
+
+    if (x)
+    {
+        TEST_IMPORT(prv_b,  prv);
+        TEST_IMPORT(pub_b,  pub);
+        TEST_IMPORT(prv2_b, prv2);
+        TEST_IMPORT(pub2_b, pub2);
+        TEST_IMPORT(sec_b,  sec);
+
+        TEST_EMPTY(buf_b, prv)
+        if (ret)
+        {
+            ret = maid_kex_pubgen(x, prv_b, buf_b);
+            if (ret)
+                ret = maid_mem_cmp(pub_b, buf_b, sizeof(buf_b));
+        }
+
+        if (ret)
+        {
+            ret = maid_kex_pubgen(x, prv2_b, buf_b);
+            if (ret)
+                ret = maid_mem_cmp(pub2_b, buf_b, sizeof(buf_b));
+        }
+
+        if (ret)
+        {
+            ret = maid_kex_secgen(x, prv_b, pub2_b, buf_b);
+            if (ret)
+                ret = maid_mem_cmp(sec_b, buf_b, sizeof(buf_b));
+        }
+
+        if (ret)
+        {
+            ret = maid_kex_secgen(x, prv2_b, pub_b, buf_b);
+            if (ret)
+                ret = maid_mem_cmp(sec_b, buf_b, sizeof(buf_b));
+        }
+    }
+    else
+        ret = false;
+    maid_kex_del(x);
+
+    return ret;
+}
+
 /* Implemented tests */
 
 extern u8
@@ -636,6 +738,135 @@ maid_test_mp(void)
            "002363a195fd757c1bc3e3da2363a1bd81a3e3dbbd5b7d4f95fd7cf400000000");
     ret -= test_mp_s(words, maid_mp_sar, sb, 45, false,
            "fffffffffffef56e06f6f56fd675f77dd5f05d6e57f05f52bfd656f6801f688d");
+
+    return ret;
+}
+
+extern u8
+maid_test_1305(void)
+{
+    /* ComparIson with python */
+
+    u8 ret = 7;
+
+    maid_ff *ff = maid_ff_new(MAID_FF_1305);
+    if (ff)
+    {
+        char *s0 = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
+                   "11b1d0dec0d1f1eddeadbea7cafebe7a";
+        char *sa = "00000000000000000000000000000002"
+                   "02b83f4700e81032dc6c28155c592ce1";
+        char *sb = "00000000000000000000000000000003"
+                   "22438911613849865bbd5b3d9a46fc62";
+
+        size_t words = MAID_MP_WORDS(256);
+        ret -= test_ff_p(words, ff,
+                         "00000000000000000000000000000003"
+                         "fffffffffffffffffffffffffffffffb");
+        ret -= test_ff_1(maid_ff_mod, words, s0, ff, sa);
+        ret -= test_ff_i(words, sa, ff,
+                         "00000000000000000000000000000002"
+                         "58923187c2541e454c0bfe60a7a3457c");
+        ret -= test_ff_2(maid_ff_add, words, sa, sb, ff, false,
+                         "00000000000000000000000000000001"
+                         "24fbc858622059b938298352f6a02948");
+        ret -= test_ff_2(maid_ff_sub, words, sa, sb, ff, false,
+                         "00000000000000000000000000000002"
+                         "e074b6359fafc6ac80aeccd7c212307a");
+        ret -= test_ff_2(maid_ff_mul, words, sa, sb, ff, true,
+                         "00000000000000000000000000000001"
+                         "9c95c9df7c97511b8bc15bb86256fb10");
+        ret -= test_ff_2(maid_ff_exp, words, sa, sb, ff, false,
+                         "00000000000000000000000000000000"
+                         "5d9d80380dfd58baf42257c9ce49918d");
+    }
+    maid_ff_del(ff);
+
+    return ret;
+}
+
+extern u8
+maid_test_25519(void)
+{
+    /* Comparison with python */
+
+    u8 ret = 7;
+
+    maid_ff *ff = maid_ff_new(MAID_FF_25519);
+    if (ff)
+    {
+        char *s0 = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
+                   "11b1d0dec0d1f1eddeadbea7cafebe7a";
+        char *sa = "40d1f1ed0011b1d0cafebabe0de1f1ed"
+                   "11b1d0dec0d1f1eddeadbea7cafebe8d";
+        char *sb = "5eadc0dedeadfacebeefbabe0badcafe"
+                   "0bea57facaded003ed11b1d00badbeba";
+
+        size_t words = MAID_MP_WORDS(256);
+        ret -= test_ff_p(words, ff,
+                         "7fffffffffffffffffffffffffffffff"
+                         "ffffffffffffffffffffffffffffffed");
+        ret -= test_ff_1(maid_ff_mod, words, s0, ff, sa);
+        ret -= test_ff_i(words, sa, ff,
+                         "73ea5ef44dd52163a5bdb81e124295a6"
+                         "f797925597ad96816c09fb1eb79ce294");
+        ret -= test_ff_2(maid_ff_add, words, sa, sb, ff, false,
+                         "1f7fb2cbdebfac9f89ee757c198fbceb"
+                         "1d9c28d98bb0c1f1cbbf7077d6ac7d5a");
+        ret -= test_ff_2(maid_ff_sub, words, sa, sb, ff, false,
+                         "6224310e2163b7020c0f0000023426ef"
+                         "05c778e3f5f321e9f19c0cd7bf50ffc0");
+        ret -= test_ff_2(maid_ff_mul, words, sa, sb, ff, true,
+                         "71ac4e1bb600fe2fb60e85a61eed5f92"
+                         "5d5e3bb1049bad0479d87f08c3c7b2dd");
+        ret -= test_ff_2(maid_ff_exp, words, sa, sb, ff, false,
+                         "73e6ad78efc874b6e6a2e727a79c24ac"
+                         "6587275c6b95348cfdd0e3ef76a78979");
+    }
+    maid_ff_del(ff);
+
+    return ret;
+}
+
+extern u8
+maid_test_order25519(void)
+{
+    /* Comparison with python */
+
+    u8 ret = 7;
+
+    maid_ff *ff = maid_ff_new(MAID_FF_ORDER25519);
+    if (ff)
+    {
+        char *s0 = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
+                   "11b1d0dec0d1f1eddeadbea7cafebe7a";
+        char *sa = "00d1f1ed0011b1d0cafebabe0de1f1ec"
+                   "173e1a6f1d3697e1bdd1196b6f78cf5e";
+        char *sb = "0eadc0dedeadfacebeefbabe0badcafc"
+                   "fc97a7ac844bd9217422a9795331fb9e";
+
+        size_t words = MAID_MP_WORDS(256);
+        ret -= test_ff_p(words, ff,
+                         "10000000000000000000000000000000"
+                         "14def9dea2f79cd65812631a5cf5d3ed");
+        ret -= test_ff_1(maid_ff_mod, words, s0, ff, sa);
+        ret -= test_ff_i(words, sa, ff,
+                         "0d3e313dce17039688b54efbe6e97323"
+                         "176c569870c23fa07ef438c8a5dbb123");
+        ret -= test_ff_2(maid_ff_add, words, sa, sb, ff, false,
+                         "0f7fb2cbdebfac9f89ee757c198fbce9"
+                         "13d5c21ba182710331f3c2e4c2aacafc");
+        ret -= test_ff_2(maid_ff_sub, words, sa, sb, ff, false,
+                         "0224310e2163b7020c0f0000023426ef"
+                         "2f856ca13be25b96a1c0d30c793ca7ad");
+        ret -= test_ff_2(maid_ff_mul, words, sa, sb, ff, true,
+                         "0e44c69609854c3458cd781bd9a2e3c8"
+                         "608a10f01f998ec18ef32d7b6431cb94");
+        ret -= test_ff_2(maid_ff_exp, words, sa, sb, ff, false,
+                         "01a23aa9771edab2459adfdf8d0ec8de"
+                         "96443852aed3fa6b4913f957be638f56");
+    }
+    maid_ff_del(ff);
 
     return ret;
 }
@@ -1264,4 +1495,75 @@ maid_test_edwards25519(void)
                         "3c010ac0f12e7a42cb33284f86837c30",
                         "d75a980182b10ab7d54bfed3c964073a"
                         "0ee172f3daa62325af021a68f707511a");
+}
+
+extern u8
+maid_test_ed25519(void)
+{
+    u8 ret = 3;
+
+    /* RFC8032 test vectors */
+    u8 pub[] = {0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7,
+                0xd5, 0x4b, 0xfe, 0xd3, 0xc9, 0x64, 0x07, 0x3a,
+                0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
+                0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a};
+    u8 prv[] = {0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60,
+                0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4,
+                0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19,
+                0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60};
+
+    u8 pub2[] = {0x3d, 0x40, 0x17, 0xc3, 0xe8, 0x43, 0x89, 0x5a,
+                 0x92, 0xb7, 0x0a, 0xa7, 0x4d, 0x1b, 0x7e, 0xbc,
+                 0x9c, 0x98, 0x2c, 0xcf, 0x2e, 0xc4, 0x96, 0x8c,
+                 0xc0, 0xcd, 0x55, 0xf1, 0x2a, 0xf4, 0x66, 0x0c};
+    u8 prv2[] = {0x4c, 0xcd, 0x08, 0x9b, 0x28, 0xff, 0x96, 0xda,
+                 0x9d, 0xb6, 0xc3, 0x46, 0xec, 0x11, 0x4e, 0x0f,
+                 0x5b, 0x8a, 0x31, 0x9f, 0x35, 0xab, 0xa6, 0x24,
+                 0xda, 0x8c, 0xf6, 0xed, 0x4f, 0xb8, 0xa6, 0xfb};
+
+    u8 pub3[] = {0xfc, 0x51, 0xcd, 0x8e, 0x62, 0x18, 0xa1, 0xa3,
+                 0x8d, 0xa4, 0x7e, 0xd0, 0x02, 0x30, 0xf0, 0x58,
+                 0x08, 0x16, 0xed, 0x13, 0xba, 0x33, 0x03, 0xac,
+                 0x5d, 0xeb, 0x91, 0x15, 0x48, 0x90, 0x80, 0x25};
+    u8 prv3[] = {0xc5, 0xaa, 0x8d, 0xf4, 0x3f, 0x9f, 0x83, 0x7b,
+                 0xed, 0xb7, 0x44, 0x2f, 0x31, 0xdc, 0xb7, 0xb1,
+                 0x66, 0xd3, 0x85, 0x35, 0x07, 0x6f, 0x09, 0x4b,
+                 0x85, 0xce, 0x3a, 0x2e, 0x0b, 0x44, 0x58, 0xf7};
+
+    maid_sign *s = maid_ed25519(pub, prv);
+    ret -= test_sign(s, "", "e5564300c360ac729086e2cc806e828a"
+                            "84877f1eb8e5d974d873e06522490155"
+                            "5fb8821590a33bacc61e39701cf9b46b"
+                            "d25bf5f0595bbe24655141438e7a100b");
+
+    s = maid_ed25519(pub2, prv2);
+    ret -= test_sign(s, "72", "92a009a9f0d4cab8720e820b5f642540"
+                              "a2b27b5416503f8fb3762223ebdb69da"
+                              "085ac1e43e15996e458f3613d0f11d8c"
+                              "387b2eaeb4302aeeb00d291612bb0c00");
+
+    s = maid_ed25519(pub3, prv3);
+    ret -= test_sign(s, "af82", "6291d657deec24024827e69c3abe01a3"
+                                "0ce548a284743a445e3680d7db5ac3ac"
+                                "18ff9b538d16f290ae67f760984dc659"
+                                "4a7c15e9716ed28dc027beceea1ec40a");
+
+    return ret;
+}
+
+extern u8
+maid_test_x25519(void)
+{
+    /* RFC7748 test vectors */
+    maid_kex *x = maid_x25519();
+    return 1 - test_kex(x, "77076d0a7318a57d3c16c17251b26645"
+                           "df4c2f87ebc0992ab177fba51db92c2a",
+                           "8520f0098930a754748b7ddcb43ef75a"
+                           "0dbf3a0d26381af4eba4a98eaa9b4e6a",
+                           "5dab087e624a8a4b79e17f8b83800ee6"
+                           "6f3bb1292618b6fd1c2f8b27ff88e0eb",
+                           "de9edb7d7b7dc1b4d35b61c2ece43537"
+                           "3f8343c85b78674dadfc7e146f882b4f",
+                           "4a5d9d5ba4ce2de1728e3bf480350f25"
+                           "e07e21c947d19e3376f09b3c1e161742");
 }
