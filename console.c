@@ -37,6 +37,14 @@
 
 #include <internal/types.h>
 
+#include <maid/crypto/sha2.h>
+#include <maid/crypto/blake2.h>
+#include <maid/crypto/blake2k.h>
+#include <maid/crypto/chacha20.h>
+#include <maid/crypto/poly1305.h>
+#include <maid/crypto/hmac_sha2.h>
+#include <maid/crypto/chacha20rng.h>
+
 /* Filter functions */
 
 static bool
@@ -324,7 +332,7 @@ usage(char *ctx)
         fprintf(stderr, "maid rng [algorithm] [entropy]\n"
                         "Pseudo-randomly generate bytes\n\n"
                         "Algorithms:\n"
-                        "    chacha20-rng (entropy: 44)\n");
+                        "    chacha20rng (entropy: 44)\n");
     else if (strcmp(ctx, "hash") == 0)
         fprintf(stderr, "maid hash [algorithm] < message\n"
                         "Hashes a message\n\n"
@@ -381,7 +389,7 @@ usage(char *ctx)
                         "Algorithms:\n"
                         "    ed25519\n\n"
                         "Generators:\n"
-                        "    chacha20-rng (entropy: 44)\n");
+                        "    chacha20rng (entropy: 44)\n");
     else if (strcmp(ctx, "pubgen") == 0)
         fprintf(stderr, "maid pubgen [algorithm] [key]\n"
                         "Extracts public key from private key\n"
@@ -423,29 +431,32 @@ stream(int argc, char *argv[])
         u8 key[32] = {0};
         u8  iv[16] = {0};
 
+        size_t key_s = 0;
+        size_t iv_s  = 0;
+        u8 buf[4096] = {0};
+
         maid_stream *ctx = NULL;
         if (strcmp(argv[1], "chacha20") == 0)
-        {
-            ret = get_data(argv[2], key, 32, false) &&
-                  get_data(argv[3],  iv, 16, false);
-            if (ret)
-                ctx = maid_chacha20(key, iv, 0);
-        }
+            ctx = maid_chacha20(buf);
         else
             ret = usage("stream");
 
-        if (ret)
+        if (ret && !ctx)
         {
-            if (ctx)
-                run_filter(ctx, filter_stream);
-            else
-                fprintf(stderr, "Out of memory\n");
+            fprintf(stderr, "Out of memory\n");
+            ret = false;
+        }
 
-            maid_stream_del(ctx);
+        if (ret && get_data(argv[2], key, key_s, false) &&
+                   get_data(argv[3],  iv, iv_s,  false))
+        {
+            maid_stream_config(ctx, key, iv, 0);
+            run_filter(ctx, filter_stream);
         }
 
         maid_mem_clear(key, sizeof(key));
         maid_mem_clear(iv,  sizeof(iv));
+        maid_mem_clear(buf, sizeof(buf));
     }
     else
         ret = usage("stream");
@@ -462,112 +473,103 @@ mac(int argc, char *argv[])
     {
         u8 key[128] = {0};
 
+        size_t key_s = 0;
+        u8 buf[4096] = {0};
+
         maid_mac *ctx = NULL;
         ret = true;
         if (strcmp(argv[1], "hmac-sha224") == 0)
         {
-            ret = get_data(argv[2], key, 64, false);
-            if (ret)
-                ctx = maid_hmac_sha2(false, key, 28);
+            key_s = 64;
+            ctx = maid_hmac_sha2(buf, false, 28);
         }
         else if (strcmp(argv[1], "hmac-sha256") == 0)
         {
-            ret = get_data(argv[2], key, 64, false);
-            if (ret)
-                ctx = maid_hmac_sha2(false, key, 32);
+            key_s = 64;
+            ctx = maid_hmac_sha2(buf, false, 32);
         }
         else if (strcmp(argv[1], "hmac-sha384") == 0)
         {
-            ret = get_data(argv[2], key, 128, false);
-            if (ret)
-                ctx = maid_hmac_sha2(true, key, 48);
+            key_s = 128;
+            ctx = maid_hmac_sha2(buf, true, 48);
         }
         else if (strcmp(argv[1], "hmac-sha512") == 0)
         {
-            ret = get_data(argv[2], key, 128, false);
-            if (ret)
-                ctx = maid_hmac_sha2(true, key, 64);
+            key_s = 128;
+            ctx = maid_hmac_sha2(buf, true, 64);
         }
         else if (strcmp(argv[1], "hmac-sha512-224") == 0)
         {
-            ret = get_data(argv[2], key, 128, false);
-            if (ret)
-                ctx = maid_hmac_sha2(true, key, 28);
+            key_s = 128;
+            ctx = maid_hmac_sha2(buf, true, 28);
         }
         else if (strcmp(argv[1], "hmac-sha512-256") == 0)
         {
-            ret = get_data(argv[2], key, 128, false);
-            if (ret)
-                ctx = maid_hmac_sha2(true, key, 32);
+            key_s = 128;
+            ctx = maid_hmac_sha2(buf, true, 32);
         }
         else if (strcmp(argv[1], "poly1305") == 0)
         {
-            ret = get_data(argv[2], key, 32, false);
-            if (ret)
-                ctx = maid_poly1305(key);
+            key_s = 32;
+            ctx = maid_poly1305(buf);
         }
         else if (strcmp(argv[1], "blake2s-128") == 0)
         {
-            ret = get_data(argv[2], key, 32, false);
-            if (ret)
-                ctx = maid_blake2k(false, 16, key, 32);
+            key_s = 32;
+            ctx = maid_blake2k(buf, false, 16, 32);
         }
         else if (strcmp(argv[1], "blake2s-160") == 0)
         {
-            ret = get_data(argv[2], key, 32, false);
-            if (ret)
-                ctx = maid_blake2k(false, 20, key, 32);
+            key_s = 32;
+            ctx = maid_blake2k(buf, false, 20, 32);
         }
         else if (strcmp(argv[1], "blake2s-224") == 0)
         {
-            ret = get_data(argv[2], key, 32, false);
-            if (ret)
-                ctx = maid_blake2k(false, 28, key, 32);
+            key_s = 32;
+            ctx = maid_blake2k(buf, false, 28, 32);
         }
         else if (strcmp(argv[1], "blake2s-256") == 0)
         {
-            ret = get_data(argv[2], key, 32, false);
-            if (ret)
-                ctx = maid_blake2k(false, 32, key, 32);
+            key_s = 32;
+            ctx = maid_blake2k(buf, false, 32, 32);
         }
         else if (strcmp(argv[1], "blake2b-160") == 0)
         {
-            ret = get_data(argv[2], key, 64, false);
-            if (ret)
-                ctx = maid_blake2k(true, 20, key, 64);
+            key_s = 64;
+            ctx = maid_blake2k(buf, true, 20, 64);
         }
         else if (strcmp(argv[1], "blake2b-256") == 0)
         {
-            ret = get_data(argv[2], key, 64, false);
-            if (ret)
-                ctx = maid_blake2k(true, 32, key, 64);
+            key_s = 64;
+            ctx = maid_blake2k(buf, true, 32, 64);
         }
         else if (strcmp(argv[1], "blake2b-384") == 0)
         {
-            ret = get_data(argv[2], key, 64, false);
-            if (ret)
-                ctx = maid_blake2k(true, 48, key, 64);
+            key_s = 64;
+            ctx = maid_blake2k(buf, true, 48, 64);
         }
         else if (strcmp(argv[1], "blake2b-512") == 0)
         {
-            ret = get_data(argv[2], key, 64, false);
-            if (ret)
-                ctx = maid_blake2k(true, 64, key, 64);
+            key_s = 64;
+            ctx = maid_blake2k(buf, true, 64, 64);
         }
         else
             ret = usage("mac");
 
-        if (ret)
+        if (ret && !ctx)
         {
-            if (ctx)
-                run_filter(ctx, filter_mac);
-            else
-                fprintf(stderr, "Out of memory\n");
+            fprintf(stderr, "Out of memory\n");
+            ret = false;
+        }
 
-            maid_mac_del(ctx);
+        if (ret && get_data(argv[2], key, key_s, false))
+        {
+            maid_mac_config(ctx, key);
+            run_filter(ctx, filter_mac);
         }
 
         maid_mem_clear(key, sizeof(key));
+        maid_mem_clear(buf, sizeof(buf));
     }
     else
         ret = usage("mac");
@@ -586,37 +588,41 @@ rng(int argc, char *argv[])
 
         int out = STDOUT_FILENO;
 
-        u8 entropy[48] = {0};
+        u8 entropy[44] = {0};
+
+        size_t entropy_s = 0;
+        u8 buf[4096] = {0};
 
         maid_rng *ctx = NULL;
-        if (strcmp(argv[1], "chacha20-rng") == 0)
+        if (strcmp(argv[1], "chacha20rng") == 0)
         {
-            ret = get_data(argv[2], entropy, 44, false);
-            if (ret)
-                ctx = maid_chacha20_rng(entropy);
+            entropy_s = 44;
+            ctx = maid_chacha20rng(buf);
         }
         else
             ret = usage("rng");
 
-        if (ret)
+        if (ret && !ctx)
         {
-            if (ctx)
-            {
-                u8 buffer[4096] = {0};
-                while (true)
-                {
-                    maid_rng_generate(ctx, buffer, sizeof(buffer));
-                    if (write(out, buffer, sizeof(buffer)) != sizeof(buffer))
-                        break;
-                }
-                maid_mem_clear(buffer, sizeof(buffer));
-            }
-            else
-                fprintf(stderr, "Out of memory\n");
-
-            maid_rng_del(ctx);
+            fprintf(stderr, "Out of memory\n");
+            ret = false;
         }
 
+        if (ret && get_data(argv[2], entropy, entropy_s, false))
+        {
+            maid_rng_config(ctx, entropy);
+
+            u8 buf2[4096] = {0};
+            while (true)
+            {
+                maid_rng_generate(ctx, buf2, sizeof(buf2));
+                if (write(out, buf2, sizeof(buf2)) != sizeof(buf2))
+                    break;
+            }
+            maid_mem_clear(buf2, sizeof(buf2));
+        }
+
+        maid_mem_clear(buf,     sizeof(buf));
         maid_mem_clear(entropy, sizeof(entropy));
     }
     else
@@ -634,47 +640,50 @@ hash(int argc, char *argv[])
     {
         ret = true;
 
+        u8 buf[4096] = {0};
+
         maid_hash *ctx = NULL;
         if (strcmp(argv[1], "sha224") == 0)
-            ctx = maid_sha2(false, 28);
+            ctx = maid_sha2(buf, false, 28);
         else if (strcmp(argv[1], "sha256") == 0)
-            ctx = maid_sha2(false, 32);
+            ctx = maid_sha2(buf, false, 32);
         else if (strcmp(argv[1], "sha384") == 0)
-            ctx = maid_sha2(true, 48);
+            ctx = maid_sha2(buf, true, 48);
         else if (strcmp(argv[1], "sha512") == 0)
-            ctx = maid_sha2(true, 64);
+            ctx = maid_sha2(buf, true, 64);
         else if (strcmp(argv[1], "sha512-224") == 0)
-            ctx = maid_sha2(true, 28);
+            ctx = maid_sha2(buf, true, 28);
         else if (strcmp(argv[1], "sha512-256") == 0)
-            ctx = maid_sha2(true, 32);
+            ctx = maid_sha2(buf, true, 32);
         else if (strcmp(argv[1], "blake2s-128") == 0)
-            ctx = maid_blake2(false, 16);
+            ctx = maid_blake2(buf, false, 16);
         else if (strcmp(argv[1], "blake2s-160") == 0)
-            ctx = maid_blake2(false, 20);
+            ctx = maid_blake2(buf, false, 20);
         else if (strcmp(argv[1], "blake2s-224") == 0)
-            ctx = maid_blake2(false, 28);
+            ctx = maid_blake2(buf, false, 28);
         else if (strcmp(argv[1], "blake2s-256") == 0)
-            ctx = maid_blake2(false, 32);
+            ctx = maid_blake2(buf, false, 32);
         else if (strcmp(argv[1], "blake2b-160") == 0)
-            ctx = maid_blake2(true, 20);
+            ctx = maid_blake2(buf, true, 20);
         else if (strcmp(argv[1], "blake2b-256") == 0)
-            ctx = maid_blake2(true, 32);
+            ctx = maid_blake2(buf, true, 32);
         else if (strcmp(argv[1], "blake2b-384") == 0)
-            ctx = maid_blake2(true, 48);
+            ctx = maid_blake2(buf, true, 48);
         else if (strcmp(argv[1], "blake2b-512") == 0)
-            ctx = maid_blake2(true, 64);
+            ctx = maid_blake2(buf, true, 64);
         else
             ret = usage("hash");
 
-        if (ret)
+        if (ret && !ctx)
         {
-            if (ctx)
-                run_filter(ctx, filter_hash);
-            else
-                fprintf(stderr, "Out of memory\n");
-
-            maid_hash_del(ctx);
+            fprintf(stderr, "Out of memory\n");
+            ret = false;
         }
+
+        if (ret)
+            run_filter(ctx, filter_hash);
+
+        maid_mem_clear(buf, sizeof(buf));
     }
     else
         ret = usage("hash");
@@ -989,16 +998,17 @@ keygen(int argc, char *argv[])
         else
             ret = usage("keygen");
 
+        u8 buf[4096] = {0}; /* TODO */
         u8 entropy[48] = {0};
 
         maid_rng *gen = NULL;
         if (ret)
         {
-            if (strcmp(argv[2], "chacha20-rng") == 0)
+            if (strcmp(argv[2], "chacha20rng") == 0)
             {
                 ret = get_data(argv[3], entropy, 44, false);
                 if (ret)
-                    gen = maid_chacha20_rng(entropy);
+                    gen = maid_chacha20rng(buf);
             }
             else
                 ret = usage("keygen");
@@ -1038,7 +1048,7 @@ keygen(int argc, char *argv[])
             }
         }
 
-        maid_rng_del(gen);
+        maid_mem_clear(buf,     sizeof(buf));
         maid_mem_clear(entropy, sizeof(entropy));
     }
     else
@@ -1241,11 +1251,11 @@ test(int argc, char *argv[])
         TEST(maid_test_25519)
         TEST(maid_test_order25519)
         printf("\n");
-        TEST(maid_test_chacha)
+        TEST(maid_test_chacha20)
         TEST(maid_test_poly1305)
         TEST(maid_test_chacha20poly1305)
         printf("\n");
-        TEST(maid_test_chacha20_rng);
+        TEST(maid_test_chacha20rng);
         printf("\n");
         TEST(maid_test_blake2)
         TEST(maid_test_blake2k)

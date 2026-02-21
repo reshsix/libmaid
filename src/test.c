@@ -35,6 +35,15 @@
 #include <internal/ecc.h>
 #include <internal/types.h>
 
+#include <maid/crypto/sha2.h>
+#include <maid/crypto/blake2.h>
+#include <maid/crypto/blake2k.h>
+#include <maid/crypto/chacha20.h>
+#include <maid/crypto/poly1305.h>
+#include <maid/crypto/hkdf_sha2.h>
+#include <maid/crypto/hmac_sha2.h>
+#include <maid/crypto/chacha20rng.h>
+
 /* Test macros */
 
 #define TEST_EMPTY(name, dlen) \
@@ -312,14 +321,13 @@ test_stream(maid_stream *st, char *key, char *nonce,
 
         if (ret)
         {
-            maid_stream_renew(st, key_b, nonce_b, counter);
+            maid_stream_config(st, key_b, nonce_b, counter);
             maid_stream_xor(st, input_b, sizeof(output_b));
             ret = maid_mem_cmp(input_b, output_b, sizeof(output_b));
         }
     }
     else
         ret = false;
-    maid_stream_del(st);
 
     return ret;
 }
@@ -337,7 +345,7 @@ test_mac(maid_mac *m, char *key, char *input, char *tag)
 
         if (ret)
         {
-            maid_mac_renew(m, key_b);
+            maid_mac_config(m, key_b);
             maid_mac_update(m, input_b, sizeof(input_b));
 
             TEST_EMPTY(tag2_b, tag);
@@ -347,7 +355,6 @@ test_mac(maid_mac *m, char *key, char *input, char *tag)
     }
     else
         ret = false;
-    maid_mac_del(m);
 
     return ret;
 }
@@ -401,7 +408,6 @@ test_hash(maid_hash *h, char *input, char *output)
         {
             TEST_EMPTY(output2_b, output);
 
-            maid_hash_renew(h);
             maid_hash_update(h, input_b, sizeof(input_b));
             maid_hash_digest(h, output2_b);
 
@@ -410,7 +416,6 @@ test_hash(maid_hash *h, char *input, char *output)
     }
     else
         ret = false;
-    maid_hash_del(h);
 
     return ret;
 }
@@ -429,7 +434,7 @@ test_rng(maid_rng *g, char *entropy, char *output)
         if (ret)
         {
             TEST_EMPTY(result_b, output);
-            maid_rng_renew(g, entropy_b);
+            maid_rng_config(g, entropy_b);
             maid_rng_generate(g, result_b, sizeof(result_b));
 
             ret = maid_mem_cmp(result_b, output_b, sizeof(result_b));
@@ -437,23 +442,18 @@ test_rng(maid_rng *g, char *entropy, char *output)
     }
     else
         ret = false;
-    maid_rng_del(g);
 
     return ret;
 }
 
 static bool
-test_hkdf(bool bits64, size_t digest_s,
-          char *input, char *output, char *salt, char *info)
+test_hkdf(maid_kdf *k, char *input, char *output, char *salt, char *info)
 {
     bool ret = true;
 
-    TEST_IMPORT(output_b, output)
-
-    struct maid_hkdf_params p = {.info = NULL, .info_s = 0};
-    maid_kdf *k = maid_hkdf_sha2(&p, bits64, digest_s, sizeof(output_b));
-    if (ret && k)
+    if (k)
     {
+        TEST_IMPORT(output_b, output)
         TEST_IMPORT(input_b,  input)
         TEST_IMPORT(salt_b, salt)
         TEST_IMPORT(info_b, info)
@@ -461,15 +461,12 @@ test_hkdf(bool bits64, size_t digest_s,
 
         if (ret)
         {
-            p.info   = info_b;
-            p.info_s = sizeof(info_b);
-            maid_kdf_renew(k, &p);
+            maid_kdf_config(k, info_b, sizeof(info_b));
             maid_kdf_hash(k, input_b, sizeof(input_b),
                           salt_b, sizeof(salt_b), output2_b);
             ret = maid_mem_cmp(output_b, output2_b, sizeof(output_b));
         }
     }
-    maid_kdf_del(k);
 
     return ret;
 }
@@ -749,7 +746,8 @@ maid_test_1305(void)
 
     u8 ret = 7;
 
-    maid_ff *ff = maid_ff_new(MAID_FF_1305);
+    u8 buf[maid_ff_size(MAID_FF_1305)];
+    maid_ff *ff = maid_ff_init(buf, MAID_FF_1305);
     if (ff)
     {
         char *s0 = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
@@ -780,7 +778,6 @@ maid_test_1305(void)
                          "00000000000000000000000000000000"
                          "5d9d80380dfd58baf42257c9ce49918d");
     }
-    maid_ff_del(ff);
 
     return ret;
 }
@@ -792,7 +789,8 @@ maid_test_25519(void)
 
     u8 ret = 7;
 
-    maid_ff *ff = maid_ff_new(MAID_FF_25519);
+    u8 buf[maid_ff_size(MAID_FF_25519)];
+    maid_ff *ff = maid_ff_init(buf, MAID_FF_25519);
     if (ff)
     {
         char *s0 = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
@@ -823,7 +821,6 @@ maid_test_25519(void)
                          "73e6ad78efc874b6e6a2e727a79c24ac"
                          "6587275c6b95348cfdd0e3ef76a78979");
     }
-    maid_ff_del(ff);
 
     return ret;
 }
@@ -835,7 +832,8 @@ maid_test_order25519(void)
 
     u8 ret = 7;
 
-    maid_ff *ff = maid_ff_new(MAID_FF_ORDER25519);
+    u8 buf[maid_ff_size(MAID_FF_ORDER25519)];
+    maid_ff *ff = maid_ff_init(buf, MAID_FF_ORDER25519);
     if (ff)
     {
         char *s0 = "c0d1f1ed0011b1d0cafebabe0de1f1ed"
@@ -866,13 +864,12 @@ maid_test_order25519(void)
                          "01a23aa9771edab2459adfdf8d0ec8de"
                          "96443852aed3fa6b4913f957be638f56");
     }
-    maid_ff_del(ff);
 
     return ret;
 }
 
 extern u8
-maid_test_chacha(void)
+maid_test_chacha20(void)
 {
     /* Chacha20 RFC8439 vectors */
 
@@ -976,11 +973,10 @@ maid_test_chacha(void)
                       data_b3, data_b2, data_zs, data_zs, data_zs};
     int counters[] = {1, 0, 1, 1, 2, 0, 1, 42, 0, 0, 0};
 
-    u8 empty[32]  = {0};
-    u8 empty2[16] = {0};
+    u8 buf[maid_chacha20_s()];
     for (u8 i = 0; i < 11; i++)
     {
-        maid_stream *st = maid_chacha20(empty, empty2, 0);
+        maid_stream *st = maid_chacha20(buf);
         ret -= test_stream(st, keys[i], nonces[i], counters[i],
                            datas[i], ciphers[i]);
     }
@@ -1081,10 +1077,10 @@ maid_test_poly1305(void)
                     "14000000000000005500000000000000",
                     "13000000000000000000000000000000"};
 
-    u8 zeros[32] = {0};
+    u8 buf[maid_poly1305_s()];
     for (u8 i = 0; i < 11; i++)
     {
-        maid_mac *m = maid_poly1305(zeros);
+        maid_mac *m = maid_poly1305(buf);
         ret -= test_mac(m, keys[i], datas[i], tags[i]);
     }
 
@@ -1155,12 +1151,11 @@ maid_test_chacha20poly1305(void)
 }
 
 extern u8
-maid_test_chacha20_rng(void)
+maid_test_chacha20rng(void)
 {
     /* One vector from Chacha20 RFC8439 vectors */
 
     u8 ret = 1;
-
 
     char entropy[] = "1c9240a5eb55d38af333888604f6b5f0"
                      "473917c1402b80099dca5cbc207075c0"
@@ -1168,8 +1163,8 @@ maid_test_chacha20_rng(void)
     char output[]  = "965e3bc6f9ec7ed9560808f4d229f94b"
                      "137ff275ca9b3fcbdd59deaad23310ae";
 
-    u8 zeros[44] = {0};
-    maid_rng *g = maid_chacha20_rng(zeros);
+    u8 buf[maid_chacha20rng_s()];
+    maid_rng *g = maid_chacha20rng(buf);
     ret -= test_rng(g, entropy, output);
 
     return ret;
@@ -1182,6 +1177,8 @@ maid_test_blake2(void)
     u8 ret = 4;
 
     maid_hash *h = NULL;
+
+    u8 buf[maid_blake2_s(true, 64)];
     char *input[] = {"41414141414141414141414141414141"
                      "42424242424242424242424242424242"
                      "43434343434343434343434343434343"
@@ -1197,22 +1194,22 @@ maid_test_blake2(void)
                      "48484848484848484848484848484848"
                      "49494949494949494949494949494949"};
 
-    h = maid_blake2(false, 32);
+    h = maid_blake2(buf, false, 32);
     ret -= test_hash(h, input[0],
                      "70823ccd93338440a94857e8f7259b4e"
                      "907432b0290b1c480eb96aeaeb9a9f2f");
-    h = maid_blake2(true, 64);
+    h = maid_blake2(buf, true, 64);
     ret -= test_hash(h, input[1],
                      "3d1ed85f78d95f8e1e88a6594d9c3ca6"
                      "236ece2dcc4069b405012a7ab89e50b5"
                      "9d69ea41562bfcc9de4bc4742c1bcc7d"
                      "ade3843edeb62f649d5705eb6b084bc5");
 
-    h = maid_blake2(false, 31);
+    h = maid_blake2(buf, false, 31);
     ret -= test_hash(h, input[0],
                      "04b8b0036e2bf3064c55a61ef471496e"
                      "35ec44a4347b1259b715f3ff5b2dca");
-    h = maid_blake2(true, 63);
+    h = maid_blake2(buf, true, 63);
     ret -= test_hash(h, input[1],
                      "ae65cc80af9a851588dac908e5308e3f"
                      "5187205d1e93775c5b26dd0d61c697ed"
@@ -1229,12 +1226,14 @@ maid_test_blake2k(void)
     u8 ret = 4;
 
     maid_mac *m = NULL;
-    char *key  [] = {"41414141414141414141414141414141"
-                     "42424242424242424242424242424242",
-                     "41414141414141414141414141414141"
-                     "42424242424242424242424242424242"
-                     "43434343434343434343434343434343"
-                     "44444444444444444444444444444444"};
+
+    u8 buf[maid_blake2k_s(true, 64, 64)];
+    char *key[] = {"41414141414141414141414141414141"
+                   "42424242424242424242424242424242",
+                   "41414141414141414141414141414141"
+                   "42424242424242424242424242424242"
+                   "43434343434343434343434343434343"
+                   "44444444444444444444444444444444"};
     char *input[] = {"41414141414141414141414141414141"
                      "42424242424242424242424242424242"
                      "43434343434343434343434343434343"
@@ -1250,23 +1249,22 @@ maid_test_blake2k(void)
                      "48484848484848484848484848484848"
                      "49494949494949494949494949494949"};
 
-    u8 empty[64] = {0};
-    m = maid_blake2k(false, 32, empty, 32);
+    m = maid_blake2k(buf, false, 32, 32);
     ret -= test_mac(m, key[0], input[0],
                     "683832d20c6ee232522598e3048c677b"
                     "39ce5c07ae040ffdd548fe027258e6a4");
-    m = maid_blake2k(true, 64, empty, 64);
+    m = maid_blake2k(buf, true, 64, 64);
     ret -= test_mac(m, key[1], input[1],
                     "6fc5fab086737360ac153fa9e7b52f7e"
                     "628aeabeb6ca81c185209001bc6e0b11"
                     "f978d89b11ce5691f3f79edb21dba595"
                     "8d6ee8f48375c2bdfa9ff0ecf5b2a81d");
 
-    m = maid_blake2k(false, 31, empty, 32);
+    m = maid_blake2k(buf, false, 31, 32);
     ret -= test_mac(m, key[0], input[0],
                     "f1c8699d74e8e04d70f34b77cffeeeac"
                     "cbc099d1188582d163dd43b011d2b1");
-    m = maid_blake2k(true, 63, empty, 64);
+    m = maid_blake2k(buf, true, 63, 64);
     ret -= test_mac(m, key[1], input[1],
                     "98d80fbefb90c9f0cfa0882c17c2a38a"
                     "fa0b5016c8b4106dd5221197cae2af62"
@@ -1323,35 +1321,36 @@ maid_test_sha2(void)
                         "65cb9d3ef83ee6146feac861e19b563a"};
 
     maid_hash *h = NULL;
+    u8 buf[maid_sha2_s(true, 64)];
 
-    h = maid_sha2(false, 28);
+    h = maid_sha2(buf, false, 28);
     ret -= test_hash(h, input0, outputs0[0]);
-    h = maid_sha2(false, 28);
+    h = maid_sha2(buf, false, 28);
     ret -= test_hash(h, input1, outputs1[0]);
 
-    h = maid_sha2(false, 32);
+    h = maid_sha2(buf, false, 32);
     ret -= test_hash(h, input0, outputs0[1]);
-    h = maid_sha2(false, 32);
+    h = maid_sha2(buf, false, 32);
     ret -= test_hash(h, input1, outputs1[1]);
 
-    h = maid_sha2(true, 48);
+    h = maid_sha2(buf, true, 48);
     ret -= test_hash(h, input0, outputs0[2]);
-    h = maid_sha2(true, 48);
+    h = maid_sha2(buf, true, 48);
     ret -= test_hash(h, input2, outputs2[0]);
 
-    h = maid_sha2(true, 64);
+    h = maid_sha2(buf, true, 64);
     ret -= test_hash(h, input0, outputs0[3]);
-    h = maid_sha2(true, 64);
+    h = maid_sha2(buf, true, 64);
     ret -= test_hash(h, input2, outputs2[1]);
 
-    h = maid_sha2(true, 28);
+    h = maid_sha2(buf, true, 28);
     ret -= test_hash(h, input0, outputs0[4]);
-    h = maid_sha2(true, 28);
+    h = maid_sha2(buf, true, 28);
     ret -= test_hash(h, input2, outputs2[2]);
 
-    h = maid_sha2(true, 32);
+    h = maid_sha2(buf, true, 32);
     ret -= test_hash(h, input0, outputs0[5]);
-    h = maid_sha2(true, 32);
+    h = maid_sha2(buf, true, 32);
     ret -= test_hash(h, input2, outputs2[3]);
 
     return ret;
@@ -1393,20 +1392,20 @@ maid_test_hmac_sha2(void)
                     "1feae31bfe70196ff81642b868402eab"};
 
     maid_mac *m = NULL;
-    u8 zeros[128] = {0};
+    u8 buf[maid_hmac_sha2_s(true, 64)];
 
-    m = maid_hmac_sha2(false, zeros, 28);
+    m = maid_hmac_sha2(buf, false, 28);
     ret -= test_mac(m, keys[0], data, tags[0]);
-    m = maid_hmac_sha2(false, zeros, 32);
+    m = maid_hmac_sha2(buf, false, 32);
     ret -= test_mac(m, keys[0], data, tags[1]);
 
-    m = maid_hmac_sha2(true, zeros, 48);
+    m = maid_hmac_sha2(buf, true, 48);
     ret -= test_mac(m, keys[1], data, tags[2]);
-    m = maid_hmac_sha2(true, zeros, 64);
+    m = maid_hmac_sha2(buf, true, 64);
     ret -= test_mac(m, keys[1], data, tags[3]);
-    m = maid_hmac_sha2(true, zeros, 28);
+    m = maid_hmac_sha2(buf, true, 28);
     ret -= test_mac(m, keys[1], data, tags[4]);
-    m = maid_hmac_sha2(true, zeros, 32);
+    m = maid_hmac_sha2(buf, true, 32);
     ret -= test_mac(m, keys[1], data, tags[5]);
 
     return ret;
@@ -1419,42 +1418,46 @@ maid_test_hkdf_sha2(void)
 
     u8 ret = 3;
 
-    ret -= test_hkdf(false, 32,
-                     "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
-                     "0b0b0b0b0b0b",
-                     "3cb25f25faacd57a90434f64d0362f2a"
-                     "2d2d0a90cf1a5a4c5db02d56ecc4c5bf"
-                     "34007208d5b887185865",
-                     "000102030405060708090a0b0c",
-                     "f0f1f2f3f4f5f6f7f8f9");
-    ret -= test_hkdf(false, 32,
-                     "000102030405060708090a0b0c0d0e0f"
-                     "101112131415161718191a1b1c1d1e1f"
-                     "202122232425262728292a2b2c2d2e2f"
-                     "303132333435363738393a3b3c3d3e3f"
-                     "404142434445464748494a4b4c4d4e4f",
-                     "b11e398dc80327a1c8e7f78c596a4934"
-                     "4f012eda2d4efad8a050cc4c19afa97c"
-                     "59045a99cac7827271cb41c65e590e09"
-                     "da3275600c2f09b8367793a9aca3db71"
-                     "cc30c58179ec3e87c14c01d5c1f3434f"
-                     "1d87",
-                     "606162636465666768696a6b6c6d6e6f"
-                     "707172737475767778797a7b7c7d7e7f"
-                     "808182838485868788898a8b8c8d8e8f"
-                     "909192939495969798999a9b9c9d9e9f"
-                     "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
-                     "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
-                     "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
-                     "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
-                     "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
-                     "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
-    ret -= test_hkdf(false, 32,
-                     "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
-                     "0b0b0b0b0b0b",
-                     "8da4e775a563c18f715f802a063c5a31"
-                     "b8a11f5c5ee1879ec3454e5f3c738d2d"
-                     "9d201395faa4b61a96c8", "", "");
+    u8 buffer[maid_hkdf_sha2_s(false, 32, 82)];
+
+    maid_kdf *k = maid_hkdf_sha2(&buffer, false, 32, 42);
+    ret -= test_hkdf(k, "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+                        "0b0b0b0b0b0b",
+                        "3cb25f25faacd57a90434f64d0362f2a"
+                        "2d2d0a90cf1a5a4c5db02d56ecc4c5bf"
+                        "34007208d5b887185865",
+                        "000102030405060708090a0b0c",
+                        "f0f1f2f3f4f5f6f7f8f9");
+
+    k = maid_hkdf_sha2(&buffer, false, 32, 82);
+    ret -= test_hkdf(k, "000102030405060708090a0b0c0d0e0f"
+                        "101112131415161718191a1b1c1d1e1f"
+                        "202122232425262728292a2b2c2d2e2f"
+                        "303132333435363738393a3b3c3d3e3f"
+                        "404142434445464748494a4b4c4d4e4f",
+                        "b11e398dc80327a1c8e7f78c596a4934"
+                        "4f012eda2d4efad8a050cc4c19afa97c"
+                        "59045a99cac7827271cb41c65e590e09"
+                        "da3275600c2f09b8367793a9aca3db71"
+                        "cc30c58179ec3e87c14c01d5c1f3434f"
+                        "1d87",
+                        "606162636465666768696a6b6c6d6e6f"
+                        "707172737475767778797a7b7c7d7e7f"
+                        "808182838485868788898a8b8c8d8e8f"
+                        "909192939495969798999a9b9c9d9e9f"
+                        "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+                        "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+                        "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
+                        "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
+                        "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
+                        "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
+
+    k = maid_hkdf_sha2(&buffer, false, 32, 42);
+    ret -= test_hkdf(k, "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+                        "0b0b0b0b0b0b",
+                        "8da4e775a563c18f715f802a063c5a31"
+                        "b8a11f5c5ee1879ec3454e5f3c738d2d"
+                        "9d201395faa4b61a96c8", "", "");
 
     return ret;
 }

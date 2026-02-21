@@ -15,24 +15,12 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef INTERNAL_RNG_H
-#define INTERNAL_RNG_H
+#ifndef MAID_CRYPTO_POLY1305_H
+#define MAID_CRYPTO_POLY1305_H
 
-#include <stdint.h>
+#include <maid/mac.h>
 
-#include <maid/rng.h>
-
-struct maid_rng_def
-{
-    bool (*init)(void *);
-    size_t (*size)(void);
-    void (*config)(void *, const uint8_t *);
-    void (*generate)(void *, uint8_t *);
-    size_t state_s;
-};
-
-maid_rng *maid_rng_init(void *buffer, size_t buffer_s,
-                        const struct maid_rng_def *def);
-size_t maid_rng_size(const struct maid_rng_def *def);
+maid_mac *maid_poly1305(void *buffer);
+size_t maid_poly1305_s(void);
 
 #endif

@@ -31,6 +31,8 @@
 #include <internal/sign.h>
 #include <internal/types.h>
 
+#include <maid/crypto/sha2.h>
+
 static bool
 import_mp(size_t words, maid_mp_word *output, const char *input)
 {
@@ -72,8 +74,7 @@ edwards25519_del(void *ctx)
     if (ctx)
     {
         struct edwards25519 *c = ctx;
-        maid_hash_del(c->hash);
-        maid_ff_del(c->ff);
+        maid_mem_clear(c->ff, maid_ff_size(MAID_FF_25519));
         maid_mem_clear(ctx, sizeof(struct edwards25519));
     }
     free(ctx);
@@ -88,9 +89,11 @@ edwards25519_new(void)
 
     if (ret)
     {
-        ret->hash = maid_sha2(true, 64);
-        ret->ff   = maid_ff_new(MAID_FF_25519);
-        if (ret->hash && ret->ff)
+        ret->hash = calloc(1, maid_sha2_s(true, 64));
+        ret->ff   = calloc(1, maid_ff_size(MAID_FF_25519));
+        if (ret->hash && ret->ff &&
+            maid_ff_init(ret->ff, MAID_FF_25519) &&
+            maid_sha2(ret->hash, true, 64))
             ret->prime = maid_ff_prime(ret->ff);
         else
             ret = edwards25519_del(ret);
@@ -569,7 +572,6 @@ edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
     u8 buffer[64] = {0};
     maid_hash_update(c->hash, data, 32);
     maid_hash_digest(c->hash, buffer);
-    maid_hash_renew(c->hash);
 
     buffer[0]  &= 248;
     buffer[31] &= 63;
@@ -645,8 +647,8 @@ ed25519_del(void *ed25519)
     struct ed25519 *ed = ed25519;
 
     maid_ecc_del(ed->ecc);
-    maid_hash_del(ed->hash);
-    maid_ff_del(ed->ff);
+    maid_mem_clear(ed->hash, maid_sha2_s(true, 64));
+    maid_mem_clear(ed->ff, maid_ff_size(MAID_FF_ORDER25519));
     maid_mem_clear(ed25519, sizeof(struct ed25519));
 
     free(ed25519);
@@ -662,8 +664,8 @@ ed25519_new(u8 *pub, u8 *prv)
     {
         /* Allocation */
         ret->ecc  = maid_edwards25519();
-        ret->hash = maid_sha2(true, 64);
-        if (!(ret->ecc && ret->hash))
+        ret->hash = calloc(1, maid_sha2_s(true, 64));
+        if (!(ret->ecc && ret->hash && maid_sha2(ret->hash, true, 64)))
             ret = ed25519_del(ret);
 
         if (ret && prv)
@@ -677,7 +679,6 @@ ed25519_new(u8 *pub, u8 *prv)
             u8 buffer[64] = {0};
             maid_hash_update(ret->hash, prv, 32);
             maid_hash_digest(ret->hash, buffer);
-            maid_hash_renew(ret->hash);
 
             buffer[0]  &= 248;
             buffer[31] &= 63;
@@ -710,8 +711,8 @@ ed25519_new(u8 *pub, u8 *prv)
         /* Copy curve order (modulo) */
         if (ret)
         {
-            ret->ff = maid_ff_new(MAID_FF_ORDER25519);
-            if (ret->ff)
+            ret->ff = calloc(1, maid_ff_size(MAID_FF_ORDER25519));
+            if (ret->ff && maid_ff_init(ret->ff, MAID_FF_ORDER25519))
                 ret->prime = maid_ff_prime(ret->ff);
             else
                 ret = ed25519_del(ret);
@@ -741,7 +742,6 @@ ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
         u8 hash[64] = {0};
         /* r = SHA512(prefix data) % modulo */
         maid_mp_word r[words * 2];
-        maid_hash_renew(ed->hash);
         maid_hash_update(ed->hash, ed->prefix, 32);
         maid_hash_update(ed->hash, data, size);
         maid_hash_digest(ed->hash, hash);
@@ -755,7 +755,6 @@ ed25519_generate(void *ed25519, const u8 *data, size_t size, u8 *sign)
 
         /* k = SHA512(R public data) % modulo */
         maid_mp_word k[words * 2];
-        maid_hash_renew(ed->hash);
         maid_hash_update(ed->hash, sign, 32);
         maid_hash_update(ed->hash, ed->pubenc, 32);
         maid_hash_update(ed->hash, data, size);
@@ -800,7 +799,6 @@ ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
         maid_mp_word k[words * 2];
         /* k = SHA512(R public data) % modulo */
         u8 hash[64] = {0};
-        maid_hash_renew(ed->hash);
         maid_hash_update(ed->hash, sign, 32);
         maid_hash_update(ed->hash, ed->pubenc, 32);
         maid_hash_update(ed->hash, data, size);

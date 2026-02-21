@@ -27,20 +27,22 @@
 #include <internal/mac.h>
 #include <internal/types.h>
 
+#include <maid/crypto/poly1305.h>
+
 /* Maid MAC definition */
 
 struct poly1305
 {
     /* 256 bits, to handle multiplication */
     MAID_MP_SCALAR(acc, 256);
-    MAID_MP_SCALAR(r, 256);
-    MAID_MP_SCALAR(s, 256);
+    MAID_MP_SCALAR(r,   256);
+    MAID_MP_SCALAR(s,   256);
 
     maid_ff *ff;
 };
 
 static void
-poly1305_init(void *ctx, const u8 *key)
+poly1305_setup(void *ctx, const u8 *key)
 {
     if (ctx)
     {
@@ -64,55 +66,40 @@ poly1305_init(void *ctx, const u8 *key)
 }
 
 static void *
-poly1305_del(void *ctx)
+poly1305_init(void *buffer, u8 key_s, u8 state_s, u8 digest_s)
 {
-    if (ctx)
-    {
-        struct poly1305 *p = ctx;
-        maid_ff_del(p->ff);
-        maid_mem_clear(p, sizeof(struct poly1305));
-    }
-    free(ctx);
+    struct poly1305 *ret = buffer;
 
-    return NULL;
+    (void)key_s;
+    (void)state_s;
+    (void)digest_s;
+
+    ret->ff = maid_ff_init(&(ret[1]), MAID_FF_1305);
+    if (!(ret->ff))
+        ret = NULL;
+
+    return ret;
 }
 
-static void *
-poly1305_new(const u8 *key, u8 key_s, u8 state_s, u8 digest_s)
+static size_t
+poly1305_size(u8 key_s, u8 state_s, u8 digest_s)
 {
     (void)key_s;
     (void)state_s;
     (void)digest_s;
 
-    struct poly1305 *ret = calloc(1, sizeof(struct poly1305));
-
-    if (ret)
-    {
-        ret->ff = maid_ff_new(MAID_FF_1305);
-        if (ret->ff)
-            poly1305_init(ret, key);
-        else
-            ret = poly1305_del(ret);
-    }
-
-    return ret;
+    return sizeof(struct poly1305) + maid_ff_size(MAID_FF_1305);
 }
 
 static void
-poly1305_renew(void *ctx, const u8 *key)
+poly1305_config(void *ctx, const u8 *key)
 {
-    if (ctx)
-    {
-        struct poly1305 *p = ctx;
-        if (key)
-            poly1305_init(p, key);
-
-        maid_mem_clear(p->acc, MAID_MP_BYTES(MAID_MP_WORDS(256)));
-    }
+    if (ctx && key)
+        poly1305_setup(ctx, key);
 }
 
 static void
-poly1305_update(void *ctx, u8 *block, size_t size)
+poly1305_update(void *ctx, const u8 *block, size_t size)
 {
     if (ctx && block)
     {
@@ -152,20 +139,29 @@ poly1305_digest(void *ctx, u8 *output)
         maid_mp_add(MAID_MP_WORDS(256), p->acc, p->s);
         /* Exports 128 bits */
         maid_mp_write(MAID_MP_WORDS(128), p->acc, output, false);
+        /* Clear accumulator */
+        maid_mp_mov(MAID_MP_WORDS(256), p->acc, NULL);
     }
 }
 
 static const struct maid_mac_def poly1305_def =
 {
-    .new      = poly1305_new,
-    .del      = poly1305_del,
-    .renew    = poly1305_renew,
+    .init     = poly1305_init,
+    .size     = poly1305_size,
+    .config   = poly1305_config,
     .update   = poly1305_update,
     .digest   = poly1305_digest,
 };
 
 extern maid_mac *
-maid_poly1305(const u8 *key)
+maid_poly1305(void *buffer)
 {
-    return maid_mac_new(&poly1305_def, key, 32, 16, 16);
+    return maid_mac_init(buffer, maid_poly1305_s(),
+                         &poly1305_def, 32, 16, 16);
+}
+
+extern size_t
+maid_poly1305_s(void)
+{
+    return maid_mac_size(&poly1305_def, 32, 16, 16);
 }

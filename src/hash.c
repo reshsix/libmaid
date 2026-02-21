@@ -32,59 +32,40 @@ struct maid_hash
 
     u8 *buffer;
     size_t buffer_c;
-    bool finished;
 };
 
 extern struct maid_hash *
-maid_hash_del(maid_hash *h)
+maid_hash_init(void *buffer, size_t buffer_s,
+               const struct maid_hash_def *def, u8 state_s, u8 digest_s)
 {
-    if (h)
+    struct maid_hash *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
+
+    ret->def      = def;
+    ret->buffer   = (void *)&(ret[1]);
+
+    ret->ctx = &(ret->buffer[state_s]);
+    if (def->init(ret->ctx, state_s, digest_s))
     {
-        h->def->del(h->ctx);
-        free(h->buffer);
-    }
-    free(h);
-
-    return NULL;
-}
-
-extern struct maid_hash *
-maid_hash_new(const struct maid_hash_def *def, u8 state_s, u8 digest_s)
-{
-    struct maid_hash *ret = calloc(1, sizeof(struct maid_hash));
-
-    if (ret)
-    {
-        ret->def      = def;
         ret->state_s  = state_s;
         ret->digest_s = digest_s;
-
-        ret->ctx    = def->new(state_s, digest_s);
-        ret->buffer = calloc(1, state_s);
-        if (!(ret->ctx && ret->buffer))
-            ret = maid_hash_del(ret);
     }
+    else
+        ret = NULL;
 
     return ret;
 }
 
-extern void
-maid_hash_renew(struct maid_hash *h)
+extern size_t
+maid_hash_size(const struct maid_hash_def *def, u8 state_s, u8 digest_s)
 {
-    if (h)
-    {
-        h->def->renew(h->ctx);
-
-        h->buffer_c = 0;
-        h->finished = false;
-        maid_mem_clear(h->buffer, h->state_s);
-    }
+    return sizeof(struct maid_hash) + def->size(state_s, digest_s) + state_s;
 }
 
 extern void
 maid_hash_update(struct maid_hash *h, const u8 *buffer, size_t size)
 {
-    if (h && buffer && size && !(h->finished))
+    if (h && buffer && size)
     {
         while (size)
         {
@@ -111,15 +92,14 @@ maid_hash_digest(struct maid_hash *h, u8 *output)
 {
     size_t ret = 0;
 
-    if (h && output && !(h->finished))
+    if (h)
     {
         if (h->buffer_c)
             h->def->update(h->ctx, h->buffer, h->buffer_c);
 
         h->def->digest(h->ctx, output);
         h->buffer_c = 0;
-
-        h->finished = true;
+        maid_mem_clear(h->buffer, h->state_s);
 
         ret = h->digest_s;
     }

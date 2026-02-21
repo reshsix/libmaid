@@ -35,53 +35,34 @@ struct maid_stream
 };
 
 extern struct maid_stream *
-maid_stream_del(maid_stream *st)
+maid_stream_init(void *buffer, size_t buffer_s,
+                 const struct maid_stream_def *def)
 {
-    if (st)
-    {
-        st->def->del(st->ctx);
+    struct maid_stream *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
 
-        if (st->buffer)
-            maid_mem_clear(st->buffer, st->def->state_s);
-        free(st->buffer);
-    }
-    free(st);
+    ret->def    = def;
+    ret->buffer = (void *)&(ret[1]);
 
-    return NULL;
-}
-
-extern struct maid_stream *
-maid_stream_new(const struct maid_stream_def *def,
-                const u8 *key, const u8 *nonce, u64 counter)
-{
-    struct maid_stream *ret = NULL;
-    if (key && nonce)
-        ret = calloc(1, sizeof(struct maid_stream));
-
-    if (ret)
-    {
-        ret->def = def;
-        ret->ctx = def->new(key, nonce, counter);
-        ret->buffer = calloc(1, def->state_s);
-
-        if (!(ret->ctx && ret->buffer))
-            ret = maid_stream_del(ret);
-    }
+    ret->ctx = &(ret->buffer[def->state_s]);
+    if (!def->init(ret->ctx))
+        ret = NULL;
 
     return ret;
 }
 
-extern void
-maid_stream_renew(struct maid_stream *st,
-                  const u8 *key, const u8 *nonce, u64 counter)
+extern size_t
+maid_stream_size(const struct maid_stream_def *def)
 {
-    if (st)
-    {
-        st->def->renew(st->ctx, key, nonce, counter);
-        st->buffer_c = 0;
-        st->initialized = false;
-        maid_mem_clear(st->buffer, st->def->state_s);
-    }
+    return sizeof(struct maid_stream) + def->size() + def->state_s;
+}
+
+extern void
+maid_stream_config(struct maid_stream *st,
+                   const u8 *key, const u8 *nonce, u64 counter)
+{
+    if (st && key)
+        st->def->config(st->ctx, key, nonce, counter);
 }
 
 extern void

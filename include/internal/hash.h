@@ -22,14 +22,17 @@
 
 struct maid_hash_def
 {
-    void * (*new)(uint8_t, uint8_t);
-    void * (*del)(void *);
-    void (*renew)(void *);
-    void (*update)(void *, uint8_t *, size_t);
+    void * (*init)(void *, uint8_t, uint8_t);
+    size_t (*size)(uint8_t, uint8_t);
+    void (*reset)(void *);
+    void (*update)(void *, const uint8_t *, size_t);
     void (*digest)(void *, uint8_t *);
 };
 
-maid_hash *maid_hash_new(const struct maid_hash_def *def,
-                         uint8_t state_s, uint8_t digest_s);
+maid_hash *maid_hash_init(void *buffer, size_t buffer_s,
+                          const struct maid_hash_def *def,
+                          uint8_t state_s, uint8_t digest_s);
+size_t maid_hash_size(const struct maid_hash_def *def,
+                      uint8_t state_s, uint8_t digest_s);
 
 #endif

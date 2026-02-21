@@ -26,6 +26,8 @@
 #include <internal/aead.h>
 #include <internal/types.h>
 
+#include <maid/crypto/chacha20.h>
+
 struct maid_aead
 {
     u8 step, *buffer;
@@ -42,8 +44,7 @@ maid_aead_del(struct maid_aead *ae)
 {
     if (ae)
     {
-        maid_stream_del(ae->s_ctx);
-        maid_mac_del(ae->m_ctx);
+        maid_mem_clear(ae->s_ctx, maid_chacha20_s());
 
         maid_mem_clear(ae->buffer, ae->def->state_s);
         free(ae->buffer);

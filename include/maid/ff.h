@@ -29,8 +29,9 @@ enum maid_ff_prime
 
 typedef struct maid_ff maid_ff;
 
-maid_ff *maid_ff_new(enum maid_ff_prime prime);
-maid_ff *maid_ff_del(struct maid_ff *ff);
+maid_ff *maid_ff_init(void *buffer, enum maid_ff_prime prime);
+size_t maid_ff_size(enum maid_ff_prime prime);
+
 maid_mp_word *maid_ff_prime(const maid_ff *ff);
 void maid_ff_mod(size_t words, maid_mp_word *a, const maid_ff *ff);
 bool maid_ff_inv(size_t words, maid_mp_word *a, const maid_ff *ff);

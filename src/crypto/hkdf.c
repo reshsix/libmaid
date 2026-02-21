@@ -26,71 +26,67 @@
 #include <internal/kdf.h>
 #include <internal/types.h>
 
+#include <maid/crypto/sha2.h>
+#include <maid/crypto/hkdf_sha2.h>
+#include <maid/crypto/hmac_sha2.h>
+
 /* Maid KDF definition */
 
 struct hkdf
 {
-    struct maid_hkdf_params prm;
-    size_t output_s;
+    const u8 *info;
+    size_t info_s;
 
+    size_t output_s;
     maid_mac  *prf;
     maid_hash *hash;
     size_t key_s, digest_s;
 };
 
 static void *
-hkdf_del(void *ctx)
+hkdf_init(void *buffer, u8 state_s, u8 digest_s, size_t output_s)
 {
-    if (ctx)
+    struct hkdf *ret = buffer;
+
+    ret->key_s    = state_s;
+    ret->digest_s = digest_s;
+
+    if (output_s <= (255 * ret->digest_s))
     {
-        struct hkdf *p = ctx;
-        maid_mac_del(p->prf);
-        maid_hash_del(p->hash);
+        bool bits64 = (state_s == 128);
+        ret->prf  = maid_hmac_sha2(&(ret[1]), bits64, digest_s);
+        size_t idx = maid_hmac_sha2_s(bits64, digest_s);
+        ret->hash = maid_sha2(&(((u8*)ret->prf)[idx]), bits64, digest_s);
 
-        maid_mem_clear(ctx, sizeof(struct hkdf));
-    }
-    free(ctx);
-
-    return NULL;
-}
-
-static void *
-hkdf_new(const void *params, u8 state_s, u8 digest_s, size_t output_s)
-{
-    struct hkdf *ret = calloc(1, sizeof(struct hkdf));
-
-    if (ret)
-    {
-        u8 empty[128] = {0};
-        ret->prf      = maid_hmac_sha2((state_s == 128), empty, digest_s);
-        ret->hash     = maid_sha2((state_s == 128), digest_s);
-        ret->key_s    = state_s;
-        ret->digest_s = digest_s;
-
-        if (output_s <= (255 * ret->digest_s))
-        {
-            if (ret->prf && ret->hash)
-            {
-                memcpy(&(ret->prm), params, sizeof(struct maid_hkdf_params));
-                ret->output_s = output_s;
-            }
-            else
-                ret = hkdf_del(ret);
-        }
+        if (ret->prf && ret->hash)
+            ret->output_s = output_s;
         else
-            ret = hkdf_del(ret);
+            ret = NULL;
     }
+    else
+        ret = NULL;
 
     return ret;
 }
 
-static void
-hkdf_renew(void *ctx, const void *params)
+static size_t
+hkdf_size(u8 state_s, u8 digest_s, size_t output_s)
 {
-    if (ctx && params)
+    (void)output_s;
+
+    bool bits64 = (state_s == 128);
+    return sizeof(struct hkdf) +
+           maid_sha2_s(bits64, digest_s) + maid_hmac_sha2_s(bits64, digest_s);
+}
+
+static void
+hkdf_config(void *ctx, const u8 *info, size_t info_s)
+{
+    if (ctx)
     {
         struct hkdf *p = ctx;
-        memcpy(&(p->prm), params, sizeof(struct maid_hkdf_params));
+        p->info   = info;
+        p->info_s = info_s;
     }
 }
 
@@ -108,13 +104,12 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
         maid_mem_clear(key, sizeof(key));
         if (salt_s > p->key_s)
         {
-            maid_hash_renew(p->hash);
             maid_hash_update(p->hash, salt, salt_s);
             maid_hash_digest(p->hash, key);
         }
         else
             memcpy(key, salt, salt_s);
-        maid_mac_renew(p->prf, key);
+        maid_mac_config(p->prf, key);
         maid_mac_update(p->prf, data, data_s);
         maid_mac_digest(p->prf, key);
 
@@ -122,11 +117,11 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
         size_t l = p->output_s;
         for (u8 i = 1; l; i++)
         {
-            maid_mac_renew(p->prf, key);
+            maid_mac_config(p->prf, key);
             if (i != 1)
                 maid_mac_update(p->prf, &(output[p->digest_s * (i - 2)]),
                                 p->digest_s);
-            maid_mac_update(p->prf, p->prm.info, p->prm.info_s);
+            maid_mac_update(p->prf, p->info, p->info_s);
 
             maid_mac_update(p->prf, &i, 1);
             if (l >= p->digest_s)
@@ -149,16 +144,29 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
 
 static const struct maid_kdf_def hkdf_sha2_def =
 {
-    .new     = hkdf_new,
-    .del     = hkdf_del,
-    .renew   = hkdf_renew,
-    .hash    = hkdf_hash,
+    .init   = hkdf_init,
+    .size   = hkdf_size,
+    .config = hkdf_config,
+    .hash   = hkdf_hash,
 };
 
 extern maid_kdf *
-maid_hkdf_sha2(const struct maid_hkdf_params *p,
-               bool bits64, u8 digest_s, size_t output_s)
+maid_hkdf_sha2(void *buffer, bool bits64, u8 digest_s, size_t output_s)
 {
-    return maid_kdf_new(&hkdf_sha2_def, p, (bits64) ? 128 : 64,
-                        digest_s, output_s);
+    return maid_kdf_init(buffer, maid_hkdf_sha2_s(bits64, digest_s, output_s),
+                         &hkdf_sha2_def, (bits64) ? 128 : 64,
+                         digest_s, output_s);
+}
+
+extern size_t
+maid_hkdf_sha2_s(bool bits64, u8 digest_s, size_t output_s)
+{
+    size_t ret = 0;
+
+    if (digest_s == 28 || digest_s == 32 ||
+        (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
+        ret = maid_kdf_size(&hkdf_sha2_def, (bits64) ? 128 : 64,
+                            digest_s, output_s);
+
+    return ret;
 }

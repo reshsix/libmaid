@@ -35,52 +35,35 @@ struct maid_rng
 };
 
 extern struct maid_rng *
-maid_rng_del(struct maid_rng *g)
+maid_rng_init(void *buffer, size_t buffer_s, const struct maid_rng_def *def)
 {
-    if (g)
-    {
-        g->def->del(g->ctx);
-
-        if (g->buffer)
-            maid_mem_clear(g->buffer, g->def->state_s);
-        free(g->buffer);
-    }
-    free(g);
-
-    return NULL;
-}
-
-extern struct maid_rng *
-maid_rng_new(const struct maid_rng_def *def, const u8 *entropy)
-{
-    struct maid_rng *ret = NULL;
-    if (entropy)
-        ret = calloc(1, sizeof(struct maid_rng));
+    struct maid_rng *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
-        ret->def = def;
-        ret->ctx = def->new(entropy);
+        ret->def    = def;
+        ret->buffer = (void *)&(ret[1]);
 
-        ret->buffer = calloc(1, def->state_s);
-        if (!(ret->ctx && ret->buffer))
-            ret = maid_rng_del(ret);
+        ret->ctx = &(ret->buffer[def->state_s]);
+        if (!def->init(ret->ctx))
+            ret = NULL;
     }
 
     return ret;
 }
 
-extern void
-maid_rng_renew(struct maid_rng *g, const u8 *entropy)
+extern size_t
+maid_rng_size(const struct maid_rng_def *def)
 {
-    if (g)
-    {
-        g->def->renew(g->ctx, entropy);
+    return sizeof(struct maid_rng) + def->size() + def->state_s;
+}
 
-        g->buffer_c = 0;
-        g->initialized = false;
-        maid_mem_clear(g->buffer, g->def->state_s);
-    }
+extern void
+maid_rng_config(struct maid_rng *g, const u8 *entropy)
+{
+    if (g && entropy)
+        g->def->config(g->ctx, entropy);
 }
 
 extern void

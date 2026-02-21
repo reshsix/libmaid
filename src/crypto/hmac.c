@@ -25,6 +25,9 @@
 #include <internal/mac.h>
 #include <internal/types.h>
 
+#include <maid/crypto/sha2.h>
+#include <maid/crypto/hmac_sha2.h>
+
 /* Maid MAC definition */
 
 struct hmac
@@ -37,7 +40,7 @@ struct hmac
 };
 
 static void
-hmac_init(void *ctx, const u8 *key)
+hmac_setup(void *ctx, const u8 *key)
 {
     if (ctx)
     {
@@ -45,62 +48,52 @@ hmac_init(void *ctx, const u8 *key)
         if (key)
             memcpy(h->key, key, h->bytes);
 
+        maid_hash_digest(h->hash, h->buffer);
+
         memcpy(h->prefix, h->key, h->bytes);
         for (size_t i = 0; i < h->bytes; i++)
             h->prefix[i] ^= 0x5c;
 
-        maid_hash_renew(h->hash);
-
         memcpy(h->buffer, h->key, h->bytes);
         for (size_t i = 0; i < h->bytes; i++)
             h->buffer[i] ^= 0x36;
+
         maid_hash_update(h->hash, h->buffer, h->bytes);
     }
 }
 
 static void *
-hmac_del(void *ctx)
+hmac_init(void *buffer, u8 key_s, u8 state_s, u8 digest_s)
 {
-    if (ctx)
-    {
-        struct hmac *h = ctx;
-        maid_hash_del(h->hash);
-        maid_mem_clear(ctx, sizeof(struct hmac));
-    }
-    free(ctx);
-
-    return NULL;
-}
-
-static void *
-hmac_new(const u8 *key, u8 key_s, u8 state_s, u8 digest_s)
-{
-    struct hmac *ret = calloc(1, sizeof(struct hmac));
+    struct hmac *ret = buffer;
 
     (void)key_s;
-    if (ret)
-    {
-        ret->hash   = maid_sha2((state_s == 128), digest_s);
-        ret->hash_s = digest_s;
-        ret->bytes  = state_s;
+    ret->hash_s = digest_s;
+    ret->bytes  = state_s;
 
-        if (ret->hash)
-            hmac_init(ret, key);
-        else
-            ret = hmac_del(ret);
-    }
+    ret->hash = maid_sha2(&(ret[1]), (state_s == 128), digest_s);
+    if (!(ret->hash))
+        ret = NULL;
 
     return ret;
 }
 
-static void
-hmac_renew(void *ctx, const u8 *key)
+static size_t
+hmac_size(u8 key_s, u8 state_s, u8 digest_s)
 {
-    hmac_init(ctx, key);
+    (void)key_s;
+    return sizeof(struct hmac) + maid_sha2_s((state_s == 128), digest_s);
 }
 
 static void
-hmac_update(void *ctx, u8 *block, size_t size)
+hmac_config(void *ctx, const u8 *key)
+{
+    if (ctx && key)
+        hmac_setup(ctx, key);
+}
+
+static void
+hmac_update(void *ctx, const u8 *block, size_t size)
 {
     if (ctx && block)
     {
@@ -118,31 +111,45 @@ hmac_digest(void *ctx, u8 *output)
 
         maid_mem_clear(h->buffer, h->bytes);
         maid_hash_digest(h->hash, h->buffer);
-        maid_hash_renew(h->hash);
 
         maid_hash_update(h->hash, h->prefix, h->bytes);
         maid_hash_update(h->hash, h->buffer, h->hash_s);
         maid_hash_digest(h->hash, output);
+
+        hmac_setup(ctx, NULL);
     }
 }
 
 static const struct maid_mac_def hmac_sha2 =
 {
-    .new    = hmac_new,
-    .del    = hmac_del,
-    .renew  = hmac_renew,
+    .init   = hmac_init,
+    .size   = hmac_size,
+    .config = hmac_config,
     .update = hmac_update,
     .digest = hmac_digest,
 };
 
 extern maid_mac *
-maid_hmac_sha2(bool bits64, const u8 *key, u8 digest_s)
+maid_hmac_sha2(void *buffer, bool bits64, u8 digest_s)
 {
     maid_mac *ret = NULL;
 
     if (digest_s == 28 || digest_s == 32 ||
         (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
-        ret = maid_mac_new(&hmac_sha2, key, 0, (bits64) ? 128 : 64, digest_s);
+        ret = maid_mac_init(buffer, maid_hmac_sha2_s(bits64, digest_s),
+                            &hmac_sha2, 0, (bits64) ? 128 : 64, digest_s);
+
+    return ret;
+}
+
+extern size_t
+maid_hmac_sha2_s(bool bits64, u8 digest_s)
+{
+    size_t ret = 0;
+
+    if (digest_s == 28 || digest_s == 32 ||
+        (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
+        ret = maid_mac_size(&hmac_sha2, 0, (bits64) ? 128 : 64, digest_s);
 
     return ret;
 }

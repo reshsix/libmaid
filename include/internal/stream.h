@@ -20,17 +20,20 @@
 
 #include <stdint.h>
 
+#include <maid/stream.h>
+
 struct maid_stream_def
 {
-    void * (*new)(const uint8_t *, const uint8_t *, const uint64_t);
-    void * (*del)(void *);
-    void (*renew)(void *, const uint8_t *, const uint8_t *, const uint64_t);
+    bool (*init)(void *buffer);
+    size_t (*size)(void);
+    void (*config)(void *, const uint8_t *,
+                           const uint8_t *, const uint64_t);
     void (*generate)(void *, uint8_t *);
     size_t state_s;
 };
 
-maid_stream *maid_stream_new(const struct maid_stream_def *def,
-                             const uint8_t *key, const uint8_t *nonce,
-                             uint64_t counter);
+maid_stream *maid_stream_init(void *buffer, size_t buffer_s,
+                              const struct maid_stream_def *def);
+size_t maid_stream_size(const struct maid_stream_def *def);
 
 #endif

@@ -52,7 +52,7 @@ curve25519_del(void *ctx)
     if (ctx)
     {
         struct curve25519 *c = ctx;
-        maid_ff_del(c->ff);
+        maid_mem_clear(c->ff, maid_ff_size(MAID_FF_25519));
         maid_mem_clear(ctx, sizeof(struct curve25519));
     }
     free(ctx);
@@ -66,8 +66,8 @@ curve25519_new(void)
 
     if (ret)
     {
-        ret->ff = maid_ff_new(MAID_FF_25519);
-        if (ret->ff)
+        ret->ff = calloc(1, maid_ff_size(MAID_FF_25519));
+        if (ret->ff && maid_ff_init(ret->ff, MAID_FF_25519))
             ret->prime = maid_ff_prime(ret->ff);
         else
             ret = curve25519_del(ret);

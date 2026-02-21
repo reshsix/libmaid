@@ -26,6 +26,9 @@
 #include <internal/hash.h>
 #include <internal/types.h>
 
+#include <maid/crypto/blake2.h>
+#include <maid/crypto/blake2k.h>
+
 static u32
 rr32(u32 a, u8 n)
 {
@@ -168,7 +171,7 @@ f64(u64 *h, const u64 *m, u64 th, u64 tl, bool f)
 }
 
 static void
-blake2_init(void *h, bool bits64, u8 nn, u8 kk)
+blake2_setup(void *h, bool bits64, u8 nn, u8 kk)
 {
     if (bits64)
     {
@@ -183,7 +186,7 @@ blake2_init(void *h, bool bits64, u8 nn, u8 kk)
 }
 
 static void
-blake2_rounds(void *h, void *d, size_t length, bool bits64, bool last)
+blake2_rounds(void *h, const void *d, size_t length, bool bits64, bool last)
 {
     if (bits64)
     {
@@ -250,49 +253,29 @@ struct blake2
 };
 
 static void *
-blake2_del(void *ctx)
+blake2_init(void *buffer, u8 state_s, u8 digest_s)
 {
-    if (ctx)
-        maid_mem_clear(ctx, sizeof(struct blake2));
-    free(ctx);
+    struct blake2 *ret = buffer;
 
-    return NULL;
-}
+    ret->first   = true;
+    ret->bits64  = (state_s == 128);
+    ret->nn      = digest_s;
 
-static void *
-blake2_new(u8 state_s, u8 digest_s)
-{
-    struct blake2 *ret = calloc(1, sizeof(struct blake2));
-
-    if (ret)
-    {
-        ret->first   = true;
-        ret->bits64  = (state_s == 128);
-        ret->nn      = digest_s;
-
-        blake2_init(&(ret->h), ret->bits64, ret->nn, false);
-    }
+    blake2_setup(&(ret->h), ret->bits64, ret->nn, false);
 
     return ret;
 }
 
-static void
-blake2_renew(void *ctx)
+static size_t
+blake2_size(u8 state_s, u8 digest_s)
 {
-    if (ctx)
-    {
-        struct blake2 *b2 = ctx;
-        b2->length = 0;
-        b2->first = true;
-        b2->last = false;
-
-        blake2_init(&(b2->h), b2->bits64, b2->nn, false);
-        maid_mem_clear(b2->buf, sizeof(b2->buf));
-    }
+    (void)state_s;
+    (void)digest_s;
+    return sizeof(struct blake2);
 }
 
 static void
-blake2_update(void *ctx, u8 *buffer, size_t size)
+blake2_update(void *ctx, const u8 *buffer, size_t size)
 {
     if (ctx)
     {
@@ -330,96 +313,122 @@ blake2_digest(void *ctx, u8 *output)
             blake2_rounds(b2->h, b2->buf, b2->length, b2->bits64, true);
         }
 
-        blake2_output(b2->h, b2->bits64, b2->nn, output);
+        if (output)
+            blake2_output(b2->h, b2->bits64, b2->nn, output);
+
+        b2->length = 0;
+        b2->first = true;
+        b2->last = false;
+
+        blake2_setup(&(b2->h), b2->bits64, b2->nn, false);
+        maid_mem_clear(b2->buf, sizeof(b2->buf));
     }
 }
 
 static const struct maid_hash_def blake2_def =
 {
-    .new     = blake2_new,
-    .del     = blake2_del,
-    .renew   = blake2_renew,
+    .init    = blake2_init,
+    .size    = blake2_size,
     .update  = blake2_update,
     .digest  = blake2_digest,
 };
 
 extern maid_hash *
-maid_blake2(bool bits64, u8 digest_s)
+maid_blake2(void *buffer, bool bits64, u8 digest_s)
 {
     maid_hash *ret = NULL;
 
     if (( bits64 && digest_s >= 1 && digest_s <= 64) ||
         (!bits64 && digest_s >= 1 && digest_s <= 32) )
-        ret = maid_hash_new(&blake2_def, (bits64) ? 128 : 64, digest_s);
+        ret = maid_hash_init(buffer, maid_blake2_s(bits64, digest_s),
+                             &blake2_def, (bits64) ? 128 : 64, digest_s);
+
+    return ret;
+}
+
+extern size_t
+maid_blake2_s(bool bits64, u8 digest_s)
+{
+    size_t ret = 0;
+
+    if (( bits64 && digest_s >= 1 && digest_s <= 64) ||
+        (!bits64 && digest_s >= 1 && digest_s <= 32) )
+        ret = maid_hash_size(&blake2_def, (bits64) ? 128 : 64, digest_s);
 
     return ret;
 }
 
 /* Maid MAC definition */
 
-static void
-blake2k_init(void *ctx, const u8 *key)
-{
-    if (ctx)
-    {
-        struct blake2 *b2 = ctx;
-        blake2_init(&(b2->h), b2->bits64, b2->nn, b2->kk);
-
-        u8 buf[(b2->bits64) ? 128 : 64];
-        maid_mem_clear(buf, sizeof(buf));
-        memcpy(buf, key, b2->kk);
-        blake2_update(b2, buf, sizeof(buf));
-        maid_mem_clear(buf, sizeof(buf));
-    }
-}
-
 static void *
-blake2k_new(const u8 *key, u8 key_s, u8 state_s, u8 digest_s)
+blake2k_init(void *buffer, u8 key_s, u8 state_s, u8 digest_s)
 {
-    struct blake2 *ret = calloc(1, sizeof(struct blake2));
+    struct blake2 *ret = buffer;
 
-    if (ret)
-    {
-        ret->first   = true;
-        ret->bits64  = (state_s == 128);
-        ret->nn      = digest_s;
-        ret->kk      = key_s;
-
-        blake2k_init(ret, key);
-    }
+    ret->first   = true;
+    ret->bits64  = (state_s == 128);
+    ret->nn      = digest_s;
+    ret->kk      = key_s;
 
     return ret;
 }
 
+static size_t
+blake2k_size(u8 key_s, u8 state_s, u8 digest_s)
+{
+    (void)key_s;
+    (void)state_s;
+    (void)digest_s;
+
+    return blake2_size(state_s, digest_s);
+}
+
 static void
-blake2k_renew(void *ctx, const u8 *key)
+blake2k_config(void *ctx, const u8 *key)
 {
     struct blake2 *b2 = ctx;
-    b2->length = 0;
-    b2->first = true;
-    b2->last = false;
 
-    blake2k_init(ctx, key);
+    blake2_setup(&(b2->h), b2->bits64, b2->nn, b2->kk);
+
+    u8 buf[(b2->bits64) ? 128 : 64];
+    maid_mem_clear(buf, sizeof(buf));
+    memcpy(buf, key, b2->kk);
+    blake2_update(b2, buf, sizeof(buf));
+    maid_mem_clear(buf, sizeof(buf));
 }
 
 static const struct maid_mac_def blake2k_def =
 {
-    .new      = blake2k_new,
-    .del      = blake2_del,
-    .renew    = blake2k_renew,
+    .init     = blake2k_init,
+    .size     = blake2k_size,
+    .config   = blake2k_config,
     .update   = blake2_update,
     .digest   = blake2_digest,
 };
 
 extern maid_mac *
-maid_blake2k(bool bits64, u8 digest_s, const u8 *key, u8 key_s)
+maid_blake2k(void *buffer, bool bits64, u8 digest_s, u8 key_s)
 {
     maid_mac *ret = NULL;
 
     if (( bits64 && digest_s >= 1 && digest_s <= 64 && key_s <= 64) ||
         (!bits64 && digest_s >= 1 && digest_s <= 32 && key_s <= 32) )
-        ret = maid_mac_new(&blake2k_def, key, key_s,
-                           (bits64) ? 128 : 64, digest_s);
+        ret = maid_mac_init(buffer, maid_blake2k_s(bits64, digest_s, key_s),
+                            &blake2k_def, key_s,
+                            (bits64) ? 128 : 64, digest_s);
+
+    return ret;
+}
+
+extern size_t
+maid_blake2k_s(bool bits64, u8 digest_s, u8 key_s)
+{
+    size_t ret = 0;
+
+    if (( bits64 && digest_s >= 1 && digest_s <= 64 && key_s <= 64) ||
+        (!bits64 && digest_s >= 1 && digest_s <= 32 && key_s <= 32) )
+        ret = maid_mac_size(&blake2k_def, key_s,
+                            (bits64) ? 128 : 64, digest_s);
 
     return ret;
 }

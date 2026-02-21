@@ -41,108 +41,103 @@ struct maid_ff
 };
 
 extern struct maid_ff *
-maid_ff_new(enum maid_ff_prime prime)
+maid_ff_init(void *buffer, enum maid_ff_prime prime)
 {
-    struct maid_ff *ret = calloc(1, sizeof(struct maid_ff));
+    bool ret = true;
 
-    if (ret)
+    struct maid_ff *ff = buffer;
+    maid_mem_clear(buffer, maid_ff_size(prime));
+
+    ff->c = (void*)&(ff[1]);
+    switch (prime)
     {
-        switch (prime)
-        {
-            case MAID_FF_1305:
-            case MAID_FF_25519:
-                ret->words = MAID_MP_WORDS(256) * 2;
-                ret->cs    = 1;
+        case MAID_FF_1305:
+        case MAID_FF_25519:
+            ff->words = MAID_MP_WORDS(256) * 2;
+            ff->cs    = 1;
+            ff->full = &(ff->c[ff->words]);
+            switch (prime)
+            {
+                case MAID_FF_1305:
+                    ff->k     = 130;
+                    ff->c[0]  = 5;
+                    break;
+                case MAID_FF_25519:
+                    ff->k     = 255;
+                    ff->c[0]  = 19;
+                    break;
+                default:
+                    break;
+            }
+            ff->minus = true;
 
-                ret->c    = calloc(ret->words, sizeof(maid_mp_word));
-                ret->full = calloc(ret->words, sizeof(maid_mp_word));
-                if (ret->c && ret->full)
-                {
-                    switch (prime)
-                    {
-                        case MAID_FF_1305:
-                            ret->k     = 130;
-                            ret->c[0]  = 5;
-                            break;
-                        case MAID_FF_25519:
-                            ret->k     = 255;
-                            ret->c[0]  = 19;
-                            break;
-                        default:
-                            break;
-                    }
-                    ret->minus = true;
+            ff->folds = 2;
+            ff->subs  = 1;
+            break;
 
-                    ret->folds = 2;
-                    ret->subs  = 1;
-                }
-                else
-                    ret = maid_ff_del(ret);
-                break;
+        case MAID_FF_ORDER25519:
+            ff->words = MAID_MP_WORDS(512) * 2;
+            ff->cs    = ff->words;
+            ff->full = &(ff->c[ff->words]);
 
-            case MAID_FF_ORDER25519:
-                ret->words = MAID_MP_WORDS(512) * 2;
-                ret->cs    = ret->words;
+            uint8_t c[] = {0x14, 0xde, 0xf9, 0xde, 0xa2, 0xf7, 0x9c,
+                           0xd6, 0x58, 0x12, 0x63, 0x1a, 0x5c, 0xf5,
+                           0xd3, 0xed};
+            ff->k = 252;
+            maid_mp_read(MAID_MP_WORDS(128), ff->c, c, true);
+            ff->minus = false;
 
-                ret->c    = calloc(ret->words, sizeof(maid_mp_word));
-                ret->full = calloc(ret->words, sizeof(maid_mp_word));
-                if (ret->c && ret->full)
-                {
-                    uint8_t c[] = {0x14, 0xde, 0xf9, 0xde, 0xa2, 0xf7, 0x9c,
-                                   0xd6, 0x58, 0x12, 0x63, 0x1a, 0x5c, 0xf5,
-                                   0xd3, 0xed};
-                    ret->k = 252;
-                    maid_mp_read(MAID_MP_WORDS(128), ret->c, c, true);
-                    ret->minus = false;
+            ff->folds = 4;
+            ff->subs  = 1;
+            break;
 
-                    ret->folds = 4;
-                    ret->subs  = 1;
-                }
-                else
-                    ret = maid_ff_del(ret);
-                break;
-
-            default:
-                break;
-        }
+        default:
+            ret = false;
+            break;
     }
 
     if (ret)
     {
-        while (ret->cs)
+        while (ff->cs)
         {
-            if (ret->c[ret->cs - 1] == 0)
-                ret->cs--;
+            if (ff->c[ff->cs - 1] == 0)
+                ff->cs--;
             else
                 break;
         }
 
-        ret->full[ret->k / MAID_MP_BITS(1)] =
-            1ULL << (ret->k % MAID_MP_BITS(1));
-        if (ret->minus)
-            maid_mp_sub(ret->words, ret->full, ret->c);
+        ff->full[ff->k / MAID_MP_BITS(1)] =
+            1ULL << (ff->k % MAID_MP_BITS(1));
+
+        if (ff->minus)
+            maid_mp_sub(ff->words, ff->full, ff->c);
         else
-            maid_mp_add(ret->words, ret->full, ret->c);
+            maid_mp_add(ff->words, ff->full, ff->c);
+    }
+
+    return (ret) ? ff : NULL;
+}
+
+extern size_t
+maid_ff_size(enum maid_ff_prime prime)
+{
+    size_t ret = sizeof(struct maid_ff);
+
+    switch (prime)
+    {
+        case MAID_FF_1305:
+        case MAID_FF_25519:
+            ret += 2 * MAID_MP_WORDS(256) * 2 * sizeof(maid_mp_word);
+            break;
+        case MAID_FF_ORDER25519:
+            ret += 2 * MAID_MP_WORDS(512) * 2 * sizeof(maid_mp_word);
+            break;
+        default:
+            ret = 0;
+            break;
     }
 
     return ret;
-}
-
-extern maid_ff *
-maid_ff_del(struct maid_ff *ff)
-{
-    if (ff)
-    {
-        maid_mp_mov(ff->words, ff->c,    NULL);
-        maid_mp_mov(ff->words, ff->full, NULL);
-        free(ff->c);
-        free(ff->full);
-
-        maid_mem_clear(ff, sizeof(struct maid_ff));
-    }
-    free(ff);
-
-    return NULL;
 }
 
 extern maid_mp_word *

@@ -1,11 +1,7 @@
-<div align="center">
-    <h1>MAID</h1>
-    <img src="poster.png" width="350">
-    <h3>1.4 Pre-Release</h3>
-</div>
+# Maid
+**Status: 1.4 γ**
 
 ## Installation
-
 Created in `build`
 ```sh
 make
@@ -19,7 +15,6 @@ sudo ldconfig
 ```
 
 ## Reference
-
 Called by `maid`, linked with -lmaid
 | Category                            | Algorithms                   |
 |:------------------------------------|:-----------------------------|

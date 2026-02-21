@@ -22,14 +22,18 @@
 
 struct maid_mac_def
 {
-    void * (*new)(const uint8_t *, uint8_t, uint8_t, uint8_t);
-    void * (*del)(void *);
-    void (*renew)(void *, const uint8_t *);
-    void (*update)(void *, uint8_t *, size_t);
+    void * (*init)(void *, uint8_t, uint8_t, uint8_t);
+    size_t (*size)(uint8_t, uint8_t, uint8_t);
+    void (*config)(void *, const uint8_t *);
+    void (*update)(void *, const uint8_t *, size_t);
     void (*digest)(void *, uint8_t *);
 };
 
-maid_mac *maid_mac_new(const struct maid_mac_def *def, const uint8_t *key,
-                       uint8_t key_s, uint8_t state_s, uint8_t digest_s);
+struct maid_mac *maid_mac_init(void *buffer, size_t buffer_s,
+                               const struct maid_mac_def *def,
+                               uint8_t key_s, uint8_t state_s,
+                               uint8_t digest_s);
+size_t maid_mac_size(const struct maid_mac_def *def,
+                     uint8_t key_s, uint8_t state_s, uint8_t digest_s);
 
 #endif

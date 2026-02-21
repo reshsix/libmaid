@@ -24,6 +24,8 @@
 #include <internal/hash.h>
 #include <internal/types.h>
 
+#include <maid/crypto/sha2.h>
+
 static u32
 rr32(u32 a, u8 n)
 {
@@ -51,7 +53,7 @@ sr64(u64 a, u8 n)
 /* SHA-2 implementation */
 
 static void
-sha_init(void *h, bool bits64, u8 digest_s)
+sha_setup(void *h, bool bits64, u8 digest_s)
 {
     if (bits64)
     {
@@ -291,7 +293,7 @@ sha_output(void *h, u8 *tag, bool bits64, size_t digest_s)
 
 /* Maid hash definition */
 
-struct sha
+struct sha2
 {
     bool bits64;
     u8 digest_s;
@@ -302,48 +304,31 @@ struct sha
 };
 
 static void *
-sha_del(void *ctx)
+sha_init(void *buffer, u8 state_s, u8 digest_s)
 {
-    if (ctx)
-        maid_mem_clear(ctx, sizeof(struct sha));
+    struct sha2 *s2 = buffer;
 
-    free(ctx);
-    return NULL;
-}
-
-static void *
-sha_new(u8 state_s, u8 digest_s)
-{
-    struct sha *s2 = calloc(1, sizeof(struct sha));
-
-    if (s2)
-    {
-        s2->bits64   = (state_s == 128);
-        s2->digest_s = digest_s;
-        sha_init(&(s2->h), s2->bits64, s2->digest_s);
-    }
+    s2->bits64   = (state_s == 128);
+    s2->digest_s = digest_s;
+    sha_setup(&(s2->h), s2->bits64, s2->digest_s);
 
     return s2;
 }
 
-static void
-sha_renew(void *ctx)
+static size_t
+sha_size(u8 state_s, u8 digest_s)
 {
-    if (ctx)
-    {
-        struct sha *s2 = ctx;
-        sha_init(&(s2->h), s2->bits64, s2->digest_s);
-        s2->length = 0;
-        s2->last = false;
-    }
+    (void)state_s;
+    (void)digest_s;
+    return sizeof(struct sha2);
 }
 
 static void
-sha_update(void *ctx, u8 *buffer, size_t size)
+sha_update(void *ctx, const u8 *buffer, size_t size)
 {
     if (ctx)
     {
-        struct sha *s2 = ctx;
+        struct sha2 *s2 = ctx;
         s2->length += size;
 
         u8 limit1 =  (s2->bits64) ? 128 : 64;
@@ -379,33 +364,50 @@ sha_digest(void *ctx, u8 *output)
 {
     if (ctx)
     {
-        struct sha *s2 = ctx;
+        struct sha2 *s2 = ctx;
 
         /* In case the last update was with a 512/1024 bit block */
         if (!(s2->last))
             sha_update(ctx, NULL, 0);
 
-        sha_output(&(s2->h), output, s2->bits64, s2->digest_s);
+        if (output)
+            sha_output(&(s2->h), output, s2->bits64, s2->digest_s);
+
+        sha_setup(&(s2->h), s2->bits64, s2->digest_s);
+        s2->length = 0;
+        s2->last = false;
     }
 }
 
 static const struct maid_hash_def sha2_def =
 {
-    .new    = sha_new,
-    .del    = sha_del,
-    .renew  = sha_renew,
+    .init   = sha_init,
+    .size   = sha_size,
     .update = sha_update,
     .digest = sha_digest,
 };
 
 extern maid_hash *
-maid_sha2(bool bits64, u8 digest_s)
+maid_sha2(void *buffer, bool bits64, u8 digest_s)
 {
     maid_hash *ret = NULL;
 
     if (digest_s == 28 || digest_s == 32 ||
         (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
-        ret = maid_hash_new(&sha2_def, (bits64) ? 128 : 64, digest_s);
+        ret = maid_hash_init(buffer, maid_sha2_s(bits64, digest_s),
+                             &sha2_def, (bits64) ? 128 : 64, digest_s);
+
+    return ret;
+}
+
+extern size_t
+maid_sha2_s(bool bits64, u8 digest_s)
+{
+    size_t ret = 0;
+
+    if (digest_s == 28 || digest_s == 32 ||
+        (bits64 && digest_s == 48) || (bits64 && digest_s == 64))
+        ret = maid_hash_size(&sha2_def, (bits64) ? 128 : 64, digest_s);
 
     return ret;
 }

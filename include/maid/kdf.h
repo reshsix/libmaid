@@ -23,19 +23,8 @@
 
 typedef struct maid_kdf maid_kdf;
 
-struct maid_hkdf_params
-{
-    uint8_t *info;
-    size_t info_s;
-};
-
-maid_kdf *maid_hkdf_sha2(const struct maid_hkdf_params *p,
-                         bool bits64, uint8_t digest_s, size_t output_s);
-maid_kdf *maid_kdf_del(maid_kdf *k);
-
-void maid_kdf_renew(maid_kdf *k, const void *params);
-void maid_kdf_hash(struct maid_kdf *k, const uint8_t *data, size_t data_s,
+void maid_kdf_config(maid_kdf *k, const uint8_t *info, size_t info_s);
+void maid_kdf_hash(maid_kdf *k, const uint8_t *data, size_t data_s,
                    const uint8_t *salt, size_t salt_s, uint8_t *output);
-
 
 #endif

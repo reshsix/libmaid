@@ -27,11 +27,11 @@ uint8_t maid_test_1305(void);
 uint8_t maid_test_25519(void);
 uint8_t maid_test_order25519(void);
 
-uint8_t maid_test_chacha(void);
+uint8_t maid_test_chacha20(void);
 uint8_t maid_test_poly1305(void);
 uint8_t maid_test_chacha20poly1305(void);
 
-uint8_t maid_test_chacha20_rng(void);
+uint8_t maid_test_chacha20rng(void);
 
 uint8_t maid_test_blake2(void);
 uint8_t maid_test_blake2k(void);

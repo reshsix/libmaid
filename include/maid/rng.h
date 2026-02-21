@@ -22,10 +22,7 @@
 
 typedef struct maid_rng maid_rng;
 
-maid_rng *maid_chacha20_rng(const uint8_t *entropy);
-maid_rng *maid_rng_del(maid_rng *g);
-
-void maid_rng_renew(maid_rng *g, const uint8_t *entropy);
+void maid_rng_config(maid_rng *g, const uint8_t *entropy);
 void maid_rng_generate(maid_rng *g, uint8_t *buffer, size_t size);
 
 #endif

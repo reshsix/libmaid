@@ -23,13 +23,7 @@
 
 typedef struct maid_mac maid_mac;
 
-maid_mac *maid_poly1305(const uint8_t *key);
-maid_mac *maid_hmac_sha2(bool bits64, const uint8_t *key, uint8_t digest_s);
-maid_mac *maid_blake2k(bool bits64, uint8_t digest_s,
-                       const uint8_t *key, uint8_t key_s);
-maid_mac *maid_mac_del(maid_mac *m);
-
-void maid_mac_renew(maid_mac *m, const uint8_t *key);
+void maid_mac_config(maid_mac *m, const uint8_t *key);
 void maid_mac_update(maid_mac *m, const uint8_t *buffer, size_t size);
 size_t maid_mac_digest(maid_mac *m, uint8_t *output);
 

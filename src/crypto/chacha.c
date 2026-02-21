@@ -20,14 +20,15 @@
 
 #include <maid/mem.h>
 #include <maid/mac.h>
-#include <maid/rng.h>
-#include <maid/aead.h>
-#include <maid/stream.h>
 
 #include <internal/rng.h>
 #include <internal/aead.h>
 #include <internal/types.h>
 #include <internal/stream.h>
+
+#include <maid/crypto/chacha20.h>
+#include <maid/crypto/poly1305.h>
+#include <maid/crypto/chacha20rng.h>
 
 /* Chacha20 implementation */
 
@@ -64,59 +65,41 @@ doubleround(u32 *block)
 
 /* Maid stream definitions */
 
-struct chacha
+struct chacha20
 {
     u8 key[32], nonce[12];
     u64 counter;
 };
 
-static void *
-chacha_new(const u8 *key, const u8 *nonce, u64 counter)
+static bool
+chacha20_init(void *ctx)
 {
     /* IETF version */
-    struct chacha *ret = calloc(1, sizeof(struct chacha));
-
-    if (ret)
-    {
-        memcpy(ret->key,     key, sizeof(ret->key));
-        memcpy(ret->nonce, nonce, sizeof(ret->nonce));
-        ret->counter = counter;
-    }
-
-    return ret;
+    (void)ctx;
+    return true;
 }
 
-static void *
-chacha_del(void *ctx)
+static size_t
+chacha20_size(void)
 {
-    if (ctx)
-        maid_mem_clear(ctx, sizeof(struct chacha));
-    free(ctx);
-
-    return NULL;
+    return sizeof(struct chacha20);
 }
 
 static void
-chacha_renew(void *ctx, const u8 *key, const u8 *nonce, u64 counter)
+chacha20_config(void *ctx, const u8 *key, const u8 *nonce, u64 counter)
 {
-    if (ctx)
-    {
-        struct chacha *ch = ctx;
-
-        if (key)
-            memcpy(ch->key, key, sizeof(ch->key));
-        if (nonce)
-            memcpy(ch->nonce, nonce, sizeof(ch->nonce));
-        ch->counter = counter;
-    }
+    struct chacha20 *ch = ctx;
+    memcpy(ch->key,     key, sizeof(ch->key));
+    memcpy(ch->nonce, nonce, sizeof(ch->nonce));
+    ch->counter = counter;
 }
 
 static void
-chacha_generate(void *ctx, u8 *out)
+chacha20_generate(void *ctx, u8 *out)
 {
     if (ctx && out)
     {
-        struct chacha *ch = ctx;
+        struct chacha20 *ch = ctx;
 
         strcpy((char*)out, "expand 32-byte k");
         memcpy(&(out[16]), ch->key, 32);
@@ -145,17 +128,23 @@ chacha_generate(void *ctx, u8 *out)
 
 static const struct maid_stream_def chacha20_def =
 {
-    .new      = chacha_new,
-    .del      = chacha_del,
-    .renew    = chacha_renew,
-    .generate = chacha_generate,
+    .init     = chacha20_init,
+    .size     = chacha20_size,
+    .config   = chacha20_config,
+    .generate = chacha20_generate,
     .state_s  = 64,
 };
 
 extern maid_stream *
-maid_chacha20(const u8 *key, const u8 *nonce, u64 counter)
+maid_chacha20(void *buffer)
 {
-    return maid_stream_new(&chacha20_def, key, nonce, counter);
+    return maid_stream_init(buffer, maid_chacha20_s(), &chacha20_def);
+}
+
+extern size_t
+maid_chacha20_s(void)
+{
+    return maid_stream_size(&chacha20_def);
 }
 
 /* Maid AEAD definitions */
@@ -166,21 +155,24 @@ chacha20poly1305_init(const u8 *key, const u8 *nonce,
                       bool renew)
 {
     if (!renew)
-        *st = maid_chacha20(key, nonce, 0);
-    else if (*st)
-        maid_stream_renew(*st, key, nonce, 0);
-
-    if (*st)
     {
+        *st = calloc(1, maid_chacha20_s());
+        *m  = calloc(1, maid_poly1305_s());
+    }
+
+    if (*st && *m)
+    {
+        maid_chacha20(*st);
+        maid_stream_config(*st, key, nonce, 0);
+
         /* Poly1305 ephemeral key (32 bytes)
          * Uses a chacha block to increase the counter */
         u8 ekey[64] = {0};
         maid_stream_xor(*st, ekey, sizeof(ekey));
+        maid_poly1305(*m);
+        maid_mac_config(*m, ekey);
 
-        if (!renew)
-            *m = maid_poly1305(ekey);
-        else if (*m)
-            maid_mac_renew(*m, ekey);
+        /* TODO may fail */
 
         maid_mem_clear(ekey, sizeof(ekey));
     }
@@ -204,71 +196,49 @@ maid_chacha20poly1305(const u8 *key, const u8 *nonce)
 
 /* Maid RNG definitions */
 
-struct chacha20_rng
+static bool
+chacha20rng_init(void *buffer)
 {
-    maid_stream *st;
-};
-
-static void *
-chacha20_rng_del(void *ctx)
-{
-    if (ctx)
-    {
-        struct chacha20_rng *chr = ctx;
-        maid_stream_del(chr->st);
-    }
-    free(ctx);
-
-    return NULL;
+    return maid_chacha20(buffer);
 }
 
-static void *
-chacha20_rng_new(const u8 *entropy)
+static size_t
+chacha20rng_size(void)
 {
-    struct chacha20_rng *ret = calloc(1, sizeof(struct chacha20_rng));
-
-    if (ret)
-    {
-        ret->st = maid_chacha20(entropy, &(entropy[32]), 0);
-        if (!(ret->st))
-            ret = chacha20_rng_del(ret);
-    }
-
-    return ret;
+    return maid_chacha20_s();
 }
 
 static void
-chacha20_rng_renew(void *ctx, const u8 *entropy)
+chacha20rng_config(void *ctx, const u8 *entropy)
 {
-    if (ctx)
-    {
-        struct chacha20_rng *ctr = ctx;
-        maid_stream_renew(ctr->st, entropy, &(entropy[32]), 0);
-    }
+    if (ctx && entropy)
+        maid_stream_config(ctx, entropy, &(entropy[32]), 0);
 }
 
 static void
-chacha20_rng_generate(void *ctx, u8 *buffer)
+chacha20rng_generate(void *ctx, u8 *buffer)
 {
     if (ctx && buffer)
-    {
-        struct chacha20_rng *ctr = ctx;
-        memset(buffer, '\0', 64);
-        maid_stream_xor(ctr->st, buffer, 64);
-    }
+        maid_stream_xor(ctx, buffer, 64);
 }
 
-static const struct maid_rng_def chacha20_rng_def =
+static const struct maid_rng_def chacha20rng_def =
 {
-    .new      = chacha20_rng_new,
-    .del      = chacha20_rng_del,
-    .renew    = chacha20_rng_renew,
-    .generate = chacha20_rng_generate,
+    .init     = chacha20rng_init,
+    .size     = chacha20rng_size,
+    .config   = chacha20rng_config,
+    .generate = chacha20rng_generate,
     .state_s  = 64,
 };
 
 extern maid_rng *
-maid_chacha20_rng(const u8 *entropy)
+maid_chacha20rng(void *buffer)
 {
-    return maid_rng_new(&chacha20_rng_def, entropy);
+    return maid_rng_init(buffer, maid_chacha20rng_s(), &chacha20rng_def);
+}
+
+extern size_t
+maid_chacha20rng_s(void)
+{
+    return maid_rng_size(&chacha20rng_def);
 }

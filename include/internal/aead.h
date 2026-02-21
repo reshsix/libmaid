@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <maid/aead.h>
 #include <maid/stream.h>
 
 struct maid_aead_def

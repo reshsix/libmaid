@@ -31,39 +31,34 @@ struct maid_kdf
 };
 
 extern struct maid_kdf *
-maid_kdf_del(maid_kdf *k)
+maid_kdf_init(void *buffer, size_t buffer_s,
+              const struct maid_kdf_def *def,
+              u8 state_s, u8 digest_s, size_t output_s)
 {
-    if (k)
-        k->def->del(k->ctx);
-    free(k);
+    struct maid_kdf *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
 
-    return NULL;
-}
+    ret->def = def;
 
-extern struct maid_kdf *
-maid_kdf_new(const struct maid_kdf_def *def, const void *params,
-             u8 state_s, u8 digest_s, size_t output_s)
-{
-    struct maid_kdf *ret = NULL;
-    if (params)
-        ret = calloc(1, sizeof(struct maid_kdf));
-
-    if (ret)
-    {
-        ret->def = def;
-        ret->ctx = def->new(params, state_s, digest_s, output_s);
-        if (!(ret->ctx))
-            ret = maid_kdf_del(ret);
-    }
+    ret->ctx = (void *)&(ret[1]);
+    if (!(def->init(ret->ctx, state_s, digest_s, output_s)))
+        ret = NULL;
 
     return ret;
 }
 
-extern void
-maid_kdf_renew(struct maid_kdf *k, const void *params)
+extern size_t
+maid_kdf_size(const struct maid_kdf_def *def,
+              u8 state_s, u8 digest_s, size_t output_s)
 {
-    if (k)
-        k->def->renew(k->ctx, params);
+    return sizeof(struct maid_kdf) + def->size(state_s, digest_s, output_s);
+}
+
+extern void
+maid_kdf_config(struct maid_kdf *m, const u8 *info, size_t info_s)
+{
+    if (m)
+        m->def->config(m->ctx, info, info_s);
 }
 
 extern void
