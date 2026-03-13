@@ -18,6 +18,7 @@
 #ifndef MAID_KDF_H
 #define MAID_KDF_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 

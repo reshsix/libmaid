@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/kdf.h>
 #include <maid/mac.h>
 #include <maid/mem.h>
@@ -108,7 +105,7 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
             maid_hash_digest(p->hash, key);
         }
         else
-            memcpy(key, salt, salt_s);
+            maid_mem_copy(key, salt, salt_s);
         maid_mac_config(p->prf, key);
         maid_mac_update(p->prf, data, data_s);
         maid_mac_digest(p->prf, key);
@@ -133,7 +130,7 @@ hkdf_hash(void *ctx, const u8 *data, size_t data_s,
             {
                 u8 hash[p->digest_s];
                 maid_mac_digest(p->prf, hash);
-                memcpy(&(output[p->digest_s * (i - 1)]), hash, l);
+                maid_mem_copy(&(output[p->digest_s * (i - 1)]), hash, l);
 
                 maid_mem_clear(hash, sizeof(hash));
                 l = 0;

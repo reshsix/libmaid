@@ -18,6 +18,7 @@
 #ifndef MAID_AEAD_H
 #define MAID_AEAD_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 

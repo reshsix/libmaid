@@ -18,6 +18,7 @@
 #ifndef MAID_STREAM_H
 #define MAID_STREAM_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct maid_stream maid_stream;

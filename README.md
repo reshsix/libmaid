@@ -32,16 +32,9 @@ Algorithms
   [X25519](include/maid/crypto/x25519.h)
 
 
-## Installation
-Created in `build`
+## Assembling
+Built as `libmaid.a`
 ```sh
 make
-build/maid test
+make test
 ```
-
-Placed in `/usr/local`
-```sh
-sudo make install
-sudo ldconfig
-```
-Called by `maid`, linked with -lmaid

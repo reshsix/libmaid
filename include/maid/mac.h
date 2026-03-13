@@ -18,6 +18,7 @@
 #ifndef MAID_MAC_H
 #define MAID_MAC_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 

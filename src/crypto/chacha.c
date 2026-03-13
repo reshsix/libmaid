@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/mem.h>
 #include <maid/mac.h>
 
@@ -89,8 +86,8 @@ static void
 chacha20_config(void *ctx, const u8 *key, const u8 *nonce, u64 counter)
 {
     struct chacha20 *ch = ctx;
-    memcpy(ch->key,     key, sizeof(ch->key));
-    memcpy(ch->nonce, nonce, sizeof(ch->nonce));
+    maid_mem_copy(ch->key,     key, sizeof(ch->key));
+    maid_mem_copy(ch->nonce, nonce, sizeof(ch->nonce));
     ch->counter = counter;
 }
 
@@ -101,12 +98,12 @@ chacha20_generate(void *ctx, u8 *out)
     {
         struct chacha20 *ch = ctx;
 
-        strcpy((char*)out, "expand 32-byte k");
-        memcpy(&(out[16]), ch->key, 32);
+        maid_mem_copy(out, "expand 32-byte k", 16);
+        maid_mem_copy(&(out[16]), ch->key, 32);
 
         u8 cs = (sizeof(u32) * 4) - sizeof(ch->nonce);
         maid_mem_write(&(out[48]), 0, cs, false, ch->counter);
-        memcpy(&(out[48 + cs]), ch->nonce, sizeof(ch->nonce));
+        maid_mem_copy(&(out[48 + cs]), ch->nonce, sizeof(ch->nonce));
 
         u32 tmp[16] = {0};
         for (u8 i = 0; i < 16; i++)

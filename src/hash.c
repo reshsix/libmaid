@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/mem.h>
 #include <maid/hash.h>
 
@@ -72,7 +69,7 @@ maid_hash_update(struct maid_hash *h, const u8 *buffer, size_t size)
             u8 empty = h->state_s - h->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
-            memcpy(&(h->buffer[h->buffer_c]), buffer, copy);
+            maid_mem_copy(&(h->buffer[h->buffer_c]), buffer, copy);
             h->buffer_c += copy;
             if (h->buffer_c < h->state_s)
                 break;

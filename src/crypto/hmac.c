@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/mac.h>
 #include <maid/mem.h>
 #include <maid/hash.h>
@@ -46,15 +43,15 @@ hmac_setup(void *ctx, const u8 *key)
     {
         struct hmac *h = ctx;
         if (key)
-            memcpy(h->key, key, h->bytes);
+            maid_mem_copy(h->key, key, h->bytes);
 
         maid_hash_digest(h->hash, h->buffer);
 
-        memcpy(h->prefix, h->key, h->bytes);
+        maid_mem_copy(h->prefix, h->key, h->bytes);
         for (size_t i = 0; i < h->bytes; i++)
             h->prefix[i] ^= 0x5c;
 
-        memcpy(h->buffer, h->key, h->bytes);
+        maid_mem_copy(h->buffer, h->key, h->bytes);
         for (size_t i = 0; i < h->bytes; i++)
             h->buffer[i] ^= 0x36;
 

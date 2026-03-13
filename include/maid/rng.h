@@ -18,6 +18,7 @@
 #ifndef MAID_RNG_H
 #define MAID_RNG_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct maid_rng maid_rng;

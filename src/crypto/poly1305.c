@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/ff.h>
 #include <maid/mp.h>
 #include <maid/mac.h>
@@ -108,7 +105,7 @@ poly1305_update(void *ctx, const u8 *block, size_t size)
 
         /* Read data into buffer (256 bits) */
         u8 buf[32] = {0};
-        memcpy(buf, block, size);
+        maid_mem_copy(buf, block, size);
 
         /* Pad buffer accordingly */
         buf[size] |= 1;

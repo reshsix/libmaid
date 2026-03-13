@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/mac.h>
 #include <maid/mem.h>
 
@@ -86,7 +83,7 @@ maid_mac_update(struct maid_mac *m, const u8 *buffer, size_t size)
             u8 empty = m->state_s - m->buffer_c;
             u8 copy  = (size < empty) ? size : empty;
 
-            memcpy(&(m->buffer[m->buffer_c]), buffer, copy);
+            maid_mem_copy(&(m->buffer[m->buffer_c]), buffer, copy);
             m->buffer_c += copy;
             if (m->buffer_c < m->state_s)
                 break;

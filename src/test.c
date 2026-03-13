@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/ff.h>
 #include <maid/mp.h>
 #include <maid/ecc.h>
@@ -48,6 +45,17 @@
 #include <maid/crypto/chacha20rng.h>
 #include <maid/crypto/edwards25519.h>
 #include <maid/crypto/chacha20poly1305.h>
+
+static size_t
+strlen(const char *addr)
+{
+    size_t ret = 0;
+
+    while (addr[ret])
+        ret++;
+
+    return ret;
+}
 
 /* Test macros */
 
@@ -90,7 +98,7 @@ test_mem_import(enum maid_mem t, char *input, char *output)
     maid_mem_clear(buf, sizeof(buf));
 
     return maid_mem_import(t, buf, sizeof(buf), input, l) == l &&
-           memcmp(buf, output, l2) == 0 && buf[l2] == '\0';
+           maid_mem_cmp(buf, output, l2) && buf[l2] == '\0';
 }
 
 static bool
@@ -103,7 +111,7 @@ test_mem_export(enum maid_mem t, char *input, char *output)
     maid_mem_clear(buf, sizeof(buf));
 
     return maid_mem_export(t, input, l, buf, sizeof(buf)) == l2 &&
-           memcmp(buf, output, l2) == 0 && buf[l2] == '\0';
+           maid_mem_cmp(buf, output, l2) && buf[l2] == '\0';
 }
 
 static bool

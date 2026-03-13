@@ -18,6 +18,7 @@
 #ifndef MAID_SIGN_H
 #define MAID_SIGN_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 

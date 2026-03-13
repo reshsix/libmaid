@@ -15,18 +15,11 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <string.h>
-
 #include <maid/mp.h>
 #include <maid/mem.h>
 
 #include <internal/mp.h>
 #include <internal/types.h>
-
-#if defined(__x86_64__) || defined(_M_X64)
-#include <immintrin.h>
-#endif
 
 extern void
 maid_mp_read(size_t words, maid_mp_word *a, const u8 *addr, bool big)
@@ -52,34 +45,6 @@ maid_mp_write(size_t words, const maid_mp_word *a, u8 *addr, bool big)
             maid_mem_write(addr, (!big) ? i : words - i - 1,
                            MAID_MP_BYTES(1), big, (a) ? a[i] : 0x0);
         }
-    }
-}
-
-extern void
-maid_mp_debug(size_t words, const char *name, const maid_mp_word *a)
-{
-    if (words && name)
-    {
-        const char *maid_mp_fmt    = "%016lx";
-        const char *maid_mp_fmt_ns = "%lx";
-
-        volatile bool started = false;
-        volatile maid_mp_word w = 0;
-
-        fprintf(stderr, "%s = 0x", name);
-        for (size_t i = 0; i < words; i++)
-        {
-            w = ((a) ? a[words - 1 - i] : 0x0);
-            if (!started && w == 0 && i != words - 1)
-                continue;
-
-            fprintf(stderr, (started) ? maid_mp_fmt : maid_mp_fmt_ns, w);
-            started = true;
-        }
-        fprintf(stderr, "\n");
-
-        w = 0;
-        started = false;
     }
 }
 
@@ -284,10 +249,6 @@ maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
         for (size_t i = 0; i < words; i++)
         {
-            #if defined(__x86_64__) || defined(_M_X64)
-            carry = _addcarry_u64(carry, a[i], b ? b[i] : 0,
-                                  (unsigned long long *)&(a[i]));
-            #else
             volatile maid_mp_word val = (b ? b[i] : 0);
 
             a[i] += val;
@@ -295,7 +256,6 @@ maid_mp_add(size_t words, maid_mp_word *a, const maid_mp_word *b)
             carry = (carry) ? (a[i] <= val) : (a[i] < val);
 
             val = 0;
-            #endif
         }
 
         carry = 0;
@@ -311,10 +271,6 @@ maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
         for (size_t i = 0; i < words; i++)
         {
-            #if defined(__x86_64__) || defined(_M_X64)
-            borrow = _subborrow_u64(borrow, a[i], b ? b[i] : 0,
-                                    (unsigned long long *)&(a[i]));
-            #else
             volatile maid_mp_word org = a[i];
             volatile maid_mp_word val = (b ? b[i] : 0);
 
@@ -324,7 +280,6 @@ maid_mp_sub(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
             org = 0;
             val = 0;
-            #endif
         }
 
         borrow = 0;
@@ -349,16 +304,6 @@ maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b)
 
         for (size_t i = 0; i < words; i++)
         {
-            #if defined(__SIZEOF_INT128__)
-            for (size_t j = 0; j < words; j++)
-            {
-                volatile unsigned __int128 x = tmp[i];
-                x *= ((b) ? b[j] : (j == 0));
-
-                low[j]  = x;
-                high[j] = x >> 64;
-            }
-            #else
             const size_t       half = MAID_MP_BITS(1) / 2;
             const maid_mp_word mask = MAID_MP_MAX >> half;
 
@@ -391,7 +336,6 @@ maid_mp_mul(size_t words, maid_mp_word *a, const maid_mp_word *b)
                 high[j] += xw >> half;
                 high[j] += yz >> half;
             }
-            #endif
 
             /* Adds words to the total */
             maid_mp_mov(words, tmp2, NULL);

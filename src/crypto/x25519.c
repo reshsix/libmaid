@@ -15,10 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/ff.h>
 #include <maid/mp.h>
 #include <maid/ecc.h>
@@ -338,7 +334,7 @@ curve25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
     size_t words = MAID_MP_WORDS(256);
 
     u8 buffer[32] = {0};
-    memcpy(buffer, data, 32);
+    maid_mem_copy(buffer, data, 32);
 
     buffer[0]  &= 248;
     buffer[31] &= 63;
@@ -348,17 +344,6 @@ curve25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
     maid_mem_clear(buffer, sizeof(buffer));
 
     return ret;
-}
-
-static void
-curve25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
-{
-    (void)ctx;
-    size_t words = MAID_MP_WORDS(256);
-
-    fprintf(stderr, "%s (curve25519)\n", name);
-    maid_mp_debug(words, "x", a->x);
-    maid_mp_debug(words, "z", a->z);
 }
 
 static const struct maid_ecc_def curve25519_def =
@@ -371,7 +356,6 @@ static const struct maid_ecc_def curve25519_def =
     .cmp    = curve25519_cmp,    .dbl    = curve25519_dbl,
     .add2   = curve25519_add2,   .size   = curve25519_size,
     .keygen = curve25519_keygen, .scalar = curve25519_scalar,
-    .debug  = curve25519_debug,
     .bits   = 256,
     .flags  = MAID_ECC_DIFF_ADD | MAID_ECC_NO_INF | MAID_ECC_LADDER_AD
 };

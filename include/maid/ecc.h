@@ -18,6 +18,7 @@
 #ifndef MAID_ECC_H
 #define MAID_ECC_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -53,7 +54,5 @@ uint8_t maid_ecc_flags(maid_ecc *c);
 bool maid_ecc_keygen(maid_ecc *c, uint8_t *private, maid_rng *g);
 bool maid_ecc_pubgen(maid_ecc *c, const uint8_t *private, uint8_t *public);
 bool maid_ecc_scalar(maid_ecc *c, const uint8_t *private, maid_mp_word *s);
-
-void maid_ecc_debug(maid_ecc *c, const char *name, const maid_ecc_point *a);
 
 #endif

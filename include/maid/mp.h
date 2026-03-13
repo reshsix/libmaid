@@ -18,6 +18,7 @@
 #ifndef MAID_MP_H
 #define MAID_MP_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -27,7 +28,6 @@ void maid_mp_read(size_t words, maid_mp_word *a,
                   const uint8_t *addr, bool big);
 void maid_mp_write(size_t words, const maid_mp_word *a,
                    uint8_t *addr, bool big);
-void maid_mp_debug(size_t words, const char *name, const maid_mp_word *a);
 
 void maid_mp_not(size_t words, maid_mp_word *a);
 void maid_mp_and(size_t words, maid_mp_word *a, const maid_mp_word *b);

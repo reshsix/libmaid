@@ -18,6 +18,7 @@
 #ifndef MAID_FF_H
 #define MAID_FF_H
 
+#include <stddef.h>
 #include <stdbool.h>
 
 #include <maid/mp.h>

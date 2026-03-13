@@ -15,9 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/mac.h>
 #include <maid/mem.h>
 #include <maid/hash.h>
@@ -175,12 +172,12 @@ blake2_setup(void *h, bool bits64, u8 nn, u8 kk)
 {
     if (bits64)
     {
-        memcpy(h, iv64, sizeof(iv64));
+        maid_mem_copy(h, iv64, sizeof(iv64));
         ((u64*)h)[0] ^= (0x01010000 | (kk << 8) | nn);
     }
     else
     {
-        memcpy(h, iv32, sizeof(iv32));
+        maid_mem_copy(h, iv32, sizeof(iv32));
         ((u32*)h)[0] ^= (0x01010000 | (kk << 8) | nn);
     }
 }
@@ -215,7 +212,7 @@ blake2_output(void *h, bool bits64, u8 length, u8 *tag)
             u8 mem[sizeof(u32)] = {0};
             maid_mem_write(mem, 0, sizeof(u32), false, h32[length]);
 
-            memcpy(&(tag[length * sizeof(u32)]), mem, remain);
+            maid_mem_copy(&(tag[length * sizeof(u32)]), mem, remain);
             maid_mem_clear(mem, sizeof(mem));
         }
     }
@@ -233,7 +230,7 @@ blake2_output(void *h, bool bits64, u8 length, u8 *tag)
             u8 mem[sizeof(u64)] = {0};
             maid_mem_write(mem, 0, sizeof(u64), false, h64[length]);
 
-            memcpy(&(tag[length * sizeof(u64)]), mem, remain);
+            maid_mem_copy(&(tag[length * sizeof(u64)]), mem, remain);
             maid_mem_clear(mem, sizeof(mem));
         }
     }
@@ -288,7 +285,7 @@ blake2_update(void *ctx, const u8 *buffer, size_t size)
         if (size >= limit)
         {
             b2->length += size;
-            memcpy(b2->buf, buffer, size);
+            maid_mem_copy(b2->buf, buffer, size);
         }
         else
         {
@@ -392,7 +389,7 @@ blake2k_config(void *ctx, const u8 *key)
 
     u8 buf[(b2->bits64) ? 128 : 64];
     maid_mem_clear(buf, sizeof(buf));
-    memcpy(buf, key, b2->kk);
+    maid_mem_copy(buf, key, b2->kk);
     blake2_update(b2, buf, sizeof(buf));
     maid_mem_clear(buf, sizeof(buf));
 }

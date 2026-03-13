@@ -18,6 +18,7 @@
 #ifndef MAID_MEM_H
 #define MAID_MEM_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -27,6 +28,7 @@ void maid_mem_write(void *addr, size_t index,
                     size_t length, bool big, uint64_t data);
 void maid_mem_clear(void *addr, size_t length);
 bool maid_mem_cmp(const void *addr, const void *addr2, size_t length);
+void maid_mem_copy(void *addr, const void *addr2, size_t length);
 
 enum maid_mem
 {

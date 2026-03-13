@@ -18,6 +18,7 @@
 #ifndef MAID_HASH_H
 #define MAID_HASH_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct maid_hash maid_hash;

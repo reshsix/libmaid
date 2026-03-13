@@ -15,10 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/ff.h>
 #include <maid/mp.h>
 #include <maid/ecc.h>
@@ -32,6 +28,17 @@
 #include <internal/types.h>
 
 #include <maid/crypto/sha2.h>
+
+static size_t
+strlen(const char *addr)
+{
+    size_t ret = 0;
+
+    while (addr[ret])
+        ret++;
+
+    return ret;
+}
 
 static bool
 import_mp(size_t words, maid_mp_word *output, const char *input)
@@ -583,19 +590,6 @@ edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
     return true;
 }
 
-static void
-edwards25519_debug(void *ctx, const char *name, const struct maid_ecc_point *a)
-{
-    (void)ctx;
-    size_t words = MAID_MP_WORDS(256);
-
-    fprintf(stderr, "%s (edwards25519)\n", name);
-    maid_mp_debug(words, "x", a->x);
-    maid_mp_debug(words, "y", a->y);
-    maid_mp_debug(words, "z", a->z);
-    maid_mp_debug(words, "t", a->t);
-}
-
 static const struct maid_ecc_def edwards25519_def =
 {
     .new    = edwards25519_new,    .del    = edwards25519_del,
@@ -606,7 +600,6 @@ static const struct maid_ecc_def edwards25519_def =
     .cmp    = edwards25519_cmp,    .dbl    = edwards25519_dbl,
     .add    = edwards25519_add,    .size   = edwards25519_size,
     .keygen = edwards25519_keygen, .scalar = edwards25519_scalar,
-    .debug  = edwards25519_debug,
     .bits   = 256
 };
 
@@ -685,7 +678,7 @@ ed25519_new(u8 *pub, u8 *prv)
             buffer[31] |= 64;
 
             maid_mp_read(MAID_MP_WORDS(256), ret->scalar, buffer, false);
-            memcpy(ret->prefix, &(buffer[32]), 32);
+            maid_mem_copy(ret->prefix, &(buffer[32]), 32);
             maid_mem_clear(buffer, sizeof(buffer));
         }
 
@@ -694,7 +687,7 @@ ed25519_new(u8 *pub, u8 *prv)
         {
             if (pub)
             {
-                memcpy(ret->pubenc, pub, 32);
+                maid_mem_copy(ret->pubenc, pub, 32);
                 if (!maid_ecc_decode(ret->ecc, ret->pubenc, &(ret->public)))
                     ret = ed25519_del(ret);
             }

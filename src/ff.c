@@ -15,10 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/ff.h>
 #include <maid/mp.h>
 #include <maid/mem.h>

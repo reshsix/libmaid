@@ -15,10 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <maid/ecc.h>
 
 #include <internal/mp.h>
@@ -303,12 +299,4 @@ maid_ecc_scalar(struct maid_ecc *c, const u8 *private, maid_mp_word *s)
         ret = c->def->scalar(c->context, private, s);
 
     return ret;
-}
-
-extern void
-maid_ecc_debug(struct maid_ecc *c, const char *name,
-               const struct maid_ecc_point *a)
-{
-    if (c)
-        c->def->debug(c->context, name, a);
 }

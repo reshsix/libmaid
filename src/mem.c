@@ -15,8 +15,6 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <string.h>
-
 #include <maid/mem.h>
 
 #include <internal/types.h>
@@ -97,14 +95,25 @@ maid_mem_cmp(const void *addr, const void *addr2, size_t length)
     return ret;
 }
 
+extern void
+maid_mem_copy(void *dest, const void *src, size_t length)
+{
+    if (dest && src)
+    {
+        volatile u8 *a = dest;
+        const volatile u8 *b = src;
+        for (size_t i = 0; i < length; i++)
+            a[i] = b[i];
+    }
+}
+
 static size_t
 base16_import(void *addr, size_t limit,
               const char *input, size_t length, bool upper)
 {
     size_t ret = 0;
 
-    volatile u8 table[256] = {0};
-    memset((u8*)table, 0xFF, sizeof(table));
+    volatile u8 table[256] = {0xFF};
 
     for (int i = 0; i < 10; i++)
         table['0' + i] = i;
@@ -191,8 +200,7 @@ base32_import(void *addr, size_t limit,
 {
     size_t ret = 0;
 
-    volatile u8 table[256] = {0};
-    memset((u8*)table, 0xFF, sizeof(table));
+    volatile u8 table[256] = {0xFF};
 
     if (!hex)
     {
@@ -337,8 +345,7 @@ base64_import(void *addr, size_t limit,
 {
     size_t ret = 0;
 
-    volatile u8 table[256] = {0};
-    memset((u8*)table, 0xFF, sizeof(table));
+    volatile u8 table[256] = {0xFF};
 
     for (int i = 0; i < 26; i++)
         table['A' + i] = i;
