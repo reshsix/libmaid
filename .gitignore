@@ -1,9 +1,9 @@
 # Build files 
 build
+libmaid.a
 
 # Personal files
 backup
 TODO
 token
-a.exe
 a.out

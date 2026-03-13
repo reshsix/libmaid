@@ -17,33 +17,20 @@
 
 CFLAGS += --std=c99 -Iinclude -Wall -Wextra
 
-.PHONY: all debug clean install uninstall
+.PHONY: all debug clean test
 
-TARGETS = build/libmaid.a build/libmaid.so build/maid
+TARGETS = libmaid.a
 all: CFLAGS += -march=native -O3 -DNDEBUG=1
 all: $(TARGETS)
 debug: CFLAGS += -Og -ggdb3
 debug: $(TARGETS)
 clean:
-	rm -rf build
-
-DESTDIR ?= /usr/local
-install: build/libmaid.a build/libmaid.so
-	mkdir -p "$(DESTDIR)/lib"
-	mkdir -p "$(DESTDIR)/include"
-	cp build/libmaid.a  "$(DESTDIR)/lib/"
-	cp build/libmaid.so "$(DESTDIR)/lib/"
-	cp -r include/maid "$(DESTDIR)/include/"
-	cp build/maid "$(DESTDIR)/bin/"
-uninstall:
-	rm -rf "$(DESTDIR)/include/maid/"
-	rm -rf "$(DESTDIR)/lib/libmaid.a"
-	rm -rf "$(DESTDIR)/lib/libmaid.so"
-	rm -rf "$(DESTDIR)/bin/maid"
+	@rm -rf build
+	@rm -f libmaid.a
 
 FOLDERS = build build/crypto
 $(FOLDERS):
-	mkdir -p $@
+	@mkdir -p $@
 
 OBJS = crypto/chacha.o crypto/poly1305.o \
        crypto/hmac.o crypto/sha.o crypto/blake2.o \
@@ -52,13 +39,15 @@ OBJS = crypto/chacha.o crypto/poly1305.o \
 	   ecc.o sign.o kex.o test.o
 OBJS := $(addprefix build/, $(OBJS))
 build/%.o: src/%.c | $(FOLDERS)
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+	@printf '%s\n' "  CC      $(@:build/%=%)"
+	@$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
-build/libmaid.a: $(OBJS) | build
-	ar ruv $@ $^
-	ranlib $@
-build/libmaid.so: $(OBJS) | build
-	$(CC) -shared -o $@ $^
+libmaid.a: $(OBJS) | build
+	@printf '%s\n' "  AR      $@"
+	@ar cr $@ $^
+	@printf '%s\n' "  RANLIB  $@"
+	@ranlib $@
 
-build/maid: console.c | build
-	$(CC) $(CFLAGS) $^ -o $@ -Lbuild -lmaid
+test: test.c | build
+	@$(CC) $(CFLAGS) $^ -o build/test -L. -lmaid
+	@build/test
