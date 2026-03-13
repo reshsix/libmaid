@@ -37,12 +37,17 @@
 
 #include <maid/crypto/sha2.h>
 #include <maid/crypto/blake2.h>
+#include <maid/crypto/x25519.h>
 #include <maid/crypto/blake2k.h>
+#include <maid/crypto/ed25519.h>
 #include <maid/crypto/chacha20.h>
 #include <maid/crypto/poly1305.h>
 #include <maid/crypto/hkdf_sha2.h>
 #include <maid/crypto/hmac_sha2.h>
+#include <maid/crypto/curve25519.h>
 #include <maid/crypto/chacha20rng.h>
+#include <maid/crypto/edwards25519.h>
+#include <maid/crypto/chacha20poly1305.h>
 
 /* Test macros */
 

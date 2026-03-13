@@ -15,18 +15,11 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef MAID_KEX_H
-#define MAID_KEX_H
+#ifndef MAID_CRYPTO_CURVE25519_H
+#define MAID_CRYPTO_CURVE25519_H
 
-#include <stdint.h>
-#include <stdbool.h>
+#include <maid/ecc.h>
 
-typedef struct maid_kex maid_kex;
-
-maid_kex *maid_kex_del(maid_kex *x);
-
-bool maid_kex_pubgen(maid_kex *x, const uint8_t *prv, uint8_t *pub);
-bool maid_kex_secgen(maid_kex *x, const uint8_t *prv,
-                     const uint8_t *pub, uint8_t *buffer);
+maid_ecc *maid_curve25519(void);
 
 #endif

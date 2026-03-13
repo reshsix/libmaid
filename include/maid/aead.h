@@ -23,7 +23,6 @@
 
 typedef struct maid_aead maid_aead;
 
-maid_aead *maid_chacha20poly1305(const uint8_t *key, const uint8_t *nonce);
 maid_aead *maid_aead_del(maid_aead *ae);
 
 void maid_aead_renew(maid_aead *ae, const uint8_t *key, const uint8_t *nonce);

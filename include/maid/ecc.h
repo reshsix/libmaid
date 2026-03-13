@@ -27,8 +27,6 @@
 typedef struct maid_ecc maid_ecc;
 typedef struct maid_ecc_point maid_ecc_point;
 
-maid_ecc *maid_curve25519(void);
-maid_ecc *maid_edwards25519(void);
 maid_ecc *maid_ecc_del(maid_ecc *c);
 
 maid_ecc_point *maid_ecc_alloc(maid_ecc *c);
