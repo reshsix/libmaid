@@ -28,6 +28,9 @@
 #include <internal/kex.h>
 #include <internal/types.h>
 
+#include <maid/crypto/x25519.h>
+#include <maid/crypto/curve25519.h>
+
 /* Curve25519 curve definition */
 
 struct maid_ecc_point
@@ -43,52 +46,29 @@ struct curve25519
 };
 
 static void *
-curve25519_del(void *ctx)
+curve25519_init(void *buffer)
 {
-    if (ctx)
-    {
-        struct curve25519 *c = ctx;
-        maid_mem_clear(c->ff, maid_ff_size(MAID_FF_25519));
-        maid_mem_clear(ctx, sizeof(struct curve25519));
-    }
-    free(ctx);
-    return NULL;
-}
-
-static void *
-curve25519_new(void)
-{
-    struct curve25519 *ret = calloc(1, sizeof(struct curve25519));
+    struct curve25519 *ret = buffer;
 
     if (ret)
     {
-        ret->ff = calloc(1, maid_ff_size(MAID_FF_25519));
-        if (ret->ff && maid_ff_init(ret->ff, MAID_FF_25519))
+        ret->ff = (void *)&(ret[1]);
+        if (maid_ff_init(ret->ff, MAID_FF_25519))
             ret->prime = maid_ff_prime(ret->ff);
         else
-            ret = curve25519_del(ret);
+            ret = NULL;
     }
 
     return ret;
 }
 
-static void *
-curve25519_free(void *ctx, struct maid_ecc_point *p)
+static size_t
+curve25519_size(size_t *point_s)
 {
-    (void)ctx;
+    if (point_s)
+        *point_s = sizeof(struct maid_ecc_point);
 
-    if (p)
-        maid_mem_clear(p, sizeof(struct maid_ecc_point));
-    free(p);
-
-    return NULL;
-}
-
-static void *
-curve25519_alloc(void *ctx)
-{
-    (void)ctx;
-    return calloc(1, sizeof(struct maid_ecc_point));
+    return sizeof(struct curve25519) + maid_ff_size(MAID_FF_25519);
 }
 
 static void
@@ -304,19 +284,6 @@ curve25519_add2(void *ctx, struct maid_ecc_point *a,
     MAID_MP_CLEAR(buf)
 }
 
-static size_t
-curve25519_size(void *ctx, size_t *key_s, size_t *point_s)
-{
-    (void)ctx;
-
-    if (key_s)
-        *key_s = 32;
-    if (point_s)
-        *point_s = 32;
-
-    return MAID_MP_WORDS(256);
-}
-
 static bool
 curve25519_keygen(void *ctx, u8 *data, maid_rng *g)
 {
@@ -348,22 +315,27 @@ curve25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 
 static const struct maid_ecc_def curve25519_def =
 {
-    .new    = curve25519_new,    .del    = curve25519_del,
-    .alloc  = curve25519_alloc,  .free   = curve25519_free,
+    .init   = curve25519_init,   .size   = curve25519_size,
     .base   = curve25519_base,   .copy   = curve25519_copy,
     .swap   = curve25519_swap,
     .encode = curve25519_encode, .decode = curve25519_decode,
     .cmp    = curve25519_cmp,    .dbl    = curve25519_dbl,
-    .add2   = curve25519_add2,   .size   = curve25519_size,
+    .add2   = curve25519_add2,
     .keygen = curve25519_keygen, .scalar = curve25519_scalar,
     .bits   = 256,
     .flags  = MAID_ECC_DIFF_ADD | MAID_ECC_NO_INF | MAID_ECC_LADDER_AD
 };
 
 extern maid_ecc *
-maid_curve25519(void)
+maid_curve25519(void *buffer)
 {
-    return maid_ecc_new(&curve25519_def);
+    return maid_ecc_init(buffer, maid_curve25519_s(NULL), &curve25519_def);
+}
+
+extern size_t
+maid_curve25519_s(size_t *point_s)
+{
+    return maid_ecc_size(&curve25519_def, point_s);
 }
 
 /* Maid KEX definitions */
@@ -376,33 +348,21 @@ struct x25519
 };
 
 static void *
-x25519_del(void *x25519)
+x25519_init(void *buffer)
 {
-    if (x25519)
-    {
-        struct x25519 *x = x25519;
-        maid_ecc_del(x->c);
+    struct x25519 *ret = buffer;
 
-        maid_mem_clear(x25519, sizeof(struct x25519));
-    }
-    free(x25519);
-
-    return NULL;
-}
-
-static void *
-x25519_new(void)
-{
-    struct x25519 *ret = calloc(1, sizeof(struct x25519));
-
-    if (ret)
-    {
-        ret->c = maid_curve25519();
-        if (!(ret->c))
-            ret = x25519_del(ret);
-    }
+    ret->c = (void *)&(ret[1]);
+    if (!(maid_curve25519(ret->c)))
+        ret = NULL;
 
     return ret;
+}
+
+static size_t
+x25519_size(void)
+{
+    return sizeof(struct x25519) + maid_curve25519_s(NULL);
 }
 
 static bool
@@ -432,12 +392,18 @@ x25519_secgen(void *x25519, const u8 *private, const u8 *public, u8 *buffer)
 
 static const struct maid_kex_def x25519_def =
 {
-    .new    = x25519_new,    .del    = x25519_del,
+    .init   = x25519_init,   .size   = x25519_size,
     .pubgen = x25519_pubgen, .secgen = x25519_secgen
 };
 
 extern maid_kex *
-maid_x25519(void)
+maid_x25519(void *buffer)
 {
-    return maid_kex_new(&x25519_def);
+    return maid_kex_init(buffer, maid_x25519_s(), &x25519_def);
+}
+
+extern size_t
+maid_x25519_s(void)
+{
+    return maid_kex_size(&x25519_def);
 }

@@ -389,7 +389,7 @@ test_aead(maid_aead *ae, char *key, char *nonce,
 
         if (ret)
         {
-            maid_aead_renew(ae, key_b, nonce_b);
+            maid_aead_config(ae, key_b, nonce_b);
             maid_aead_update(ae, ad_b, sizeof(ad_b));
             maid_aead_crypt(ae, input_b, sizeof(input_b), decrypt);
 
@@ -402,7 +402,6 @@ test_aead(maid_aead *ae, char *key, char *nonce,
     }
     else
         ret = false;
-    maid_aead_del(ae);
 
     return ret;
 }
@@ -485,7 +484,7 @@ test_hkdf(maid_kdf *k, char *input, char *output, char *salt, char *info)
 }
 
 static bool
-test_ecc(maid_ecc *c, size_t words, char *base, char *inf,
+test_ecc(maid_ecc *c, size_t words, size_t point_s, char *base, char *inf,
          char *doub, char *trip, char *scalar, char *mul)
 {
     bool ret = true;
@@ -500,9 +499,11 @@ test_ecc(maid_ecc *c, size_t words, char *base, char *inf,
 
     if (c && ret)
     {
-        maid_ecc_point *r0 = maid_ecc_alloc(c);
-        maid_ecc_point *r1 = maid_ecc_alloc(c);
-        maid_ecc_point *r2 = maid_ecc_alloc(c);
+        u8 buffer[point_s * 3];
+
+        maid_ecc_point *r0 = (void *)&(buffer[point_s * 0]);
+        maid_ecc_point *r1 = (void *)&(buffer[point_s * 1]);
+        maid_ecc_point *r2 = (void *)&(buffer[point_s * 2]);
         if (c && r0 && r1 && r2)
         {
             maid_ecc_base(c, r0);
@@ -548,28 +549,26 @@ test_ecc(maid_ecc *c, size_t words, char *base, char *inf,
         }
         else
             ret = false;
-        maid_ecc_free(c, r0);
-        maid_ecc_free(c, r1);
-        maid_ecc_free(c, r2);
-        maid_ecc_del(c);
     }
 
     return ret;
 }
 
 static bool
-test_sign(maid_sign *s, char *data, char *sign)
+test_sign(maid_sign *s, char *pub, char *prv, char *data, char *sign)
 {
     bool ret = true;
 
     if (s)
     {
+        TEST_IMPORT(pub_b,  pub);
+        TEST_IMPORT(prv_b,  prv);
         TEST_IMPORT(data_b, data);
         TEST_IMPORT(sign_b, sign);
 
         TEST_EMPTY(buf_b, sign)
         if (ret)
-            ret = maid_sign_size(s) == sizeof(sign_b);
+            ret = maid_sign_config(s, pub_b, prv_b);
 
         if (ret)
         {
@@ -583,7 +582,6 @@ test_sign(maid_sign *s, char *data, char *sign)
     }
     else
         ret = false;
-    maid_sign_del(s);
 
     return ret;
 }
@@ -632,7 +630,6 @@ test_kex(maid_kex *x, char *prv, char *pub, char *prv2, char *pub2, char *sec)
     }
     else
         ret = false;
-    maid_kex_del(x);
 
     return ret;
 }
@@ -1151,11 +1148,10 @@ maid_test_chacha20poly1305(void)
                     "eead9d67890cbb22392336fea1851f38"};
     bool modes[] = {false, true};
 
-    u8 empty[32]  = {0};
-    u8 empty2[12] = {0};
+    u8 buffer[maid_chacha20poly1305_s()];
     for (u8 i = 0; i < 2; i++)
     {
-        maid_aead *ae = maid_chacha20poly1305(empty, empty2);
+        maid_aead *ae = maid_chacha20poly1305(buffer);
         ret -= test_aead(ae, keys[i], nonces[i],
                          ads[i], inputs[i], outputs[i], tags[i], modes[i]);
     }
@@ -1478,8 +1474,11 @@ maid_test_hkdf_sha2(void)
 extern u8
 maid_test_curve25519(void)
 {
-    maid_ecc *c = maid_curve25519();
-    return 1 - test_ecc(c, MAID_MP_WORDS(256),
+    size_t point_s = 0;
+    u8 buffer[maid_curve25519_s(&point_s)];
+
+    maid_ecc *c = maid_curve25519(buffer);
+    return 1 - test_ecc(c, MAID_MP_WORDS(256), point_s,
                         "09000000000000000000000000000000"
                         "00000000000000000000000000000000",
                         "00000000000000000000000000000000"
@@ -1497,8 +1496,11 @@ maid_test_curve25519(void)
 extern u8
 maid_test_edwards25519(void)
 {
-    maid_ecc *c = maid_edwards25519();
-    return 1 - test_ecc(c, MAID_MP_WORDS(256),
+    size_t point_s = 0;
+    u8 buffer[maid_edwards25519_s(&point_s)];
+
+    maid_ecc *c = maid_edwards25519(buffer);
+    return 1 - test_ecc(c, MAID_MP_WORDS(256), point_s,
                         "58666666666666666666666666666666"
                         "66666666666666666666666666666666",
                         "01000000000000000000000000000000"
@@ -1519,47 +1521,38 @@ maid_test_ed25519(void)
     u8 ret = 3;
 
     /* RFC8032 test vectors */
-    u8 pub[] = {0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7,
-                0xd5, 0x4b, 0xfe, 0xd3, 0xc9, 0x64, 0x07, 0x3a,
-                0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
-                0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a};
-    u8 prv[] = {0x9d, 0x61, 0xb1, 0x9d, 0xef, 0xfd, 0x5a, 0x60,
-                0xba, 0x84, 0x4a, 0xf4, 0x92, 0xec, 0x2c, 0xc4,
-                0x44, 0x49, 0xc5, 0x69, 0x7b, 0x32, 0x69, 0x19,
-                0x70, 0x3b, 0xac, 0x03, 0x1c, 0xae, 0x7f, 0x60};
+    char pub[] = "d75a980182b10ab7d54bfed3c964073a"
+               "0ee172f3daa62325af021a68f707511a";
+    char prv[] = "9d61b19deffd5a60ba844af492ec2cc4"
+               "4449c5697b326919703bac031cae7f60";
 
-    u8 pub2[] = {0x3d, 0x40, 0x17, 0xc3, 0xe8, 0x43, 0x89, 0x5a,
-                 0x92, 0xb7, 0x0a, 0xa7, 0x4d, 0x1b, 0x7e, 0xbc,
-                 0x9c, 0x98, 0x2c, 0xcf, 0x2e, 0xc4, 0x96, 0x8c,
-                 0xc0, 0xcd, 0x55, 0xf1, 0x2a, 0xf4, 0x66, 0x0c};
-    u8 prv2[] = {0x4c, 0xcd, 0x08, 0x9b, 0x28, 0xff, 0x96, 0xda,
-                 0x9d, 0xb6, 0xc3, 0x46, 0xec, 0x11, 0x4e, 0x0f,
-                 0x5b, 0x8a, 0x31, 0x9f, 0x35, 0xab, 0xa6, 0x24,
-                 0xda, 0x8c, 0xf6, 0xed, 0x4f, 0xb8, 0xa6, 0xfb};
+    char pub2[] = "3d4017c3e843895a92b70aa74d1b7ebc"
+                "9c982ccf2ec4968cc0cd55f12af4660c";
+    char prv2[] = "4ccd089b28ff96da9db6c346ec114e0f"
+                "5b8a319f35aba624da8cf6ed4fb8a6fb";
 
-    u8 pub3[] = {0xfc, 0x51, 0xcd, 0x8e, 0x62, 0x18, 0xa1, 0xa3,
-                 0x8d, 0xa4, 0x7e, 0xd0, 0x02, 0x30, 0xf0, 0x58,
-                 0x08, 0x16, 0xed, 0x13, 0xba, 0x33, 0x03, 0xac,
-                 0x5d, 0xeb, 0x91, 0x15, 0x48, 0x90, 0x80, 0x25};
-    u8 prv3[] = {0xc5, 0xaa, 0x8d, 0xf4, 0x3f, 0x9f, 0x83, 0x7b,
-                 0xed, 0xb7, 0x44, 0x2f, 0x31, 0xdc, 0xb7, 0xb1,
-                 0x66, 0xd3, 0x85, 0x35, 0x07, 0x6f, 0x09, 0x4b,
-                 0x85, 0xce, 0x3a, 0x2e, 0x0b, 0x44, 0x58, 0xf7};
+    char pub3[] = "fc51cd8e6218a1a38da47ed00230f058"
+                "0816ed13ba3303ac5deb911548908025";
+    char prv3[] = "c5aa8df43f9f837bedb7442f31dcb7b1"
+                "66d38535076f094b85ce3a2e0b4458f7";
 
-    maid_sign *s = maid_ed25519(pub, prv);
-    ret -= test_sign(s, "", "e5564300c360ac729086e2cc806e828a"
+    u8 buffer[maid_ed25519_s(NULL, NULL)];
+    maid_sign *s = maid_ed25519(buffer);
+
+    ret -= test_sign(s, pub, prv, "",
+                            "e5564300c360ac729086e2cc806e828a"
                             "84877f1eb8e5d974d873e06522490155"
                             "5fb8821590a33bacc61e39701cf9b46b"
                             "d25bf5f0595bbe24655141438e7a100b");
 
-    s = maid_ed25519(pub2, prv2);
-    ret -= test_sign(s, "72", "92a009a9f0d4cab8720e820b5f642540"
+    ret -= test_sign(s, pub2, prv2, "72",
+                              "92a009a9f0d4cab8720e820b5f642540"
                               "a2b27b5416503f8fb3762223ebdb69da"
                               "085ac1e43e15996e458f3613d0f11d8c"
                               "387b2eaeb4302aeeb00d291612bb0c00");
 
-    s = maid_ed25519(pub3, prv3);
-    ret -= test_sign(s, "af82", "6291d657deec24024827e69c3abe01a3"
+    ret -= test_sign(s, pub3, prv3, "af82",
+                                "6291d657deec24024827e69c3abe01a3"
                                 "0ce548a284743a445e3680d7db5ac3ac"
                                 "18ff9b538d16f290ae67f760984dc659"
                                 "4a7c15e9716ed28dc027beceea1ec40a");
@@ -1571,7 +1564,9 @@ extern u8
 maid_test_x25519(void)
 {
     /* RFC7748 test vectors */
-    maid_kex *x = maid_x25519();
+    u8 buffer[maid_x25519_s()];
+    maid_kex *x = maid_x25519(buffer);
+
     return 1 - test_kex(x, "77076d0a7318a57d3c16c17251b26645"
                            "df4c2f87ebc0992ab177fba51db92c2a",
                            "8520f0098930a754748b7ddcb43ef75a"

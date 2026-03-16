@@ -20,6 +20,7 @@
 
 #include <maid/sign.h>
 
-maid_sign *maid_ed25519(uint8_t *pub, uint8_t *prv);
+maid_sign *maid_ed25519(void *buffer);
+size_t maid_ed25519_s(size_t *pub_s, size_t *prv_s);
 
 #endif

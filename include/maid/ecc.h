@@ -28,11 +28,6 @@
 typedef struct maid_ecc maid_ecc;
 typedef struct maid_ecc_point maid_ecc_point;
 
-maid_ecc *maid_ecc_del(maid_ecc *c);
-
-maid_ecc_point *maid_ecc_alloc(maid_ecc *c);
-maid_ecc_point *maid_ecc_free(maid_ecc *c, maid_ecc_point *p);
-
 void maid_ecc_base(maid_ecc *c, maid_ecc_point *p);
 void maid_ecc_copy(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 void maid_ecc_swap(maid_ecc *c, maid_ecc_point *p,
@@ -48,7 +43,6 @@ void maid_ecc_add(maid_ecc *c, maid_ecc_point *p, const maid_ecc_point *q);
 void maid_ecc_mul(maid_ecc *c, maid_ecc_point *p,
                   const maid_mp_word *s);
 
-size_t maid_ecc_size(maid_ecc *c, size_t *key_s, size_t *point_s);
 uint8_t maid_ecc_flags(maid_ecc *c);
 
 bool maid_ecc_keygen(maid_ecc *c, uint8_t *private, maid_rng *g);

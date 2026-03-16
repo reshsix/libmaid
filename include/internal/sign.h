@@ -23,14 +23,15 @@
 
 struct maid_sign_def
 {
-    void * (*new)(uint8_t *, uint8_t *);
-    void * (*del)(void *);
-    size_t (*size)(void *);
+    void * (*init)(void *);
+    size_t (*size)(void);
+    bool (*config)(void *, const void *, const void *);
     bool (*generate)(void *, const uint8_t *, size_t, uint8_t *);
     bool (*verify)(void *, const uint8_t *, size_t, const uint8_t *);
 };
 
-maid_sign *maid_sign_new(const struct maid_sign_def *def,
-                         uint8_t *pub, uint8_t *prv);
+maid_sign *maid_sign_init(void *buffer, size_t buffer_s,
+                          const struct maid_sign_def *def);
+size_t maid_sign_size(const struct maid_sign_def *def);
 
 #endif

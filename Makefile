@@ -48,6 +48,7 @@ libmaid.a: $(OBJS) | build
 	@printf '%s\n' "  RANLIB  $@"
 	@ranlib $@
 
+test: CFLAGS += -Og -ggdb3
 test: test.c | build
 	@$(CC) $(CFLAGS) $^ -o build/test -L. -lmaid
 	@build/test

@@ -26,6 +26,7 @@
 #include <maid/crypto/chacha20.h>
 #include <maid/crypto/poly1305.h>
 #include <maid/crypto/chacha20rng.h>
+#include <maid/crypto/chacha20poly1305.h>
 
 /* Chacha20 implementation */
 
@@ -146,39 +147,42 @@ maid_chacha20_s(void)
 
 /* Maid AEAD definitions */
 
-static void
-chacha20poly1305_init(const u8 *key, const u8 *nonce,
-                      maid_stream **st, maid_mac **m,
-                      bool renew)
+static bool
+chacha20poly1305_init(void *buffer, maid_stream **st, maid_mac **m)
 {
-    if (!renew)
-    {
-        *st = calloc(1, maid_chacha20_s());
-        *m  = calloc(1, maid_poly1305_s());
-    }
+    *st = buffer;
+    *m  = (void *)&(((u8*)buffer)[maid_chacha20_s()]);
+    return maid_chacha20(*st) && maid_poly1305(*m);
+}
 
-    if (*st && *m)
-    {
-        maid_chacha20(*st);
-        maid_stream_config(*st, key, nonce, 0);
+static size_t
+chacha20poly1305_size(void)
+{
+    return maid_chacha20_s() + maid_poly1305_s();
+}
 
-        /* Poly1305 ephemeral key (32 bytes)
-         * Uses a chacha block to increase the counter */
-        u8 ekey[64] = {0};
-        maid_stream_xor(*st, ekey, sizeof(ekey));
-        maid_poly1305(*m);
-        maid_mac_config(*m, ekey);
+static bool
+chacha20poly1305_config(maid_stream *st, maid_mac *m,
+                        const u8 *key, const u8 *nonce)
+{
+    maid_stream_config(st, key, nonce, 0);
 
-        /* TODO may fail */
+    /* Poly1305 ephemeral key (32 bytes)
+     * Uses a chacha block to increase the counter */
+    u8 ekey[64] = {0};
+    maid_stream_xor(st, ekey, sizeof(ekey));
+    maid_mac_config(m, ekey);
+    maid_mem_clear(ekey, sizeof(ekey));
 
-        maid_mem_clear(ekey, sizeof(ekey));
-    }
+    return true;
 }
 
 static const struct maid_aead_def chacha20poly1305_def =
 {
-    .init  = chacha20poly1305_init,
-    .mode  = maid_stream_xor,
+    .init   = chacha20poly1305_init,
+    .size   = chacha20poly1305_size,
+    .config = chacha20poly1305_config,
+    .mode   = maid_stream_xor,
 
     .state_s = 16,
     .s_big   = false,
@@ -186,9 +190,16 @@ static const struct maid_aead_def chacha20poly1305_def =
 };
 
 extern maid_aead *
-maid_chacha20poly1305(const u8 *key, const u8 *nonce)
+maid_chacha20poly1305(void *buffer)
 {
-    return maid_aead_new(&chacha20poly1305_def, key, nonce);
+    return maid_aead_init(buffer, maid_chacha20poly1305_s(),
+                          &chacha20poly1305_def);
+}
+
+extern size_t
+maid_chacha20poly1305_s(void)
+{
+    return maid_aead_size(&chacha20poly1305_def);
 }
 
 /* Maid RNG definitions */

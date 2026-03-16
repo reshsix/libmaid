@@ -15,6 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <maid/mem.h>
 #include <maid/sign.h>
 
 #include <internal/sign.h>
@@ -27,40 +28,35 @@ struct maid_sign
 };
 
 extern struct maid_sign *
-maid_sign_new(const struct maid_sign_def *def, u8 *pub, u8 *prv)
+maid_sign_init(void *buffer, size_t buffer_s, const struct maid_sign_def *def)
 {
-    struct maid_sign *ret = NULL;
-    if (pub || prv)
-        ret = calloc(1, sizeof(struct maid_sign));
+    struct maid_sign *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
         ret->def = def;
-        ret->context = def->new(pub, prv);
+        ret->context = def->init(&(ret[1]));
         if (!(ret->context))
-            ret = maid_sign_del(ret);
+            ret = NULL;
     }
 
     return ret;
 }
 
-extern struct maid_sign *
-maid_sign_del(struct maid_sign *s)
+extern size_t
+maid_sign_size(const struct maid_sign_def *def)
 {
-    if (s && s->context)
-        s->def->del(s->context);
-    free(s);
-
-    return NULL;
+    return sizeof(struct maid_sign) + def->size();
 }
 
-extern size_t
-maid_sign_size(struct maid_sign *s)
+extern bool
+maid_sign_config(struct maid_sign *s, void *pub, void *prv)
 {
-    size_t ret = 0;
+    bool ret = false;
 
     if (s)
-        ret = s->def->size(s->context);
+        ret = s->def->config(s->context, pub, prv);
 
     return ret;
 }

@@ -28,6 +28,8 @@
 #include <internal/types.h>
 
 #include <maid/crypto/sha2.h>
+#include <maid/crypto/ed25519.h>
+#include <maid/crypto/edwards25519.h>
 
 static size_t
 strlen(const char *addr)
@@ -76,67 +78,41 @@ struct edwards25519
 };
 
 static void *
-edwards25519_del(void *ctx)
+edwards25519_init(void *buffer)
 {
-    if (ctx)
-    {
-        struct edwards25519 *c = ctx;
-        maid_mem_clear(c->ff, maid_ff_size(MAID_FF_25519));
-        maid_mem_clear(ctx, sizeof(struct edwards25519));
-    }
-    free(ctx);
+    struct edwards25519 *ret = buffer;
 
-    return NULL;
-}
-
-static void *
-edwards25519_new(void)
-{
-    struct edwards25519 *ret = calloc(1, sizeof(struct edwards25519));
-
-    if (ret)
-    {
-        ret->hash = calloc(1, maid_sha2_s(true, 64));
-        ret->ff   = calloc(1, maid_ff_size(MAID_FF_25519));
-        if (ret->hash && ret->ff &&
-            maid_ff_init(ret->ff, MAID_FF_25519) &&
-            maid_sha2(ret->hash, true, 64))
-            ret->prime = maid_ff_prime(ret->ff);
-        else
-            ret = edwards25519_del(ret);
-    }
+    ret->hash = (void *)&(ret[1]);
+    ret->ff   = (void *)&(((u8*)ret->hash)[maid_sha2_s(true, 64)]);
+    if (maid_ff_init(ret->ff, MAID_FF_25519) &&
+        maid_sha2(ret->hash, true, 64))
+        ret->prime = maid_ff_prime(ret->ff);
+    else
+        ret = NULL;
 
     if (ret && !(import_mp(MAID_MP_WORDS(256), ret->d,
-                       "52036cee2b6ffe738cc740797779e898"
-                       "00700a4d4141d8ab75eb4dca135978a3") &&
+                           "52036cee2b6ffe738cc740797779e898"
+                           "00700a4d4141d8ab75eb4dca135978a3") &&
                  import_mp(MAID_MP_WORDS(256), ret->x,
-                       "216936d3cd6e53fec0a4e231fdd6dc5c"
-                       "692cc7609525a7b2c9562d608f25d51a") &&
+                           "216936d3cd6e53fec0a4e231fdd6dc5c"
+                           "692cc7609525a7b2c9562d608f25d51a") &&
                  import_mp(MAID_MP_WORDS(256), ret->y,
-                       "66666666666666666666666666666666"
-                       "66666666666666666666666666666658")))
-        ret = edwards25519_del(ret);
+                           "66666666666666666666666666666666"
+                           "66666666666666666666666666666658")))
+        ret = NULL;
 
     return ret;
 }
 
-static void *
-edwards25519_free(void *ctx, struct maid_ecc_point *p)
+static size_t
+edwards25519_size(size_t *point_s)
 {
-    (void)ctx;
+    if (point_s)
+        *point_s = sizeof(struct maid_ecc_point);
 
-    if (p)
-        maid_mem_clear(p, sizeof(struct maid_ecc_point));
-
-    free(p);
-    return NULL;
-}
-
-static void *
-edwards25519_alloc(void *ctx)
-{
-    (void)ctx;
-    return calloc(1, sizeof(struct maid_ecc_point));
+    return sizeof(struct edwards25519) +
+           maid_sha2_s(true, 64) +
+           maid_ff_size(MAID_FF_25519);
 }
 
 static void
@@ -548,20 +524,6 @@ edwards25519_add(void *ctx, struct maid_ecc_point *a,
     MAID_MP_CLEAR(buf)
 }
 
-static size_t
-edwards25519_size(void *ctx, size_t *key_s, size_t *point_s)
-{
-    (void)ctx;
-    size_t words = MAID_MP_WORDS(256);
-
-    if (key_s)
-        *key_s = 32;
-    if (point_s)
-        *point_s = 32;
-
-    return words;
-}
-
 static bool
 edwards25519_keygen(void *ctx, u8 *data, maid_rng *g)
 {
@@ -592,21 +554,26 @@ edwards25519_scalar(void *ctx, const u8 *data, maid_mp_word *s)
 
 static const struct maid_ecc_def edwards25519_def =
 {
-    .new    = edwards25519_new,    .del    = edwards25519_del,
-    .alloc  = edwards25519_alloc,  .free   = edwards25519_free,
+    .init   = edwards25519_init,   .size   = edwards25519_size,
     .base   = edwards25519_base,   .copy   = edwards25519_copy,
     .swap   = edwards25519_swap,
     .encode = edwards25519_encode, .decode = edwards25519_decode,
     .cmp    = edwards25519_cmp,    .dbl    = edwards25519_dbl,
-    .add    = edwards25519_add,    .size   = edwards25519_size,
+    .add    = edwards25519_add,
     .keygen = edwards25519_keygen, .scalar = edwards25519_scalar,
     .bits   = 256
 };
 
 extern maid_ecc *
-maid_edwards25519(void)
+maid_edwards25519(void *buffer)
 {
-    return maid_ecc_new(&edwards25519_def);
+    return maid_ecc_init(buffer, maid_edwards25519_s(NULL), &edwards25519_def);
+}
+
+extern size_t
+maid_edwards25519_s(size_t *point_s)
+{
+    return maid_ecc_size(&edwards25519_def, point_s);
 }
 
 /* Ed25519 signature definition */
@@ -635,91 +602,76 @@ struct ed25519
 };
 
 static void *
-ed25519_del(void *ed25519)
+ed25519_init(void *buffer)
 {
-    struct ed25519 *ed = ed25519;
-
-    maid_ecc_del(ed->ecc);
-    maid_mem_clear(ed->hash, maid_sha2_s(true, 64));
-    maid_mem_clear(ed->ff, maid_ff_size(MAID_FF_ORDER25519));
-    maid_mem_clear(ed25519, sizeof(struct ed25519));
-
-    free(ed25519);
-    return NULL;
-}
-
-static void *
-ed25519_new(u8 *pub, u8 *prv)
-{
-    struct ed25519 *ret = calloc(1, sizeof(struct ed25519));
+    struct ed25519 *ret = buffer;
 
     if (ret)
     {
         /* Allocation */
-        ret->ecc  = maid_edwards25519();
-        ret->hash = calloc(1, maid_sha2_s(true, 64));
-        if (!(ret->ecc && ret->hash && maid_sha2(ret->hash, true, 64)))
-            ret = ed25519_del(ret);
-
-        if (ret && prv)
-            ret->sign   = true;
-        if (ret && pub)
-            ret->verify = true;
-
-        /* Private key loading */
-        if (ret && prv)
-        {
-            u8 buffer[64] = {0};
-            maid_hash_update(ret->hash, prv, 32);
-            maid_hash_digest(ret->hash, buffer);
-
-            buffer[0]  &= 248;
-            buffer[31] &= 63;
-            buffer[31] |= 64;
-
-            maid_mp_read(MAID_MP_WORDS(256), ret->scalar, buffer, false);
-            maid_mem_copy(ret->prefix, &(buffer[32]), 32);
-            maid_mem_clear(buffer, sizeof(buffer));
-        }
-
-        /* Public key loading */
-        if (ret)
-        {
-            if (pub)
-            {
-                maid_mem_copy(ret->pubenc, pub, 32);
-                if (!maid_ecc_decode(ret->ecc, ret->pubenc, &(ret->public)))
-                    ret = ed25519_del(ret);
-            }
-            else
-            {
-                /* Pubenc is needed even for signing */
-                maid_ecc_base(ret->ecc, &(ret->point));
-                maid_ecc_mul(ret->ecc, &(ret->point), ret->scalar);
-                if (!maid_ecc_encode(ret->ecc, ret->pubenc, &(ret->point)))
-                    ret = ed25519_del(ret);
-            }
-        }
-
-        /* Copy curve order (modulo) */
-        if (ret)
-        {
-            ret->ff = calloc(1, maid_ff_size(MAID_FF_ORDER25519));
-            if (ret->ff && maid_ff_init(ret->ff, MAID_FF_ORDER25519))
-                ret->prime = maid_ff_prime(ret->ff);
-            else
-                ret = ed25519_del(ret);
-        }
+        ret->hash = (void *)&(ret[1]);
+        ret->ecc  = (void *)&(((u8*)ret->hash)[maid_sha2_s(true, 64)]);
+        ret->ff   = (void *)&(((u8*)ret->ecc)[maid_edwards25519_s(NULL)]);
+        if (maid_sha2(ret->hash, true, 64) &&
+            maid_edwards25519(ret->ecc)  &&
+            maid_ff_init(ret->ff, MAID_FF_ORDER25519))
+            ret->prime = maid_ff_prime(ret->ff);
+        else
+            ret = NULL;
     }
 
     return ret;
 }
 
 static size_t
-ed25519_size(void *ed)
+ed25519_size(void)
 {
-    (void)ed;
-    return 64;
+    return sizeof(struct ed25519) + maid_sha2_s(true, 64) +
+           maid_edwards25519_s(NULL) + maid_ff_size(MAID_FF_ORDER25519);
+}
+
+static bool
+ed25519_config(void *ed25519, const void *pub, const void *prv)
+{
+    bool ret = true;
+
+    struct ed25519 *ed = ed25519;
+    ed->sign   = (prv);
+    ed->verify = (pub);
+
+    /* Private key loading */
+    if (prv)
+    {
+        u8 buffer[64] = {0};
+        maid_hash_update(ed->hash, prv, 32);
+        maid_hash_digest(ed->hash, buffer);
+
+        buffer[0]  &= 248;
+        buffer[31] &= 63;
+        buffer[31] |= 64;
+
+        maid_mp_read(MAID_MP_WORDS(256), ed->scalar, buffer, false);
+        maid_mem_copy(ed->prefix, &(buffer[32]), 32);
+        maid_mem_clear(buffer, sizeof(buffer));
+    }
+
+    /* Public key loading */
+    if (pub)
+    {
+        maid_mem_copy(ed->pubenc, pub, 32);
+        if (!maid_ecc_decode(ed->ecc, ed->pubenc, &(ed->public)))
+            ret = false;
+    }
+    else
+    {
+        /* Pubenc is needed even for signing */
+        maid_ecc_base(ed->ecc, &(ed->point));
+        maid_ecc_mul(ed->ecc, &(ed->point), ed->scalar);
+        if (!maid_ecc_encode(ed->ecc, ed->pubenc, &(ed->point)))
+            ret = false;
+    }
+
+    return ret;
 }
 
 static bool
@@ -823,15 +775,26 @@ ed25519_verify(void *ed25519, const u8 *data, size_t size, const u8 *sign)
 
 static const struct maid_sign_def ed25519_def =
 {
-    .new      = ed25519_new,
-    .del      = ed25519_del,
+    .init     = ed25519_init,
     .size     = ed25519_size,
+    .config   = ed25519_config,
     .generate = ed25519_generate,
     .verify   = ed25519_verify,
 };
 
 extern maid_sign *
-maid_ed25519(u8 *pub, u8 *prv)
+maid_ed25519(void *buffer)
 {
-    return maid_sign_new(&ed25519_def, pub, prv);
+    return maid_sign_init(buffer, maid_ed25519_s(NULL, NULL), &ed25519_def);
+}
+
+extern size_t
+maid_ed25519_s(size_t *pub_s, size_t *prv_s)
+{
+    if (pub_s)
+        *pub_s = 32;
+    if (prv_s)
+        *prv_s = 32;
+
+    return maid_sign_size(&ed25519_def);
 }

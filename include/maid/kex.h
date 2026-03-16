@@ -23,8 +23,6 @@
 
 typedef struct maid_kex maid_kex;
 
-maid_kex *maid_kex_del(maid_kex *x);
-
 bool maid_kex_pubgen(maid_kex *x, const uint8_t *prv, uint8_t *pub);
 bool maid_kex_secgen(maid_kex *x, const uint8_t *prv,
                      const uint8_t *pub, uint8_t *buffer);

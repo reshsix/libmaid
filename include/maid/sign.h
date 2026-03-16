@@ -24,9 +24,7 @@
 
 typedef struct maid_sign maid_sign;
 
-maid_sign *maid_sign_del(maid_sign *s);
-
-size_t maid_sign_size(maid_sign *s);
+bool maid_sign_config(maid_sign *s, void *pub, void *prv);
 bool maid_sign_generate(maid_sign *s, const uint8_t *data,
                         size_t size, uint8_t *sign);
 bool maid_sign_verify(maid_sign *s, const uint8_t *data,

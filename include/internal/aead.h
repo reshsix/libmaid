@@ -26,15 +26,18 @@
 
 struct maid_aead_def
 {
-    void (*init)(const uint8_t *, const uint8_t *,
-                 maid_stream **, maid_mac **, bool);
-    void (*mode)(maid_stream *, uint8_t *, size_t);
+    bool   (*init)(void *, maid_stream **, maid_mac **);
+    size_t (*size)(void);
+    bool   (*config)(maid_stream *, maid_mac *,
+                     const uint8_t *, const uint8_t *);
 
+    void (*mode)(maid_stream *, uint8_t *, size_t);
     size_t state_s;
     bool s_bits, s_big;
 };
 
-maid_aead *maid_aead_new(const struct maid_aead_def *def,
-                         const uint8_t *key, const uint8_t *nonce);
+maid_aead *maid_aead_init(void *buffer, size_t buffer_s,
+                          const struct maid_aead_def *def);
+size_t maid_aead_size(const struct maid_aead_def *def);
 
 #endif

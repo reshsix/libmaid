@@ -24,9 +24,7 @@
 
 typedef struct maid_aead maid_aead;
 
-maid_aead *maid_aead_del(maid_aead *ae);
-
-void maid_aead_renew(maid_aead *ae, const uint8_t *key, const uint8_t *nonce);
+bool maid_aead_config(maid_aead *ae, const uint8_t *key, const uint8_t *nonce);
 void maid_aead_update(maid_aead *ae, const uint8_t *buffer, size_t size);
 void maid_aead_crypt(maid_aead *ae, uint8_t *buffer,
                      size_t size, bool decrypt);

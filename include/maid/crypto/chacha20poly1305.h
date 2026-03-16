@@ -20,6 +20,7 @@
 
 #include <maid/aead.h>
 
-maid_aead *maid_chacha20poly1305(const uint8_t *key, const uint8_t *nonce);
+maid_aead *maid_chacha20poly1305(void *buffer);
+size_t maid_chacha20poly1305_s(void);
 
 #endif

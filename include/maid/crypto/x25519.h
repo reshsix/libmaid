@@ -20,6 +20,7 @@
 
 #include <maid/kex.h>
 
-maid_kex *maid_x25519(void);
+maid_kex *maid_x25519(void *buffer);
+size_t maid_x25519_s(void);
 
 #endif

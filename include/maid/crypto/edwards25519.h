@@ -20,6 +20,7 @@
 
 #include <maid/ecc.h>
 
-maid_ecc *maid_edwards25519(void);
+maid_ecc *maid_edwards25519(void *buffer);
+size_t maid_edwards25519_s(size_t *point_s);
 
 #endif

@@ -15,6 +15,7 @@
  *  License along with libmaid; if not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <maid/mem.h>
 #include <maid/kex.h>
 
 #include <internal/kex.h>
@@ -27,29 +28,27 @@ struct maid_kex
 };
 
 extern struct maid_kex *
-maid_kex_new(const struct maid_kex_def *def)
+maid_kex_init(void *buffer, size_t buffer_s,
+              const struct maid_kex_def *def)
 {
-    struct maid_kex *ret = calloc(1, sizeof(struct maid_kex));
+    struct maid_kex *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
         ret->def = def;
-        ret->context = def->new();
-        if (!(ret->context))
-            ret = maid_kex_del(ret);
+        ret->context = (void *)&(ret[1]);
+        if (!(def->init(ret->context)))
+            ret = NULL;
     }
 
     return ret;
 }
 
-extern struct maid_kex *
-maid_kex_del(struct maid_kex *x)
+extern size_t
+maid_kex_size(const struct maid_kex_def *def)
 {
-    if (x)
-        x->def->del(x->context);
-    free(x);
-
-    return NULL;
+    return sizeof(struct maid_kex) + def->size();
 }
 
 extern bool

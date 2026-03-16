@@ -37,56 +37,45 @@ struct maid_aead
 };
 
 extern struct maid_aead *
-maid_aead_del(struct maid_aead *ae)
+maid_aead_init(void *buffer, size_t buffer_s,
+               const struct maid_aead_def *def)
 {
-    if (ae)
-    {
-        maid_mem_clear(ae->s_ctx, maid_chacha20_s());
-
-        maid_mem_clear(ae->buffer, ae->def->state_s);
-        free(ae->buffer);
-    }
-    free(ae);
-
-    return NULL;
-}
-
-extern struct maid_aead *
-maid_aead_new(const struct maid_aead_def *def,
-              const u8 *key, const u8 *nonce)
-{
-    struct maid_aead *ret = NULL;
-    if (key && nonce)
-        ret = calloc(1, sizeof(struct maid_aead));
+    struct maid_aead *ret = buffer;
+    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
         ret->def = def;
+        ret->buffer = (void *)&(ret[1]);
 
-        bool initialized = false;
-        def->init(key, nonce, &(ret->s_ctx), &(ret->m_ctx), false);
-        initialized = (ret->s_ctx && ret->m_ctx);
-
-        ret->buffer = calloc(1, def->state_s);
-        if (!(initialized && ret->buffer))
-            ret = maid_aead_del(ret);
+        if (!def->init(&(ret->buffer[def->state_s]),
+                       &(ret->s_ctx), &(ret->m_ctx)))
+            ret = NULL;
     }
 
     return ret;
 }
 
-extern void
-maid_aead_renew(struct maid_aead *ae, const u8 *key, const u8 *nonce)
+extern size_t
+maid_aead_size(const struct maid_aead_def *def)
+{
+    return sizeof(struct maid_aead) + def->state_s + def->size();
+}
+
+extern bool
+maid_aead_config(struct maid_aead *ae, const u8 *key, const u8 *nonce)
 {
     if (ae)
     {
-        ae->def->init(key, nonce, &(ae->s_ctx), &(ae->m_ctx), true);
+        ae->def->config(ae->s_ctx, ae->m_ctx, key, nonce);
 
         ae->step = 0;
         ae->s_ad = 0;
         ae->s_ct = 0;
         maid_mem_clear(ae->buffer, ae->def->state_s);
     }
+
+    return (ae);
 }
 
 extern void

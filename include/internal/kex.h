@@ -23,12 +23,14 @@
 
 struct maid_kex_def
 {
-    void * (*new)(void);
-    void * (*del)(void *);
+    void * (*init)(void *);
+    size_t (*size)(void);
     bool (*pubgen)(void *, const uint8_t *, uint8_t *);
     bool (*secgen)(void *, const uint8_t *, const uint8_t *, uint8_t *);
 };
 
-maid_kex *maid_kex_new(const struct maid_kex_def *def);
+maid_kex *maid_kex_init(void *buffer, size_t buffer_s,
+                        const struct maid_kex_def *def);
+size_t maid_kex_size(const struct maid_kex_def *def);
 
 #endif

@@ -34,11 +34,8 @@ enum
 
 struct maid_ecc_def
 {
-    void * (*new)(void);
-    void * (*del)(void *);
-
-    void * (*alloc)(void *);
-    void * (*free)(void *, maid_ecc_point *);
+    void * (*init)(void *);
+    size_t (*size)(size_t *);
 
     void (*base)(void *, maid_ecc_point *);
     void (*copy)(void *, maid_ecc_point *, const maid_ecc_point *);
@@ -53,7 +50,6 @@ struct maid_ecc_def
     void (*add2)(void *, maid_ecc_point *,
                  const maid_ecc_point *, const maid_ecc_point *);
 
-    size_t (*size)(void *, size_t *, size_t *);
     bool (*keygen)(void *, uint8_t *, maid_rng *);
     bool (*scalar)(void *, const uint8_t *, maid_mp_word *);
 
@@ -63,6 +59,8 @@ struct maid_ecc_def
     uint8_t flags;
 };
 
-struct maid_ecc *maid_ecc_new(const struct maid_ecc_def *def);
+struct maid_ecc *maid_ecc_init(void *buffer, size_t buffer_s,
+                               const struct maid_ecc_def *def);
+size_t maid_ecc_size(const struct maid_ecc_def *def, size_t *point_s);
 
 #endif
