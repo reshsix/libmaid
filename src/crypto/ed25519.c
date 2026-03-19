@@ -667,7 +667,9 @@ ed25519_config(void *ed25519, const void *pub, const void *prv)
         /* Pubenc is needed even for signing */
         maid_ecc_base(ed->ecc, &(ed->point));
         maid_ecc_mul(ed->ecc, &(ed->point), ed->scalar);
-        if (!maid_ecc_encode(ed->ecc, ed->pubenc, &(ed->point)))
+        if (maid_ecc_encode(ed->ecc, ed->pubenc, &(ed->point)))
+            ed->verify = true;
+        else
             ret = false;
     }
 

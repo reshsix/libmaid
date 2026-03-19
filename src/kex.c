@@ -32,10 +32,11 @@ maid_kex_init(void *buffer, size_t buffer_s,
               const struct maid_kex_def *def)
 {
     struct maid_kex *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
+        maid_mem_clear(ret, buffer_s);
+
         ret->def = def;
         ret->context = (void *)&(ret[1]);
         if (!(def->init(ret->context)))

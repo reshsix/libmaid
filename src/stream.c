@@ -36,14 +36,18 @@ maid_stream_init(void *buffer, size_t buffer_s,
                  const struct maid_stream_def *def)
 {
     struct maid_stream *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
-    ret->def    = def;
-    ret->buffer = (void *)&(ret[1]);
+    if (ret)
+    {
+        maid_mem_clear(ret, buffer_s);
 
-    ret->ctx = &(ret->buffer[def->state_s]);
-    if (!def->init(ret->ctx))
-        ret = NULL;
+        ret->def    = def;
+        ret->buffer = (void *)&(ret[1]);
+
+        ret->ctx = &(ret->buffer[def->state_s]);
+        if (!def->init(ret->ctx))
+            ret = NULL;
+    }
 
     return ret;
 }

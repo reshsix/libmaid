@@ -35,10 +35,11 @@ extern struct maid_rng *
 maid_rng_init(void *buffer, size_t buffer_s, const struct maid_rng_def *def)
 {
     struct maid_rng *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
+        maid_mem_clear(ret, buffer_s);
+
         ret->def    = def;
         ret->buffer = (void *)&(ret[1]);
 

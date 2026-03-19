@@ -31,10 +31,11 @@ extern struct maid_sign *
 maid_sign_init(void *buffer, size_t buffer_s, const struct maid_sign_def *def)
 {
     struct maid_sign *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
+        maid_mem_clear(ret, buffer_s);
+
         ret->def = def;
         ret->context = def->init(&(ret[1]));
         if (!(ret->context))

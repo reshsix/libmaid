@@ -36,19 +36,23 @@ maid_hash_init(void *buffer, size_t buffer_s,
                const struct maid_hash_def *def, u8 state_s, u8 digest_s)
 {
     struct maid_hash *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
-    ret->def      = def;
-    ret->buffer   = (void *)&(ret[1]);
-
-    ret->ctx = &(ret->buffer[state_s]);
-    if (def->init(ret->ctx, state_s, digest_s))
+    if (ret)
     {
-        ret->state_s  = state_s;
-        ret->digest_s = digest_s;
+        maid_mem_clear(ret, buffer_s);
+
+        ret->def    = def;
+        ret->buffer = (void *)&(ret[1]);
+
+        ret->ctx = &(ret->buffer[state_s]);
+        if (def->init(ret->ctx, state_s, digest_s))
+        {
+            ret->state_s  = state_s;
+            ret->digest_s = digest_s;
+        }
+        else
+            ret = NULL;
     }
-    else
-        ret = NULL;
 
     return ret;
 }

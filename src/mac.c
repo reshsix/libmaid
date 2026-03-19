@@ -37,11 +37,12 @@ maid_mac_init(void *buffer, size_t buffer_s,
               u8 key_s, u8 state_s, u8 digest_s)
 {
     struct maid_mac *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
     if (ret)
     {
-        ret->def      = def;
+        maid_mem_clear(ret, buffer_s);
+
+        ret->def    = def;
         ret->buffer = (void *)&(ret[1]);
 
         ret->ctx = def->init(&(ret->buffer[state_s]),

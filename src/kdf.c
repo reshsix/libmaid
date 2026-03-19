@@ -33,13 +33,16 @@ maid_kdf_init(void *buffer, size_t buffer_s,
               u8 state_s, u8 digest_s, size_t output_s)
 {
     struct maid_kdf *ret = buffer;
-    maid_mem_clear(buffer, buffer_s);
 
-    ret->def = def;
+    if (ret)
+    {
+        maid_mem_clear(ret, buffer_s);
 
-    ret->ctx = (void *)&(ret[1]);
-    if (!(def->init(ret->ctx, state_s, digest_s, output_s)))
-        ret = NULL;
+        ret->def = def;
+        ret->ctx = (void *)&(ret[1]);
+        if (!(def->init(ret->ctx, state_s, digest_s, output_s)))
+            ret = NULL;
+    }
 
     return ret;
 }
