@@ -1,5 +1,5 @@
 # Maid
-**Status: 1.4.0 γ**
+**Status: 1.4.0**
 
 ## Headers
 Generic
